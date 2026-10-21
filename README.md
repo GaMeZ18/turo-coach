@@ -44,17 +44,16 @@ Supabase → **Authentication → Users → Invite user** con tu email. El **pri
   En *Mi cuenta* hay un botón de instalar y las instrucciones para cada dispositivo. Las actualizaciones llegan solas: cada vez que subes cambios a GitHub, la app instalada los recibe al abrirla.
 
 ### Pizarra
-| Herramienta | Qué hace |
-|---|---|
-| Colocar | Arrastrar jugadores/conos (solo en la fase 1) |
-| Correr / Botar / Bloqueo | Arrastrar desde un jugador para dibujar su movimiento en la fase actual |
-| Balón | Tocar quién empieza con el balón |
-| Pase | Tocar al receptor; pasa quien tiene el balón al empezar la fase |
-| Borrar | Toca un jugador: borra su movimiento de esta fase (o el jugador, en la fase 1) |
+Funciona como Coach Studio: **colocar → ● Grabar → 📷 Captura**.
 
-Hasta 6 fases. *Animar* reproduce todas seguidas; *Todas* las muestra superpuestas (es la imagen que se guarda como miniatura). `Ctrl+Z` deshace.
+1. **Colocar** (imagen *Inicio*): añade jugadores (atacante, defensor, entrenador o los presets *5 ataque* / *5 vs 5*) y material (cono, chino, aro, pica, valla, escalera, balón, texto). Arrástralos a su sitio. Si tocas uno, puedes cambiarle la etiqueta, el color o la rotación, o darle el balón.
+2. **● Grabar**: arrastra a los jugadores por donde se mueven y cada recorrido se queda grabado. El tipo de línea sale solo (*Auto*: bote si lleva el balón, desplazamiento si no) o lo eliges tú: desplazamiento, bote o bloqueo.
+3. Para el balón: **Pase** (y tocas al receptor), **Mano a mano** (y tocas al receptor) o **Tiro**.
+4. **📷 Captura**: cierra la imagen actual y empieza otra limpia (máx. 6). *Animar* las reproduce todas seguidas; *Todas* las superpone numeradas (es la miniatura del ejercicio).
 
----
+Símbolos (los universales): atacante = número en círculo · defensor = X · desplazamiento = línea continua con flecha · bote = zigzag · pase = discontinua · bloqueo = línea en T · mano a mano = línea con dos barras · tiro = doble línea.
+
+Teclado: `Supr` borra · `R` / `Mayús+R` gira · `Espacio` anima · `Ctrl+Z` deshace · `Esc` deselecciona.
 
 ## Desarrollo en local
 ```bash
