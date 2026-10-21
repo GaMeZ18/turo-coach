@@ -13,11 +13,7 @@ Herramienta web para los entrenadores del CB Turó de la Peira: equipos, jugador
 2. **SQL Editor** → pega el contenido de `supabase/migrations/0001_inicial.sql` → *Run*.
 3. **Authentication → Sign In / Providers → Email**: desactiva *Allow new users to sign up* (solo se entra por invitación).
 4. **Authentication → URL Configuration**: *Site URL* = la URL de Vercel (p. ej. `https://turo-coach.vercel.app`) y añádela también en *Redirect URLs* con `/**` al final.
-5. **Authentication → Emails → Templates**:
-   - *Invite user*: cambia el enlace por
-     `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite`
-   - *Magic link*: cambia el enlace por
-     `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email`
+5. **Plantillas de email**: no hace falta tocarlas; la app funciona con las de Supabase. (Para personalizarlas, Supabase exige configurar antes un SMTP propio.)
 6. **Project Settings → API**: copia la *Project URL* y la *anon public key*.
 
 ### 2. GitHub + Vercel

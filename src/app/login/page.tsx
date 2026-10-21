@@ -1,4 +1,5 @@
 import { entrar, enviarEnlace } from "./actions";
+import SesionDesdeEnlace from "./SesionDesdeEnlace";
 
 export default async function LoginPage({
   searchParams,
@@ -24,6 +25,7 @@ export default async function LoginPage({
 
           <div className="rounded-2xl bg-white p-5 text-tinta shadow-2xl shadow-black/40">
             <div className="filete -mx-5 -mt-5 mb-5 rounded-t-2xl" />
+            <SesionDesdeEnlace />
             {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
             {enviado && (
               <p className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
