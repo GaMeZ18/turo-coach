@@ -13,7 +13,9 @@ const num = (fd: FormData, k: string) => {
   return v === null ? null : Number(v);
 };
 
-export async function crearJugador(formData: FormData) {
+export type ResultadoAlta = { ok: boolean; error?: string; n: number };
+
+export async function crearJugador(prev: ResultadoAlta, formData: FormData): Promise<ResultadoAlta> {
   const supabase = await createClient();
   const equipoId = String(formData.get("equipo_id"));
   const { data, error } = await supabase
@@ -25,15 +27,16 @@ export async function crearJugador(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, error: `Jugador: ${error.message}`, n: prev.n };
   const { error: e2 } = await supabase.from("equipo_jugadores").insert({
     equipo_id: equipoId,
     jugador_id: data.id,
     dorsal: num(formData, "dorsal"),
     posicion: txt(formData, "posicion"),
   });
-  if (e2) throw new Error(e2.message);
+  if (e2) return { ok: false, error: `Plantilla: ${e2.message}`, n: prev.n };
   revalidatePath("/jugadores");
+  return { ok: true, n: prev.n + 1 };
 }
 
 /** Añade al equipo activo un jugador que ya existe (p. ej. de la temporada pasada). */

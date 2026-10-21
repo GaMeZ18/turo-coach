@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import SinEquipo from "@/components/SinEquipo";
-import { crearJugador, incorporarJugador } from "./actions";
+import { incorporarJugador } from "./actions";
+import FormNuevoJugador from "./FormNuevoJugador";
 
 type Fila = {
   dorsal: number | null;
@@ -80,21 +81,7 @@ export default async function JugadoresPage() {
 
       {!equipo.congelado && (
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <form action={crearJugador} className="tarjeta space-y-3 p-4">
-            <h2 className="font-medium">Nuevo jugador</h2>
-            <input type="hidden" name="equipo_id" value={equipo.id} />
-            <div className="grid grid-cols-2 gap-2">
-              <input name="nombre" required placeholder="Nombre" className="campo" />
-              <input name="apellidos" placeholder="Apellidos" className="campo" />
-              <input name="dorsal" type="number" min={0} max={99} placeholder="Dorsal" className="campo" />
-              <input name="posicion" placeholder="Posición (base, alero…)" className="campo" />
-              <div className="col-span-2">
-                <label className="etiqueta">Fecha de nacimiento</label>
-                <input name="fecha_nacimiento" type="date" className="campo" />
-              </div>
-            </div>
-            <button className="btn-primario">Añadir</button>
-          </form>
+          <FormNuevoJugador equipoId={equipo.id} />
 
           <form action={incorporarJugador} className="tarjeta space-y-3 p-4">
             <h2 className="font-medium">Incorporar jugador existente</h2>
