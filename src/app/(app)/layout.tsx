@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
+import RegistrarSW from "@/components/RegistrarSW";
 import { salir } from "@/app/login/actions";
 import { LogOut, UserRound } from "lucide-react";
 
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="filete" />
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <RegistrarSW />
     </div>
   );
 }

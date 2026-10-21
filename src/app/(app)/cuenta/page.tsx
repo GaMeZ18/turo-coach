@@ -1,7 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
-import InstalarApp from "@/components/InstalarApp";
 import Enviar from "@/components/Enviar";
 
 async function guardarCuenta(formData: FormData) {
@@ -43,8 +42,7 @@ export default async function CuentaPage({
 
       <div className="tarjeta mt-5 p-4 text-sm">
         <h2 className="mb-2 font-medium">Instalar la app</h2>
-        <InstalarApp variante="tarjeta" />
-        <ul className="mt-3 space-y-1 border-t border-linea pt-3 text-xs text-tinta/60">
+        <ul className="space-y-1 text-xs text-tinta/60">
           <li><strong>iPhone / iPad:</strong> Safari → Compartir → «Añadir a pantalla de inicio».</li>
           <li><strong>Android:</strong> Chrome → menú ⋮ → «Instalar aplicación».</li>
           <li><strong>Windows:</strong> Edge o Chrome → icono de instalar en la barra de direcciones. Queda en el menú Inicio.</li>

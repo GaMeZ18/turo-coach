@@ -28,7 +28,6 @@ export default function InstalarApp({ variante = "aviso" }: { variante?: "aviso"
   const [oculto, setOculto] = useState(true);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     setPlataforma(detectar());
     setInstalada(yaInstalada());
     try { setOculto(localStorage.getItem("instalar-oculto") === "1"); } catch { setOculto(false); }
