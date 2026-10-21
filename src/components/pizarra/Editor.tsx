@@ -85,8 +85,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const anchoVista = V.x1 - V.x0;
   const altoDisp = grande ? Math.max(220, caja.alto - 200) : altoMax;
   const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / ALTO));
-  const R = 0.5 * p.config.tamano;
-  const toque = Math.max(R * 1.5, 22 / escala);
+  // Radio de la ficha: 0,5 m, pero nunca menos de ~13 px en pantalla (para poder tocar el número)
+  const R = Math.max(0.5, 13 / escala) * p.config.tamano;
   const elSel = p.elementos.find((x) => x.id === sel) ?? null;
   const ocupado = !!anim || !!exportando;
   const anchoBarra = Math.max(anchoVista * escala, 320);
@@ -238,7 +238,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       return;
     }
     if (balonSel && esJugador(el.tipo)) { darBalon(balonSel, el.id); return; }
-    setSel((s) => (s === el.id ? null : el.id));
+    setSel(el.id);
+  };
+
+  /** Al apretar sobre una ficha queda seleccionada: el siguiente arrastre la mueve */
+  const apretar = (el: Elemento) => {
+    if (ocupado || herramienta !== "mover" || balonSel) return;
+    if (el.tipo !== "balon" && sel !== el.id) { setSel(el.id); setSelDibujo(null); }
   };
 
   const editarEtiqueta = (el: Elemento) => {
@@ -296,7 +302,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       node.position(inicio);
       vivoRef.current = null;
       setVivo(null);
-      tocar(el);
+      if (el.tipo === "balon") tocar(el);
       return;
     }
 
@@ -823,12 +829,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   const zonaTactil = (el: Elemento) => {
     const transparente = "rgba(0,0,0,0.001)";
-    if (el.tipo === "escalera") return <Rect x={-0.5} y={-1.7} width={1} height={3.4} fill={transparente} />;
-    if (el.tipo === "valla") return <Rect x={-0.75} y={-0.35} width={1.5} height={0.7} fill={transparente} />;
-    if (el.tipo === "pica") return <Rect x={-0.35} y={-0.9} width={0.7} height={1.8} fill={transparente} />;
-    if (el.tipo === "canasta") return <Rect x={-1.25} y={-1} width={1.6} height={2} fill={transparente} />;
-    if (el.tipo === "balon") return <Circle radius={Math.max(0.42, 16 / escala)} fill={transparente} />;
-    return <Circle radius={esJugador(el.tipo) ? toque : Math.min(toque, 0.6)} fill={transparente} />;
+    if (el.tipo === "escalera") return <Rect x={-0.45} y={-1.6} width={0.9} height={3.2} fill={transparente} />;
+    if (el.tipo === "valla") return <Rect x={-0.65} y={-0.3} width={1.3} height={0.6} fill={transparente} />;
+    if (el.tipo === "pica") return <Rect x={-0.3} y={-0.8} width={0.6} height={1.6} fill={transparente} />;
+    if (el.tipo === "canasta") return <Rect x={-1.25} y={-0.95} width={1.55} height={1.9} fill={transparente} />;
+    if (el.tipo === "balon") return <Circle radius={Math.max(0.28, 9 / escala)} fill={transparente} />;
+    if (esJugador(el.tipo)) return <Circle radius={R * 1.08} fill={transparente} />; // la ficha del número
+    return <Circle radius={Math.max(0.45, 10 / escala)} fill={transparente} />;
   };
 
   // orden de pintado: material, jugadores y, encima de todo, los balones
@@ -907,7 +914,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       x={pos.x}
                       y={pos.y}
                       rotation={esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0}
-                      draggable={arrastrable()}
+                      draggable={arrastrable() && (sel === el.id || balonSel === el.id)}
                       listening={herramienta === "mover" && !especial}
                       dragBoundFunc={(abs) => ({
                         x: Math.max(0, Math.min(anchoVista * escala, abs.x)),
@@ -916,6 +923,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       onDragStart={() => inicioArrastre(el)}
                       onDragMove={(ev) => durante(el, ev.target)}
                       onDragEnd={(ev) => finArrastre(el, ev.target)}
+                      onMouseDown={() => apretar(el)}
+                      onTouchStart={() => apretar(el)}
                       onClick={() => tocar(el)}
                       onTap={() => tocar(el)}
                       onDblClick={() => editarEtiqueta(el)}
@@ -1121,10 +1130,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
         {grabando
-          ? "GRABANDO: arrastra a un jugador (si lleva el balón, bota). Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
-          : "Añade jugadores y material y arrástralos a su sitio. Para dar el balón: tócalo y toca al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
+          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
+          : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.1</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.2</span>
       </p>
     </div>
   );
