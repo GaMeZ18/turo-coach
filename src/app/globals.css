@@ -25,6 +25,11 @@
   --font-escudo: var(--font-graduate), Georgia, serif;
 }
 
+html {
+  /* reserva el hueco de la barra de scroll: así la pizarra no cambia de tamaño al aparecer */
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   background: var(--color-suave);

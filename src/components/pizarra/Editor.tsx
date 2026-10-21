@@ -61,6 +61,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
   const [modoBalon, setModoBalon] = useState<"pase" | "mano" | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [vivo, setVivo] = useState<{ id: string; puntos: number[] } | null>(null);
+  const vivoRef = useRef<{ id: string; puntos: number[] } | null>(null);
   const [anim, setAnim] = useState<{ fase: number; t: number } | null>(null);
   const [verTodo, setVerTodo] = useState(false);
   const [grande, setGrande] = useState(false);
@@ -74,7 +75,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
   const altoDisponible = grande ? Math.max(200, caja.alto - 150) : altoMax;
   const escala = Math.max(4, Math.min(caja.ancho / W, altoDisponible / H));
   const R = p.pista === "completa" ? 0.5 : 0.45;
-  const toque = Math.max(R * 1.4, 18 / escala); // zona táctil mínima ~18 px
+  const toque = Math.max(R * 1.5, 22 / escala); // zona táctil mínima ~22 px (dedo)
   const est = useMemo(() => estados(p), [p]);
   const e = paso > 0 ? est[paso - 1] : null;
   const fase: Fase | null = paso > 0 ? p.fases[paso - 1] : null;
@@ -277,20 +278,24 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
   };
 
   const inicioArrastre = (el: Elemento) => {
-    setSel(el.id);
+    // OJO: no seleccionar aquí. Si aparece algo encima de la pista durante el arrastre,
+    // la pista se desplaza bajo el dedo y el jugador "se escapa".
     setModoBalon(null);
     if (paso > 0) {
       const pos = posicionMostrada(el.id);
-      if (pos) setVivo({ id: el.id, puntos: [pos.x, pos.y] });
+      vivoRef.current = pos ? { id: el.id, puntos: [pos.x, pos.y] } : null;
+      setVivo(vivoRef.current);
     }
   };
 
   const durante = (el: Elemento, node: Konva.Node) => {
-    if (paso === 0 || !vivo || vivo.id !== el.id) return;
+    const v = vivoRef.current;
+    if (paso === 0 || !v || v.id !== el.id) return;
     const x = node.x(), y = node.y();
-    const n = vivo.puntos.length;
-    if (Math.hypot(x - vivo.puntos[n - 2], y - vivo.puntos[n - 1]) < 0.12) return;
-    setVivo({ id: el.id, puntos: [...vivo.puntos, x, y] });
+    const n = v.puntos.length;
+    if (Math.hypot(x - v.puntos[n - 2], y - v.puntos[n - 1]) < 0.12) return;
+    v.puntos = [...v.puntos, x, y];
+    setVivo({ id: v.id, puntos: v.puntos });
   };
 
   const finArrastre = (el: Elemento, node: Konva.Node) => {
@@ -303,10 +308,12 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
       });
       return;
     }
-    const recorrido = vivo && vivo.id === el.id ? [...vivo.puntos, destino.x, destino.y] : [];
-    setVivo(null);
-    const puntos = simplificar(recorrido);
+    const v = vivoRef.current;
     const previa = posicionMostrada(el.id);
+    const origen = v && v.id === el.id ? v.puntos : previa ? [previa.x, previa.y] : [];
+    vivoRef.current = null;
+    setVivo(null);
+    const puntos = simplificar([...origen, destino.x, destino.y]);
     if (puntos.length < 4 || longitud(puntos) < 0.4) {
       if (previa) node.position(previa); // arrastre demasiado corto: vuelve a su sitio
       return;
@@ -708,6 +715,89 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
         </div>
       )}
 
+      {/* ===== Pista ===== */}
+      <div ref={contRef} className="relative w-full">
+        <div className="mx-auto overflow-hidden rounded-xl border border-linea shadow-sm" style={{ width: W * escala, touchAction: "none" }}>
+          <Stage ref={stageRef} width={W * escala} height={H * escala} onClick={fondoTocado} onTap={fondoTocado}>
+            <Layer scaleX={escala} scaleY={escala}>
+              <Pista tipo={p.pista} />
+
+              {/* Posición de salida (sombra) de quien se mueve en esta fase */}
+              {!anim && !verTodo && paso > 0 && e && fase?.movimientos.map((m) => {
+                const ini = e.inicio[m.elementoId];
+                const el = p.elementos.find((x) => x.id === m.elementoId);
+                if (!ini || !el || !esJugador(el.tipo)) return null;
+                return <Circle key={`s-${m.elementoId}`} x={ini.x} y={ini.y} radius={R} fill={el.color} opacity={0.15} listening={false} />;
+              })}
+
+              {lineas.map(({ m, fase: fi }, i) => dibujarMovimiento(m, `l-${fi}-${i}`, anim ? 0.35 : 1, verTodo ? fi : undefined))}
+              {accionesBalon.map((x, i) => dibujarAccion(x, `b-${i}`, 1, verTodo ? x.fase : undefined))}
+              {anim && p.fases[anim.fase].balon && (() => {
+                const fa = p.fases[anim.fase];
+                const ea = est[anim.fase];
+                const desde = ea.fin[fa.balon!.de];
+                const hasta = destinoAccion(fa.balon!, ea.fin);
+                return desde && hasta ? dibujarAccion({ a: fa.balon!, fase: anim.fase, desde, hasta }, "b-anim", 0.35) : null;
+              })()}
+              {vivo && (() => {
+                const el = p.elementos.find((x) => x.id === vivo.id);
+                return el ? dibujarMovimiento({ elementoId: vivo.id, tipo: tipoTrazoPara(el), puntos: vivo.puntos }, "vivo", 0.7) : null;
+              })()}
+
+              {/* Material debajo, jugadores encima (así siempre se pueden coger) */}
+              {[...p.elementos].sort((a, b) => Number(esJugador(a.tipo)) - Number(esJugador(b.tipo))).map((el) => {
+                const pos = posiciones[el.id];
+                if (!pos) return null;
+                const seleccionado = sel === el.id && !anim && !verTodo;
+                return (
+                  <Group
+                    key={el.id}
+                    x={pos.x}
+                    y={pos.y}
+                    rotation={esJugador(el.tipo) ? 0 : el.rot ?? 0}
+                    draggable={!anim && !verTodo}
+                    dragBoundFunc={(abs) => ({
+                      x: Math.max(0, Math.min(W * escala, abs.x)),
+                      y: Math.max(0, Math.min(H * escala, abs.y)),
+                    })}
+                    onDragStart={() => inicioArrastre(el)}
+                    onDragMove={(ev) => durante(el, ev.target)}
+                    onDragEnd={(ev) => finArrastre(el, ev.target)}
+                    onClick={() => tocar(el)}
+                    onTap={() => tocar(el)}
+                    onMouseEnter={(ev) => { const s = ev.target.getStage(); if (s && !anim) s.container().style.cursor = "grab"; }}
+                    onMouseLeave={(ev) => { const s = ev.target.getStage(); if (s) s.container().style.cursor = "default"; }}
+                  >
+                    {/* zona táctil generosa */}
+                    {el.tipo === "escalera" ? (
+                      <Rect x={-0.5} y={-1.7} width={1} height={3.4} fill="rgba(0,0,0,0.001)" />
+                    ) : el.tipo === "valla" || el.tipo === "pica" ? (
+                      <Rect x={el.tipo === "valla" ? -0.75 : -0.35} y={el.tipo === "valla" ? -0.35 : -0.9} width={el.tipo === "valla" ? 1.5 : 0.7} height={el.tipo === "valla" ? 0.7 : 1.8} fill="rgba(0,0,0,0.001)" />
+                    ) : (
+                      <Circle radius={esJugador(el.tipo) ? toque : Math.min(toque, 0.6)} fill="rgba(0,0,0,0.001)" />
+                    )}
+                    {seleccionado && <Circle radius={(el.tipo === "escalera" ? 1.7 : R * 1.45)} stroke="#fde302" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
+                    {modoBalon && el.tipo === "atacante" && e?.balonInicio !== el.id && (
+                      <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.08} dash={[0.15, 0.1]} listening={false} />
+                    )}
+                    {forma(el)}
+                  </Group>
+                );
+              })}
+
+              {balonEn && (
+                <Circle x={balonEn.x + R * 0.85} y={balonEn.y - R * 0.85} radius={0.21} fill="#fc6401" stroke="#7a2c00" strokeWidth={0.045} listening={false} />
+              )}
+            </Layer>
+          </Stage>
+        </div>
+        {aviso && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
+            <span className="rounded-full bg-tinta/90 px-3 py-1.5 text-xs text-white shadow">{aviso}</span>
+          </div>
+        )}
+      </div>
+
       {/* ===== Elemento seleccionado ===== */}
       {elSel && !enMovimiento && !verTodo && (
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-oro bg-oro/10 px-2 py-1.5 text-sm">
@@ -760,82 +850,6 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
           </button>
         </div>
       )}
-
-      {/* ===== Pista ===== */}
-      <div ref={contRef} className="relative w-full">
-        <div className="mx-auto overflow-hidden rounded-xl border border-linea shadow-sm" style={{ width: W * escala, touchAction: "none" }}>
-          <Stage ref={stageRef} width={W * escala} height={H * escala} onClick={fondoTocado} onTap={fondoTocado}>
-            <Layer scaleX={escala} scaleY={escala}>
-              <Pista tipo={p.pista} />
-
-              {/* Posición de salida (sombra) de quien se mueve en esta fase */}
-              {!anim && !verTodo && paso > 0 && e && fase?.movimientos.map((m) => {
-                const ini = e.inicio[m.elementoId];
-                const el = p.elementos.find((x) => x.id === m.elementoId);
-                if (!ini || !el || !esJugador(el.tipo)) return null;
-                return <Circle key={`s-${m.elementoId}`} x={ini.x} y={ini.y} radius={R} fill={el.color} opacity={0.15} listening={false} />;
-              })}
-
-              {lineas.map(({ m, fase: fi }, i) => dibujarMovimiento(m, `l-${fi}-${i}`, anim ? 0.35 : 1, verTodo ? fi : undefined))}
-              {accionesBalon.map((x, i) => dibujarAccion(x, `b-${i}`, 1, verTodo ? x.fase : undefined))}
-              {anim && p.fases[anim.fase].balon && (() => {
-                const fa = p.fases[anim.fase];
-                const ea = est[anim.fase];
-                const desde = ea.fin[fa.balon!.de];
-                const hasta = destinoAccion(fa.balon!, ea.fin);
-                return desde && hasta ? dibujarAccion({ a: fa.balon!, fase: anim.fase, desde, hasta }, "b-anim", 0.35) : null;
-              })()}
-              {vivo && (() => {
-                const el = p.elementos.find((x) => x.id === vivo.id);
-                return el ? dibujarMovimiento({ elementoId: vivo.id, tipo: tipoTrazoPara(el), puntos: vivo.puntos }, "vivo", 0.7) : null;
-              })()}
-
-              {p.elementos.map((el) => {
-                const pos = posiciones[el.id];
-                if (!pos) return null;
-                const seleccionado = sel === el.id && !anim && !verTodo;
-                return (
-                  <Group
-                    key={el.id}
-                    x={pos.x}
-                    y={pos.y}
-                    rotation={esJugador(el.tipo) ? 0 : el.rot ?? 0}
-                    draggable={!anim && !verTodo}
-                    dragBoundFunc={(abs) => ({
-                      x: Math.max(0, Math.min(W * escala, abs.x)),
-                      y: Math.max(0, Math.min(H * escala, abs.y)),
-                    })}
-                    onDragStart={() => inicioArrastre(el)}
-                    onDragMove={(ev) => durante(el, ev.target)}
-                    onDragEnd={(ev) => finArrastre(el, ev.target)}
-                    onClick={() => tocar(el)}
-                    onTap={() => tocar(el)}
-                    onMouseEnter={(ev) => { const s = ev.target.getStage(); if (s && !anim) s.container().style.cursor = "grab"; }}
-                    onMouseLeave={(ev) => { const s = ev.target.getStage(); if (s) s.container().style.cursor = "default"; }}
-                  >
-                    {/* zona táctil generosa */}
-                    <Circle radius={el.tipo === "escalera" ? 1.6 : toque} fill="rgba(0,0,0,0.001)" />
-                    {seleccionado && <Circle radius={(el.tipo === "escalera" ? 1.7 : R * 1.45)} stroke="#fde302" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
-                    {modoBalon && el.tipo === "atacante" && e?.balonInicio !== el.id && (
-                      <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.08} dash={[0.15, 0.1]} listening={false} />
-                    )}
-                    {forma(el)}
-                  </Group>
-                );
-              })}
-
-              {balonEn && (
-                <Circle x={balonEn.x + R * 0.85} y={balonEn.y - R * 0.85} radius={0.21} fill="#fc6401" stroke="#7a2c00" strokeWidth={0.045} listening={false} />
-              )}
-            </Layer>
-          </Stage>
-        </div>
-        {aviso && (
-          <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
-            <span className="rounded-full bg-tinta/90 px-3 py-1.5 text-xs text-white shadow">{aviso}</span>
-          </div>
-        )}
-      </div>
 
       {/* ===== Nota y ayuda ===== */}
       {paso > 0 && !verTodo && fase && (
