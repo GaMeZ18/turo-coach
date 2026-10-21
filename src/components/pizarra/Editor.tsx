@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Pista from "./Pista";
 import {
-  ALTO, AROS, COLOR_DEFECTO, MAX_CAPTURAS, NOMBRE, PALETA, VISTAS, barraFinal, barrasMano, compactar, esJugador,
+  ALTO, AROS, COLOR_DEFECTO, MAX_CAPTURAS, NOMBRE, PALETA, barraFinal, barrasMano, compactar, esJugador,
   estados, llevaBalon, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
   siguienteEtiqueta, simplificar, tramoDeCursor, tramoDeFotograma, zigzag,
   type AccionBalon, type Dibujo, type Elemento, type Estado, type Fotograma, type Movimiento, type Pizarra,
@@ -82,10 +82,20 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const n = p.fotogramas.length;
   const est = useMemo(() => estados(p), [p]);
   const E: Estado = est[Math.min(cursor, n)];
-  const V = VISTAS[p.vista];
-  const anchoVista = V.x1 - V.x0;
+  // Vista: la completa es la pista horizontal; las medias se ven en vertical y ampliadas
+  // (ofensiva: canasta arriba; defensiva: canasta abajo), como en Coach Studio.
+  // (u, v) = coordenadas de pantalla en metros; (x, y) = coordenadas de la pista.
+  const VD = p.vista === "completa"
+    ? { u0: 0, v0: 0, w: 28, h: 15, rotada: false, base: 0 }
+    : p.vista === "ofensiva"
+      ? { u0: -1.5, v0: -0.8, w: 18, h: 10.6, rotada: true, base: 28 }   // x = 28 - v
+      : { u0: -1.5, v0: 4.2, w: 18, h: 10.6, rotada: true, base: 14 };   // x = 14 - v
+  const anchoVista = VD.w;
+  const altoVista = VD.h;
+  const vistaACancha = (u: number, v: number): Punto => (VD.rotada ? { x: VD.base - v, y: u } : { x: u, y: v });
+  const giroTexto = VD.rotada ? 90 : 0; // para que números y textos queden derechos
   const altoDisp = grande ? Math.max(220, caja.alto - 200) : altoMax;
-  const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / ALTO));
+  const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / altoVista));
   // Radio de la ficha: 0,5 m, pero nunca menos de ~13 px en pantalla (para poder tocar el número)
   const R = Math.max(0.5, 13 / escala) * p.config.tamano;
   const elSel = p.elementos.find((x) => x.id === sel) ?? null;
@@ -125,12 +135,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const limpiarSeleccion = () => { setSel(null); setSelDibujo(null); setBalonSel(null); };
 
   // ---------- añadir elementos ----------
-  const enVista = (x: number) => Math.max(V.x0 + 0.6, Math.min(V.x1 - 0.6, x));
   const posNueva = (tipo: TipoElemento): Punto => {
     const cuantos = p.elementos.filter((e) => esJugador(e.tipo) === esJugador(tipo)).length;
-    const cx = (V.x0 + V.x1) / 2;
-    if (esJugador(tipo)) return { x: enVista(cx - 3 + (cuantos % 6) * 1.25), y: 2.4 + Math.floor(cuantos / 6) * 1.3 };
-    return { x: enVista(cx - 4 + (cuantos % 8) * 1.15), y: 13 - Math.floor(cuantos / 8) * 1.2 };
+    const cu = VD.u0 + VD.w / 2;
+    const q = esJugador(tipo)
+      ? vistaACancha(cu - 3.5 + (cuantos % 6) * 1.4, VD.v0 + 1.6 + Math.floor(cuantos / 6) * 1.4)
+      : vistaACancha(cu - 4.5 + (cuantos % 8) * 1.3, VD.v0 + VD.h - 1.6 - Math.floor(cuantos / 8) * 1.3);
+    return { x: Math.max(0.5, Math.min(27.5, q.x)), y: Math.max(0.5, Math.min(14.5, q.y)) };
   };
 
   const agregar = (tipo: TipoElemento) => {
@@ -474,7 +485,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const W = 297, H = 210, m = 12;
-      const ratio = anchoVista / ALTO;
+      const ratio = anchoVista / altoVista;
       let w = W - m * 2, h = w / ratio;
       if (h > H - m * 2 - 10) { h = H - m * 2 - 10; w = h * ratio; }
       imgs.forEach((src, i) => {
@@ -644,7 +655,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         ) : (
           <Arrow points={pts} {...base} pointerLength={0.38} pointerWidth={0.34} tension={0.3} />
         )}
-        {num !== undefined && <T x={medio.x + 0.18} y={medio.y - 0.55} text={String(num)} fontSize={0.5} fontStyle="bold" fill={color} />}
+        {num !== undefined && <T x={medio.x + 0.18} y={medio.y - 0.55} rotation={giroTexto} text={String(num)} fontSize={0.5} fontStyle="bold" fill={color} />}
       </Group>
     );
   };
@@ -678,7 +689,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <Arrow points={[fin.x - u.x * 0.3, fin.y - u.y * 0.3, fin.x, fin.y]} {...base} pointerLength={0.4} pointerWidth={0.42} />
           </>
         )}
-        {num !== undefined && <T x={medio.x + 0.15} y={medio.y - 0.6} text={String(num)} fontSize={0.5} fontStyle="bold" fill={TINTA} />}
+        {num !== undefined && <T x={medio.x + 0.15} y={medio.y - 0.6} rotation={giroTexto} text={String(num)} fontSize={0.5} fontStyle="bold" fill={TINTA} />}
       </Group>
     );
   };
@@ -801,6 +812,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     ...(p.elementos.filter((e) => e.tipo === "canasta").map((e) => E.pos[e.id]).filter(Boolean) as Punto[]),
   ];
 
+  /** Rotación con la que se dibuja: jugadores y texto siempre derechos */
+  const rotVisual = (el: Elemento) =>
+    esJugador(el.tipo) || el.tipo === "balon" ? giroTexto : el.tipo === "texto" ? (el.rot ?? 0) + giroTexto : el.rot ?? 0;
+
   const posMostrada = (el: Elemento): Punto | undefined =>
     el.tipo === "balon" ? posBalon(el.id) : arrastre?.id === el.id ? { x: arrastre.x, y: arrastre.y } : posiciones[el.id];
 
@@ -817,7 +832,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       const pos = posMostrada(el);
       if (!pos) continue;
       const dx = q.x - pos.x, dy = q.y - pos.y;
-      const a = (-(esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0) * Math.PI) / 180;
+      const a = (-rotVisual(el) * Math.PI) / 180;
       const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
       const dentro = (() => {
         switch (el.tipo) {
@@ -849,8 +864,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const aMetros = (ev: React.PointerEvent<HTMLDivElement>): Punto => {
     const r = ev.currentTarget.getBoundingClientRect();
     return {
-      x: Math.max(V.x0, Math.min(V.x1, (ev.clientX - r.left) / escala + V.x0)),
-      y: Math.max(0, Math.min(ALTO, (ev.clientY - r.top) / escala)),
+      ...(() => {
+        const q = vistaACancha((ev.clientX - r.left) / escala + VD.u0, (ev.clientY - r.top) / escala + VD.v0);
+        return { x: Math.max(0, Math.min(28, q.x)), y: Math.max(0, Math.min(ALTO, q.y)) };
+      })(),
     };
   };
 
@@ -890,7 +907,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       inicioArrastre(g.el);
     }
     const destino = {
-      x: Math.max(V.x0, Math.min(V.x1, g.pos.x + q.x - g.ptr.x)),
+      x: Math.max(0, Math.min(28, g.pos.x + q.x - g.ptr.x)),
       y: Math.max(0, Math.min(ALTO, g.pos.y + q.y - g.ptr.y)),
     };
     g.destino = destino;
@@ -931,15 +948,23 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           <div className="mx-auto overflow-hidden rounded-t-xl border border-b-0 border-linea bg-white" style={{ width: anchoVista * escala + 2 }}>
             {/* Todos los toques y arrastres se gestionan aquí, con eventos de puntero (ratón, dedo y lápiz igual) */}
             <div
-              style={{ width: anchoVista * escala, height: ALTO * escala, touchAction: "none" }}
+              style={{ width: anchoVista * escala, height: altoVista * escala, touchAction: "none" }}
               onPointerDown={alApretar}
               onPointerMove={alMover}
               onPointerUp={alSoltar}
               onPointerCancel={alSoltar}
               onContextMenu={(ev) => ev.preventDefault()}
             >
-            <Stage ref={stageRef} width={anchoVista * escala} height={ALTO * escala} listening={false}>
-              <Layer ref={layerRef} x={-V.x0 * escala} scaleX={escala} scaleY={escala} listening={false}>
+            <Stage ref={stageRef} width={anchoVista * escala} height={altoVista * escala} listening={false}>
+              <Layer
+                ref={layerRef}
+                x={-VD.u0 * escala}
+                y={VD.rotada ? (VD.base - VD.v0) * escala : -VD.v0 * escala}
+                rotation={VD.rotada ? -90 : 0}
+                scaleX={escala}
+                scaleY={escala}
+                listening={false}
+              >
                 <Pista />
 
                 {dibujosVisibles.map((d) => pintarDibujo(d, `d-${d.id}`))}
@@ -969,7 +994,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       key={el.id}
                       x={pos.x}
                       y={pos.y}
-                      rotation={esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0}
+                      rotation={rotVisual(el)}
                     >
                       {seleccionado && <Circle radius={el.tipo === "balon" ? 0.42 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
                       {receptor && <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.07} dash={[0.15, 0.1]} listening={false} />}
@@ -981,6 +1006,15 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             </Stage>
             </div>
           </div>
+
+          {/* escudo en la esquina en las medias pistas (en la completa va en el círculo central) */}
+          {VD.rotada && (
+            <img
+              src="/marca/escudo-128.png" alt=""
+              className="pointer-events-none absolute h-9 w-auto opacity-90"
+              style={{ top: 8, left: `calc(50% + ${(anchoVista * escala) / 2 - 48}px)` }}
+            />
+          )}
 
           {/* avisos sobre la pista (no desplazan nada) */}
           <div className="pointer-events-none absolute inset-x-0 top-2 flex flex-col items-center gap-1">
@@ -1141,7 +1175,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       {/* ===== Pista, descargas y opciones ===== */}
       <div className="mx-auto flex w-full flex-wrap items-center gap-2" style={{ maxWidth: anchoBarra }}>
         <div className="flex overflow-hidden rounded-lg border border-linea">
-          {(Object.keys(VISTAS) as Vista[]).map((v) => (
+          {(["completa", "ofensiva", "defensiva"] as Vista[]).map((v) => (
             <button
               key={v} type="button"
               onClick={() => cambiar((d) => { d.vista = v; })}
@@ -1172,7 +1206,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.3</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.4</span>
       </p>
     </div>
   );
