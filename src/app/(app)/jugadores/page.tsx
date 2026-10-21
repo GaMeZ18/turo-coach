@@ -4,6 +4,7 @@ import { equipoActivo } from "@/lib/equipo-activo";
 import SinEquipo from "@/components/SinEquipo";
 import { incorporarJugador } from "./actions";
 import FormNuevoJugador from "./FormNuevoJugador";
+import BotonEliminar from "./BotonEliminar";
 
 type Fila = {
   dorsal: number | null;
@@ -54,6 +55,7 @@ export default async function JugadoresPage() {
               <th className="px-3 py-2">Nombre</th>
               <th className="hidden px-3 py-2 sm:table-cell">Posición</th>
               <th className="px-3 py-2 text-right">Asistencia</th>
+              {!equipo.congelado && <th className="w-10" />}
             </tr>
           </thead>
           <tbody>
@@ -69,11 +71,16 @@ export default async function JugadoresPage() {
                   </td>
                   <td className="hidden px-3 py-2 text-tinta/70 sm:table-cell">{f.posicion ?? "—"}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-tinta/70">{p === null ? "—" : `${p}%`}</td>
+                  {!equipo.congelado && (
+                    <td className="w-10 px-1 py-2 text-right">
+                      <BotonEliminar equipoId={equipo.id} jugadorId={f.jugadores.id} nombre={`${f.jugadores.nombre} ${f.jugadores.apellidos ?? ""}`.trim()} />
+                    </td>
+                  )}
                 </tr>
               );
             })}
             {filas.length === 0 && (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-tinta/50">Aún no hay jugadores en este equipo.</td></tr>
+              <tr><td colSpan={5} className="px-3 py-6 text-center text-tinta/50">Aún no hay jugadores en este equipo.</td></tr>
             )}
           </tbody>
         </table>

@@ -62,6 +62,28 @@ export async function quitarDelEquipo(formData: FormData) {
   redirect("/jugadores");
 }
 
+/**
+ * Elimina al jugador de este equipo. Si no está en ningún otro equipo,
+ * borra también su ficha (solo lo permite la base de datos al coordinador;
+ * para un entrenador se queda en "quitado del equipo").
+ */
+export async function eliminarJugador(equipoId: string, jugadorId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("equipo_jugadores")
+    .delete()
+    .eq("equipo_id", equipoId)
+    .eq("jugador_id", jugadorId);
+  if (error) return { error: error.message };
+  const { count } = await supabase
+    .from("equipo_jugadores")
+    .select("jugador_id", { count: "exact", head: true })
+    .eq("jugador_id", jugadorId);
+  if (!count) await supabase.from("jugadores").delete().eq("id", jugadorId);
+  revalidatePath("/jugadores");
+  return { error: null };
+}
+
 export async function guardarJugador(formData: FormData) {
   const supabase = await createClient();
   const id = String(formData.get("jugador_id"));
