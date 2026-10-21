@@ -23,3 +23,8 @@ export const hora = (iso: string | Date) =>
 /** "YYYY-MM-DD" de hoy en Barcelona */
 export const hoyLocal = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+
+/** "YYYY-MM-DD" y "HH:mm" en hora de Barcelona, para rellenar inputs de fecha y hora */
+export const diaInput = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
+export const horaInput = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));

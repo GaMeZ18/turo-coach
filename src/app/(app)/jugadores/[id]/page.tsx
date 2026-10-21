@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import { guardarJugador, quitarDelEquipo } from "../actions";
+import Enviar from "@/components/Enviar";
 
 const ESTADOS: Record<string, string> = {
   presente: "Presente", ausente: "Ausente", justificado: "Justificado", lesionado: "Lesionado", tarde: "Tarde",
@@ -53,7 +54,7 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
           <textarea name="notas" rows={5} defaultValue={j.notas ?? ""} className="campo" placeholder="Puntos fuertes, a mejorar, objetivos…" />
         </div>
         <div className="flex gap-2 sm:col-span-2">
-          <button className="btn-primario">Guardar</button>
+          <Enviar>Guardar</Enviar>
         </div>
       </form>
 
@@ -61,7 +62,7 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
         <form action={quitarDelEquipo} className="mt-2">
           <input type="hidden" name="equipo_id" value={equipo.id} />
           <input type="hidden" name="jugador_id" value={j.id} />
-          <button className="btn-peligro !px-0">Quitar de {equipo.nombre}</button>
+          <Enviar className="btn-peligro !px-0" confirmar={`¿Quitar a ${j.nombre} de ${equipo.nombre}?`}>Quitar de {equipo.nombre}</Enviar>
         </form>
       )}
 

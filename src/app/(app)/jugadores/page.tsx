@@ -5,6 +5,7 @@ import SinEquipo from "@/components/SinEquipo";
 import { incorporarJugador } from "./actions";
 import FormNuevoJugador from "./FormNuevoJugador";
 import BotonEliminar from "./BotonEliminar";
+import Enviar from "@/components/Enviar";
 
 type Fila = {
   dorsal: number | null;
@@ -100,7 +101,7 @@ export default async function JugadoresPage() {
                 <option key={j.id} value={j.id}>{j.nombre} {j.apellidos}</option>
               ))}
             </select>
-            <button className="btn-secundario">Incorporar</button>
+            <Enviar className="btn-secundario">Incorporar</Enviar>
           </form>
         </div>
       )}

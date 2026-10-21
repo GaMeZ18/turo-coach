@@ -1,9 +1,10 @@
 import { requireUser } from "@/lib/supabase/server";
 import { equiposDeTemporada } from "@/lib/equipo-activo";
 import {
-  crearEquipo, borrarEquipo, alternarCongelado, asignarStaff, quitarStaff, trabajarCon,
+  crearEquipo, actualizarEquipo, borrarEquipo, alternarCongelado, asignarStaff, quitarStaff, trabajarCon,
 } from "./actions";
-import { Lock, LockOpen, Trash2, X } from "lucide-react";
+import { Lock, LockOpen, Pencil, Trash2, X } from "lucide-react";
+import Enviar from "@/components/Enviar";
 
 export default async function EquiposPage() {
   const { supabase, perfil, user } = await requireUser();
@@ -49,7 +50,7 @@ export default async function EquiposPage() {
             <label className="etiqueta">Categoría</label>
             <input name="categoria" placeholder="Infantil" className="campo" />
           </div>
-          <button className="btn-primario">Añadir equipo</button>
+          <Enviar>Añadir equipo</Enviar>
         </form>
       )}
 
@@ -68,9 +69,23 @@ export default async function EquiposPage() {
               </div>
               <form action={trabajarCon}>
                 <input type="hidden" name="id" value={e.id} />
-                <button className="btn-secundario !py-1.5">Trabajar con este</button>
+                <Enviar className="btn-secundario !py-1.5">Trabajar con este</Enviar>
               </form>
             </div>
+
+            {esCoord && (
+              <details className="group mt-2">
+                <summary className="inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-1 text-xs text-azul hover:underline">
+                  <Pencil size={12} /> Editar nombre y categoría
+                </summary>
+                <form action={actualizarEquipo} className="mt-2 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="id" value={e.id} />
+                  <input name="nombre" defaultValue={e.nombre} required aria-label="Nombre" className="campo !w-auto min-w-40 flex-1 !py-1.5" />
+                  <input name="categoria" defaultValue={e.categoria ?? ""} placeholder="Categoría" aria-label="Categoría" className="campo !w-36 !py-1.5" />
+                  <Enviar className="btn-primario !py-1.5">Guardar</Enviar>
+                </form>
+              </details>
+            )}
 
             <ul className="mt-3 flex flex-wrap gap-1.5">
               {staffDe(e.id).map((s) => (
@@ -80,7 +95,7 @@ export default async function EquiposPage() {
                     <form action={quitarStaff}>
                       <input type="hidden" name="equipo_id" value={e.id} />
                       <input type="hidden" name="perfil_id" value={s.perfil_id} />
-                      <button className="ml-0.5 text-tinta/40 hover:text-red-600" title="Quitar"><X size={12} /></button>
+                      <Enviar className="ml-0.5 text-tinta/40 hover:text-red-600" title="Quitar del equipo" confirmar="¿Quitar a esta persona del staff del equipo?" pendiente={<X size={12} className="animate-pulse" />}><X size={12} /></Enviar>
                     </form>
                   )}
                 </li>
@@ -103,18 +118,18 @@ export default async function EquiposPage() {
                     <option value="ayudante">Ayudante</option>
                     <option value="delegado">Delegado</option>
                   </select>
-                  <button className="btn-secundario !py-1.5">+</button>
+                  <Enviar className="btn-secundario !py-1.5" title="Asignar">+</Enviar>
                 </form>
                 <form action={alternarCongelado}>
                   <input type="hidden" name="id" value={e.id} />
                   <input type="hidden" name="congelado" value={String(e.congelado)} />
-                  <button className="btn-secundario !px-2.5 !py-1.5" title={e.congelado ? "Descongelar" : "Congelar"}>
+                  <Enviar className="btn-secundario !px-2.5 !py-1.5" title={e.congelado ? "Descongelar" : "Congelar"}>
                     {e.congelado ? <LockOpen size={16} /> : <Lock size={16} />}
-                  </button>
+                  </Enviar>
                 </form>
                 <form action={borrarEquipo}>
                   <input type="hidden" name="id" value={e.id} />
-                  <button className="btn-peligro !px-2.5 !py-1.5" title="Borrar equipo"><Trash2 size={16} /></button>
+                  <Enviar className="btn-peligro !px-2.5 !py-1.5" title="Borrar equipo" confirmar={`¿Borrar el equipo ${e.nombre}? Se borrarán también sus entrenamientos y la asistencia. No se puede deshacer.`}><Trash2 size={16} /></Enviar>
                 </form>
               </div>
             )}

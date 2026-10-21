@@ -1,11 +1,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
+import Enviar from "@/components/Enviar";
+import { check } from "@/lib/db";
 
 async function cambiarRol(formData: FormData) {
   "use server";
   const supabase = await createClient();
-  await supabase.from("perfiles").update({ rol: String(formData.get("rol")) }).eq("id", String(formData.get("id")));
+  check(await supabase.from("perfiles").update({ rol: String(formData.get("rol")) }).eq("id", String(formData.get("id"))));
   revalidatePath("/club");
 }
 
@@ -14,16 +16,16 @@ async function nuevaTemporada(formData: FormData) {
   const supabase = await createClient();
   const nombre = String(formData.get("nombre") ?? "").trim();
   if (!nombre) return;
-  await supabase.from("temporadas").update({ actual: false }).eq("actual", true);
-  await supabase.from("temporadas").insert({ nombre, actual: true });
+  check(await supabase.from("temporadas").update({ actual: false }).eq("actual", true));
+  check(await supabase.from("temporadas").insert({ nombre, actual: true }));
   revalidatePath("/", "layout");
 }
 
 async function activarTemporada(formData: FormData) {
   "use server";
   const supabase = await createClient();
-  await supabase.from("temporadas").update({ actual: false }).eq("actual", true);
-  await supabase.from("temporadas").update({ actual: true }).eq("id", String(formData.get("id")));
+  check(await supabase.from("temporadas").update({ actual: false }).eq("actual", true));
+  check(await supabase.from("temporadas").update({ actual: true }).eq("id", String(formData.get("id"))));
   revalidatePath("/", "layout");
 }
 
@@ -65,7 +67,7 @@ export default async function ClubPage() {
                     <option value="entrenador">Entrenador</option>
                     <option value="coordinador">Coordinador</option>
                   </select>
-                  <button className="btn-secundario !px-2 !py-1 text-xs">OK</button>
+                  <Enviar className="btn-secundario !px-2 !py-1 text-xs">OK</Enviar>
                 </form>
               )}
             </li>
@@ -83,7 +85,7 @@ export default async function ClubPage() {
               ) : (
                 <form action={activarTemporada}>
                   <input type="hidden" name="id" value={t.id} />
-                  <button className="rounded-full border border-linea bg-white px-3 py-1 text-sm hover:bg-suave">{t.nombre}</button>
+                  <Enviar className="rounded-full border border-linea bg-white px-3 py-1 text-sm hover:bg-suave" confirmar={`¿Pasar a trabajar con la temporada ${t.nombre}?`}>{t.nombre}</Enviar>
                 </form>
               )}
             </li>
@@ -91,7 +93,7 @@ export default async function ClubPage() {
         </ul>
         <form action={nuevaTemporada} className="mt-3 flex max-w-sm gap-2">
           <input name="nombre" placeholder="2027-28" className="campo" />
-          <button className="btn-secundario shrink-0">Nueva temporada</button>
+          <Enviar className="btn-secundario shrink-0" confirmar="La nueva temporada pasará a ser la actual. ¿Continuar?">Nueva temporada</Enviar>
         </form>
         <p className="mt-2 text-xs text-tinta/50">
           Al crear una temporada nueva se convierte en la actual. Crea los equipos y usa «Incorporar jugador existente» para pasar jugadores de un año a otro.

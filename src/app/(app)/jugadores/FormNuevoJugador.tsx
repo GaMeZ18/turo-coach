@@ -30,7 +30,16 @@ export default function FormNuevoJugador({ equipoId }: { equipoId: string }) {
           <input name="fecha_nacimiento" type="date" className="campo" />
         </div>
       </div>
-      {estado.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{estado.error}</p>}
+      {estado.error && (
+        <div className="rounded-lg bg-red-50 p-2 text-sm text-red-700">
+          {estado.error}
+          {estado.duplicado && (
+            <label className="mt-1 flex items-center gap-1.5 text-tinta/70">
+              <input type="checkbox" name="forzar" value="1" /> Es otra persona con el mismo nombre: añadir igualmente
+            </label>
+          )}
+        </div>
+      )}
       {estado.ok && <p className="text-sm text-green-700">Añadido ✓ Puedes añadir el siguiente.</p>}
       <button disabled={pendiente} className="btn-primario">{pendiente ? "Guardando…" : "Añadir"}</button>
     </form>

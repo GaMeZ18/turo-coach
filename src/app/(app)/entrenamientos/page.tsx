@@ -4,6 +4,7 @@ import { equipoActivo } from "@/lib/equipo-activo";
 import { fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import SinEquipo from "@/components/SinEquipo";
 import { crearEntreno } from "./actions";
+import Enviar from "@/components/Enviar";
 
 type Entreno = {
   id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null;
@@ -59,7 +60,7 @@ export default async function EntrenamientosPage() {
         <div className="col-span-1"><label className="etiqueta">Hora</label><input name="hora" type="time" defaultValue="18:00" className="campo" /></div>
         <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" placeholder="Ej.: Bloqueo directo" className="campo" /></div>
         <div className="col-span-1"><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" defaultValue={90} className="campo" /></div>
-        <button className="btn-primario col-span-1">Crear</button>
+        <Enviar className="btn-primario col-span-1">Crear</Enviar>
         <div className="col-span-2 sm:col-span-3"><input name="lugar" placeholder="Pista (opcional)" className="campo" /></div>
       </form>
 

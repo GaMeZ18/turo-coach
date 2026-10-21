@@ -1,5 +1,6 @@
 import { entrar, enviarEnlace } from "./actions";
 import SesionDesdeEnlace from "./SesionDesdeEnlace";
+import Enviar from "@/components/Enviar";
 
 export default async function LoginPage({
   searchParams,
@@ -42,10 +43,10 @@ export default async function LoginPage({
                 <label className="etiqueta" htmlFor="password">Contraseña</label>
                 <input id="password" name="password" type="password" autoComplete="current-password" className="campo" />
               </div>
-              <button formAction={entrar} className="btn-primario w-full !py-2.5">Entrar</button>
-              <button formAction={enviarEnlace} className="btn-secundario w-full">
+              <Enviar formAction={entrar} className="btn-primario w-full !py-2.5">Entrar</Enviar>
+              <Enviar formAction={enviarEnlace} className="btn-secundario w-full">
                 Enviarme un enlace (sin contraseña)
-              </button>
+              </Enviar>
             </form>
           </div>
           <p className="mt-4 text-center text-xs text-white/40">

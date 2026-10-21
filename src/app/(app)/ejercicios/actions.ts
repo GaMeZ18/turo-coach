@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { check } from "@/lib/db";
 
 export type DatosEjercicio = {
   id?: string;
@@ -55,7 +56,7 @@ export async function guardarEjercicio(d: DatosEjercicio) {
 
 export async function borrarEjercicio(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("ejercicios").delete().eq("id", String(formData.get("id")));
+  check(await supabase.from("ejercicios").delete().eq("id", String(formData.get("id"))));
   revalidatePath("/ejercicios");
   redirect("/ejercicios");
 }

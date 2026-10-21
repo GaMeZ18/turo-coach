@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { aISO } from "@/lib/fechas";
+import { check } from "@/lib/db";
 
 const ruta = (id: string) => `/entrenamientos/${id}`;
 
@@ -24,9 +25,27 @@ export async function crearEntreno(formData: FormData) {
   redirect(ruta(data.id));
 }
 
+export async function editarEntreno(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const { error } = await supabase
+    .from("entrenamientos")
+    .update({
+      fecha: aISO(String(formData.get("dia")), String(formData.get("hora") || "18:00")),
+      titulo: String(formData.get("titulo") ?? "").trim() || null,
+      duracion_prevista: Number(formData.get("duracion_prevista") || 90),
+      lugar: String(formData.get("lugar") ?? "").trim() || null,
+      notas: String(formData.get("notas") ?? "").trim() || null,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath(ruta(id));
+  revalidatePath("/entrenamientos");
+}
+
 export async function borrarEntreno(formData: FormData) {
   const supabase = await createClient();
-  await supabase.from("entrenamientos").delete().eq("id", String(formData.get("id")));
+  check(await supabase.from("entrenamientos").delete().eq("id", String(formData.get("id"))));
   redirect("/entrenamientos");
 }
 
@@ -47,16 +66,16 @@ export async function duplicarEntreno(formData: FormData) {
   if (!nuevo) return;
   const { data: acts } = await supabase.from("entreno_actividades").select("*").eq("entrenamiento_id", id);
   if (acts?.length) {
-    await supabase.from("entreno_actividades").insert(
+    check(await supabase.from("entreno_actividades").insert(
       acts.map(({ id: _id, entrenamiento_id: _e, ...resto }) => ({ ...resto, entrenamiento_id: nuevo.id }))
-    );
+    ));
   }
   redirect(ruta(nuevo.id));
 }
 
 export async function guardarNotasEntreno(id: string, campos: { titulo?: string; notas?: string; duracion_prevista?: number }) {
   const supabase = await createClient();
-  await supabase.from("entrenamientos").update(campos).eq("id", id);
+  check(await supabase.from("entrenamientos").update(campos).eq("id", id));
   revalidatePath(ruta(id));
 }
 
@@ -78,26 +97,26 @@ export async function anadirActividad(formData: FormData) {
     .select("id", { count: "exact", head: true })
     .eq("entrenamiento_id", entreno);
 
-  await supabase.from("entreno_actividades").insert({
+  check(await supabase.from("entreno_actividades").insert({
     entrenamiento_id: entreno,
     orden: count ?? 0,
     tipo: ejercicioId ? "ejercicio" : String(formData.get("tipo") ?? "nota"),
     ejercicio_id: ejercicioId,
     titulo,
     duracion,
-  });
+  }));
   revalidatePath(ruta(entreno));
 }
 
 export async function actualizarActividad(entreno: string, id: string, campos: { duracion?: number; notas?: string; titulo?: string }) {
   const supabase = await createClient();
-  await supabase.from("entreno_actividades").update(campos).eq("id", id);
+  check(await supabase.from("entreno_actividades").update(campos).eq("id", id));
   revalidatePath(ruta(entreno));
 }
 
 export async function borrarActividad(entreno: string, id: string) {
   const supabase = await createClient();
-  await supabase.from("entreno_actividades").delete().eq("id", id);
+  check(await supabase.from("entreno_actividades").delete().eq("id", id));
   revalidatePath(ruta(entreno));
 }
 
@@ -122,8 +141,8 @@ export async function guardarAsistencia(entreno: string, jugador: string, estado
 
 export async function todosPresentes(entreno: string, jugadores: string[]) {
   const supabase = await createClient();
-  await supabase.from("asistencias").upsert(
+  check(await supabase.from("asistencias").upsert(
     jugadores.map((j) => ({ entrenamiento_id: entreno, jugador_id: j, estado: "presente", motivo: null }))
-  );
+  ));
   revalidatePath(ruta(entreno));
 }

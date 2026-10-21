@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { check } from "@/lib/db";
 
 const txt = (fd: FormData, k: string) => {
   const v = String(fd.get(k) ?? "").trim();
@@ -13,11 +14,28 @@ const num = (fd: FormData, k: string) => {
   return v === null ? null : Number(v);
 };
 
-export type ResultadoAlta = { ok: boolean; error?: string; n: number };
+export type ResultadoAlta = { ok: boolean; error?: string; n: number; duplicado?: boolean };
 
 export async function crearJugador(prev: ResultadoAlta, formData: FormData): Promise<ResultadoAlta> {
   const supabase = await createClient();
   const equipoId = String(formData.get("equipo_id"));
+  const nombre = txt(formData, "nombre") ?? "";
+  const apellidos = txt(formData, "apellidos") ?? "";
+  const normal = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  // Evitar duplicados en el mismo equipo (mismo nombre y apellidos)
+  if (formData.get("forzar") !== "1") {
+    const { data: plantilla } = await supabase
+      .from("equipo_jugadores")
+      .select("jugadores(nombre, apellidos)")
+      .eq("equipo_id", equipoId);
+    const repetido = ((plantilla ?? []) as unknown as { jugadores: { nombre: string; apellidos: string | null } | null }[])
+      .some((p) => p.jugadores && normal(p.jugadores.nombre) === normal(nombre) && normal(p.jugadores.apellidos ?? "") === normal(apellidos));
+    if (repetido) {
+      return { ok: false, error: `Ya hay un jugador llamado ${`${nombre} ${apellidos}`.trim()} en este equipo.`, n: prev.n, duplicado: true };
+    }
+  }
+
   const { data, error } = await supabase
     .from("jugadores")
     .insert({
@@ -44,20 +62,20 @@ export async function incorporarJugador(formData: FormData) {
   const supabase = await createClient();
   const jugador = String(formData.get("jugador_id") ?? "");
   if (!jugador) return;
-  await supabase.from("equipo_jugadores").upsert({
+  check(await supabase.from("equipo_jugadores").upsert({
     equipo_id: String(formData.get("equipo_id")),
     jugador_id: jugador,
-  });
+  }));
   revalidatePath("/jugadores");
 }
 
 export async function quitarDelEquipo(formData: FormData) {
   const supabase = await createClient();
-  await supabase
+  check(await supabase
     .from("equipo_jugadores")
     .delete()
     .eq("equipo_id", String(formData.get("equipo_id")))
-    .eq("jugador_id", String(formData.get("jugador_id")));
+    .eq("jugador_id", String(formData.get("jugador_id"))));
   revalidatePath("/jugadores");
   redirect("/jugadores");
 }
@@ -100,11 +118,11 @@ export async function guardarJugador(formData: FormData) {
     .eq("id", id);
   if (error) throw new Error(error.message);
   if (equipoId) {
-    await supabase
+    check(await supabase
       .from("equipo_jugadores")
       .update({ dorsal: num(formData, "dorsal"), posicion: txt(formData, "posicion") })
       .eq("equipo_id", equipoId)
-      .eq("jugador_id", id);
+      .eq("jugador_id", id));
   }
   revalidatePath("/jugadores");
   redirect("/jugadores");

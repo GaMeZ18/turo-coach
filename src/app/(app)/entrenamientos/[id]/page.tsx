@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { fechaLarga, hora } from "@/lib/fechas";
-import { borrarEntreno, duplicarEntreno } from "../actions";
+import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
+import { borrarEntreno, duplicarEntreno, editarEntreno } from "../actions";
 import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Pencil, Trash2 } from "lucide-react";
+import Enviar from "@/components/Enviar";
 
 export default async function EntrenoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -52,14 +53,32 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
         <div className="flex gap-2">
           <form action={duplicarEntreno}>
             <input type="hidden" name="id" value={e.id} />
-            <button className="btn-secundario" title="Copia este entreno a la semana siguiente"><Copy size={16} /> +1 semana</button>
+            <Enviar className="btn-secundario" title="Copia este entreno a la semana siguiente"><Copy size={16} /> +1 semana</Enviar>
           </form>
           <form action={borrarEntreno}>
             <input type="hidden" name="id" value={e.id} />
-            <button className="btn-peligro" title="Borrar"><Trash2 size={16} /></button>
+            <Enviar className="btn-peligro" title="Borrar entrenamiento" confirmar="¿Borrar este entrenamiento con sus actividades y la asistencia? No se puede deshacer."><Trash2 size={16} /></Enviar>
           </form>
         </div>
       </div>
+
+      {e.notas && <p className="mt-3 whitespace-pre-line rounded-lg bg-oro/15 p-3 text-sm">{e.notas}</p>}
+
+      <details className="mt-3">
+        <summary className="inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-1 text-sm text-azul hover:underline">
+          <Pencil size={14} /> Editar fecha, hora y datos
+        </summary>
+        <form action={editarEntreno} className="tarjeta mt-2 grid grid-cols-2 gap-2 p-4 sm:grid-cols-6 sm:items-end">
+          <input type="hidden" name="id" value={e.id} />
+          <div><label className="etiqueta">Día</label><input name="dia" type="date" required defaultValue={diaInput(e.fecha)} className="campo" /></div>
+          <div><label className="etiqueta">Hora</label><input name="hora" type="time" required defaultValue={horaInput(e.fecha)} className="campo" /></div>
+          <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" defaultValue={e.titulo ?? ""} className="campo" /></div>
+          <div><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" min={0} defaultValue={e.duracion_prevista} className="campo" /></div>
+          <div><label className="etiqueta">Pista</label><input name="lugar" defaultValue={e.lugar ?? ""} className="campo" /></div>
+          <div className="col-span-2 sm:col-span-5"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
+          <Enviar>Guardar</Enviar>
+        </form>
+      </details>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px]">
         <Actividades

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
 import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,
 } from "../actions";
+import Enviar from "@/components/Enviar";
 
 type Actividad = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
@@ -35,6 +36,7 @@ export default function Actividades({
   const [arrastrando, setArrastrando] = useState<number | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [, start] = useTransition();
+  const formAlta = useRef<HTMLFormElement>(null);
   useEffect(() => setLista(actividades), [actividades]);
 
   const total = lista.reduce((s, a) => s + (a.duracion || 0), 0);
@@ -132,7 +134,11 @@ export default function Actividades({
         {lista.length === 0 && <li className="text-sm text-tinta/50">Añade ejercicios o actividades abajo.</li>}
       </ol>
 
-      <form action={anadirActividad} className="tarjeta mt-3 space-y-2 p-3">
+      <form
+        ref={formAlta}
+        action={async (fd) => { await anadirActividad(fd); formAlta.current?.reset(); }}
+        className="tarjeta mt-3 space-y-2 p-3"
+      >
         <input type="hidden" name="entrenamiento_id" value={entrenoId} />
         <div className="flex gap-2">
           <select name="ejercicio_id" className="campo">
@@ -157,7 +163,7 @@ export default function Actividades({
         <div className="flex gap-2">
           <input name="titulo" placeholder="Título (opcional)" className="campo" />
           <input name="duracion" type="number" min={0} placeholder="Min" className="campo !w-20" />
-          <button className="btn-primario shrink-0">Añadir</button>
+          <Enviar className="btn-primario shrink-0">Añadir</Enviar>
         </div>
       </form>
     </section>

@@ -5,6 +5,7 @@ import { urlEmbed } from "@/lib/video";
 import { borrarEjercicio, duplicarEjercicio } from "../actions";
 import VisorPizarra from "./VisorPizarra";
 import { Copy, Pencil, Trash2 } from "lucide-react";
+import Enviar from "@/components/Enviar";
 
 export default async function VerEjercicio({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,12 +39,12 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           {puedeEditar && <Link href={`/ejercicios/${e.id}/editar`} className="btn-primario"><Pencil size={16} /> Editar</Link>}
           <form action={duplicarEjercicio}>
             <input type="hidden" name="id" value={e.id} />
-            <button className="btn-secundario" title="Hacer una copia para modificarla"><Copy size={16} /> Copiar</button>
+            <Enviar className="btn-secundario" title="Hacer una copia para modificarla"><Copy size={16} /> Copiar</Enviar>
           </form>
           {puedeEditar && (
             <form action={borrarEjercicio}>
               <input type="hidden" name="id" value={e.id} />
-              <button className="btn-peligro" title="Borrar"><Trash2 size={16} /></button>
+              <Enviar className="btn-peligro" title="Borrar ejercicio" confirmar={`¿Borrar «${e.titulo}»? Desaparecerá también de los entrenamientos donde esté. No se puede deshacer.`}><Trash2 size={16} /></Enviar>
             </form>
           )}
         </div>

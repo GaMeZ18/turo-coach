@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import InstalarApp from "@/components/InstalarApp";
+import Enviar from "@/components/Enviar";
 
 async function guardarCuenta(formData: FormData) {
   "use server";
@@ -37,7 +38,7 @@ export default async function CuentaPage({
       <form action={guardarCuenta} className="tarjeta mt-5 space-y-3 p-4">
         <div><label className="etiqueta">Nombre</label><input name="nombre" defaultValue={perfil.nombre ?? ""} className="campo" /></div>
         <div><label className="etiqueta">Nueva contraseña</label><input name="password" type="password" autoComplete="new-password" placeholder="Déjalo vacío para no cambiarla" className="campo" /></div>
-        <button className="btn-primario">Guardar</button>
+        <Enviar>Guardar</Enviar>
       </form>
 
       <div className="tarjeta mt-5 p-4 text-sm">
