@@ -5,16 +5,28 @@ import FormEjercicio from "../FormEjercicio";
 export default async function NuevoEjercicio({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string }>;
+  searchParams: Promise<{ desde?: string; entreno?: string }>;
 }) {
-  await requireUser();
-  const { desde } = await searchParams;
+  const { supabase } = await requireUser();
+  const { desde, entreno } = await searchParams;
+
+  // ?entreno=<id> → se crea desde un entrenamiento y se añade a él al guardar
+  const { data: e } = entreno
+    ? await supabase.from("entrenamientos").select("id, titulo").eq("id", entreno).maybeSingle()
+    : { data: null };
+
   return (
     <div>
-      <Link href="/ejercicios" className="text-sm text-tinta/60 hover:underline">← Ejercicios</Link>
-      <h1 className="mb-5 mt-1 text-2xl font-semibold">Nuevo ejercicio</h1>
-      {/* ?desde=pizarra → la página carga el borrador guardado en la pizarra libre */}
-      <FormEjercicio desdePizarra={desde === "pizarra"} />
+      {e ? (
+        <Link href={`/entrenamientos/${e.id}`} className="text-sm text-tinta/60 hover:underline">← {e.titulo ?? "Entrenamiento"}</Link>
+      ) : (
+        <Link href="/ejercicios" className="text-sm text-tinta/60 hover:underline">← Ejercicios</Link>
+      )}
+      <h1 className="mb-1 mt-1 text-2xl font-semibold">Nuevo ejercicio</h1>
+      {e && <p className="mb-4 text-sm text-tinta/60">Al guardarlo se añadirá a «{e.titulo ?? "este entrenamiento"}».</p>}
+      {!e && <div className="mb-4" />}
+      {/* ?desde=pizarra → carga el borrador de la pizarra libre */}
+      <FormEjercicio desdePizarra={desde === "pizarra"} entrenoId={e?.id} />
     </div>
   );
 }

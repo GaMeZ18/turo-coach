@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, PenTool, Trash2 } from "lucide-react";
 import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,
 } from "../actions";
@@ -166,6 +166,12 @@ export default function Actividades({
           <Enviar className="btn-primario shrink-0">Añadir</Enviar>
         </div>
       </form>
+      <Link
+        href={`/ejercicios/nuevo?entreno=${entrenoId}`}
+        className="mt-2 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-azul/30 p-3 text-sm font-medium text-azul transition hover:border-azul hover:bg-azul/5"
+      >
+        <PenTool size={16} /> Crear ejercicio nuevo con la pizarra
+      </Link>
     </section>
   );
 }

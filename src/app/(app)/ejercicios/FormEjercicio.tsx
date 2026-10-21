@@ -10,10 +10,12 @@ import { guardarEjercicio, type DatosEjercicio } from "./actions";
 export const CLAVE_BORRADOR = "turo-pizarra-borrador";
 
 export default function FormEjercicio({
-  inicial, desdePizarra = false,
+  inicial, desdePizarra = false, entrenoId,
 }: {
   inicial?: Partial<DatosEjercicio> & { id?: string };
   desdePizarra?: boolean;
+  /** Si se crea desde un entrenamiento: al guardar se añade a la sesión y se vuelve a ella */
+  entrenoId?: string;
 }) {
   const [d, setD] = useState<DatosEjercicio>({
     id: inicial?.id,
@@ -60,7 +62,7 @@ export default function FormEjercicio({
         etiquetas: etiquetasTxt.split(","),
         pizarra: tieneDibujo ? pizarra : null,
         preview,
-      });
+      }, entrenoId);
       if (r?.error) setError(r.error);
     });
   };
@@ -126,7 +128,7 @@ export default function FormEjercicio({
         </div>
         {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
         <button type="button" onClick={guardar} disabled={pendiente} className="btn-primario w-full">
-          {pendiente ? "Guardando…" : "Guardar"}
+          {pendiente ? "Guardando…" : entrenoId ? "Guardar y añadir al entreno" : "Guardar"}
         </button>
       </div>
     </div>

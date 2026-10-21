@@ -23,7 +23,7 @@ export type DatosEjercicio = {
 
 const vacioANull = (s: string) => (s.trim() === "" ? null : s.trim());
 
-export async function guardarEjercicio(d: DatosEjercicio) {
+export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
   const supabase = await createClient();
   const fila = {
     tipo: d.tipo,
@@ -51,6 +51,22 @@ export async function guardarEjercicio(d: DatosEjercicio) {
     id = data.id;
   }
   revalidatePath("/ejercicios");
+  if (entrenoId && !d.id) {
+    const { count } = await supabase
+      .from("entreno_actividades")
+      .select("id", { count: "exact", head: true })
+      .eq("entrenamiento_id", entrenoId);
+    check(await supabase.from("entreno_actividades").insert({
+      entrenamiento_id: entrenoId,
+      orden: count ?? 0,
+      tipo: "ejercicio",
+      ejercicio_id: id,
+      titulo: fila.titulo,
+      duracion: d.duracion ?? 10,
+    }));
+    revalidatePath(`/entrenamientos/${entrenoId}`);
+    redirect(`/entrenamientos/${entrenoId}`);
+  }
   redirect(`/ejercicios/${id}`);
 }
 
