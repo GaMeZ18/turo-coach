@@ -17,7 +17,6 @@ import {
   type Punto, type TipoElemento, type TipoTrazo, type Vista,
 } from "./modelo";
 
-Konva.dragDistance = 5; // menos de 5 px = toque, no arrastre
 
 // Texto nítido al escalar: se dibuja grande y se reduce
 const K = 50;
@@ -63,6 +62,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const [colorActivo, setColorActivo] = useState<string | null>(null);
   const [vivo, setVivo] = useState<{ id: string; puntos: number[] } | null>(null);
   const vivoRef = useRef<{ id: string; puntos: number[] } | null>(null);
+  const gestoRef = useRef<{ el: Elemento; ptr: Punto; pos: Punto; lista: boolean; arrastrando: boolean; destino?: Punto } | null>(null);
+  const ultimoToque = useRef<{ id: string; t: number } | null>(null);
   const [dibujoVivo, setDibujoVivo] = useState<number[] | null>(null);
   const [arrastre, setArrastre] = useState<{ id: string; x: number; y: number } | null>(null);
   const [anim, setAnim] = useState<{ f: number; t: number } | null>(null);
@@ -241,12 +242,6 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     setSel(el.id);
   };
 
-  /** Al apretar sobre una ficha queda seleccionada: el siguiente arrastre la mueve */
-  const apretar = (el: Elemento) => {
-    if (ocupado || herramienta !== "mover" || balonSel) return;
-    if (el.tipo !== "balon" && sel !== el.id) { setSel(el.id); setSelDibujo(null); }
-  };
-
   const editarEtiqueta = (el: Elemento) => {
     if (!esJugador(el.tipo) && el.tipo !== "texto") return;
     const t = window.prompt(el.tipo === "texto" ? "Texto:" : "Etiqueta (número o nombre corto):", el.etiqueta);
@@ -254,7 +249,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   // ---------- arrastre ----------
-  const arrastrable = () => !ocupado && !especial && herramienta === "mover";
+  // IMPORTANTE: no usamos la detección de toques de Konva (lee píxeles del canvas y navegadores
+  // como Brave los alteran por privacidad). Calculamos qué se toca con geometría pura.
 
   const inicioArrastre = (el: Elemento) => {
     if (el.tipo !== "balon") setBalonSel(null);
@@ -265,14 +261,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     }
   };
 
-  const durante = (el: Elemento, node: Konva.Node) => {
-    setArrastre({ id: el.id, x: node.x(), y: node.y() }); // para que el balón le acompañe
+  const durante = (el: Elemento, q: Punto) => {
+    setArrastre({ id: el.id, x: q.x, y: q.y });
     const v = vivoRef.current;
     if (!grabando || !v || v.id !== el.id) return;
-    const x = node.x(), y = node.y();
     const k = v.puntos.length;
-    if (Math.hypot(x - v.puntos[k - 2], y - v.puntos[k - 1]) < 0.12) return;
-    v.puntos = [...v.puntos, x, y];
+    if (Math.hypot(q.x - v.puntos[k - 2], q.y - v.puntos[k - 1]) < 0.12) return;
+    v.puntos = [...v.puntos, q.x, q.y];
     setVivo({ id: v.id, puntos: v.puntos });
   };
 
@@ -292,37 +287,14 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     return mejor;
   };
 
-  const finArrastre = (el: Elemento, node: Konva.Node) => {
+  const finArrastre = (el: Elemento, destino: Punto) => {
     setArrastre(null);
-    const destino = { x: node.x(), y: node.y() };
-    const inicio = el.tipo === "balon" ? posBalon(el.id) : E.pos[el.id];
-
-    // Un "arrastre" de pocos píxeles es en realidad un toque (el dedo siempre se mueve un poco)
-    if (inicio && Math.hypot(destino.x - inicio.x, destino.y - inicio.y) * escala < 12) {
-      node.position(inicio);
-      vivoRef.current = null;
-      setVivo(null);
-      if (el.tipo === "balon") tocar(el);
-      return;
-    }
-
     // Balón soltado encima de un jugador: se lo da (o es un pase, si se está grabando)
     if (el.tipo === "balon") {
       const tiene = E.poseedor[el.id] ?? null;
       const receptor = jugadorCerca(destino, tiene);
-      if (receptor) {
-        if (inicio) node.position(inicio);
-        vivoRef.current = null;
-        setVivo(null);
-        darBalon(el.id, receptor);
-        return;
-      }
-      if (tiene) {
-        // con dueño y sin receptor: vuelve a su sitio
-        if (inicio) node.position(inicio);
-        avisar("Suelta el balón encima de un jugador para dárselo.");
-        return;
-      }
+      if (receptor) { vivoRef.current = null; setVivo(null); darBalon(el.id, receptor); return; }
+      if (tiene) { avisar("Suelta el balón encima de un jugador para dárselo."); return; }
     }
     const actual = E.pos[el.id];
     if (!grabando) {
@@ -340,10 +312,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     setVivo(null);
     const origen = v && v.id === el.id ? v.puntos : actual ? [actual.x, actual.y] : [];
     const puntos = simplificar([...origen, destino.x, destino.y]);
-    if (puntos.length < 4 || longitud(puntos) < 0.4) {
-      if (actual) node.position(actual);
-      return;
-    }
+    if (puntos.length < 4 || longitud(puntos) < 0.4) return;
     const finAntes = est[Math.min(cursor + 1, n)]?.pos[el.id] ?? actual;
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
@@ -355,19 +324,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   // ---------- dibujo libre (flecha y lápiz) ----------
-  const puntero = (): Punto | null => {
-    const s = stageRef.current?.getPointerPosition();
-    return s ? { x: s.x / escala + V.x0, y: s.y / escala } : null;
-  };
-  const empezarDibujo = () => {
-    if (herramienta === "mover" || ocupado || especial) return;
-    const q = puntero();
-    if (q) setDibujoVivo([q.x, q.y]);
-  };
-  const seguirDibujo = () => {
+  const seguirDibujo = (q: Punto) => {
     if (!dibujoVivo) return;
-    const q = puntero();
-    if (!q) return;
     const k = dibujoVivo.length;
     if (Math.hypot(q.x - dibujoVivo[k - 2], q.y - dibujoVivo[k - 1]) < 0.1) return;
     setDibujoVivo(herramienta === "flecha" ? [dibujoVivo[0], dibujoVivo[1], q.x, q.y] : [...dibujoVivo, q.x, q.y]);
@@ -727,12 +685,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   const pintarDibujo = (d: Dibujo, key: string) => {
     const seleccionado = selDibujo === d.id;
-    const elegir = () => { setSelDibujo(d.id); setSel(null); setBalonSel(null); };
     const comun = {
       stroke: d.color, fill: d.color, strokeWidth: 0.08, lineCap: "round" as const, lineJoin: "round" as const,
-      hitStrokeWidth: 0.6, listening: herramienta === "mover" && !ocupado && !especial,
+      listening: false,
       shadowColor: "#eab308", shadowBlur: seleccionado ? 0.3 : 0, shadowOpacity: seleccionado ? 1 : 0,
-      onClick: elegir, onTap: elegir,
     };
     return d.tipo === "flecha"
       ? <Arrow key={key} points={d.puntos} {...comun} pointerLength={0.38} pointerWidth={0.34} />
@@ -827,23 +783,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     }
   };
 
-  const zonaTactil = (el: Elemento) => {
-    const transparente = "rgba(0,0,0,0.001)";
-    if (el.tipo === "escalera") return <Rect x={-0.45} y={-1.6} width={0.9} height={3.2} fill={transparente} />;
-    if (el.tipo === "valla") return <Rect x={-0.65} y={-0.3} width={1.3} height={0.6} fill={transparente} />;
-    if (el.tipo === "pica") return <Rect x={-0.3} y={-0.8} width={0.6} height={1.6} fill={transparente} />;
-    if (el.tipo === "canasta") return <Rect x={-1.25} y={-0.95} width={1.55} height={1.9} fill={transparente} />;
-    if (el.tipo === "balon") return <Circle radius={Math.max(0.28, 9 / escala)} fill={transparente} />;
-    if (esJugador(el.tipo)) return <Circle radius={R * 1.08} fill={transparente} />; // la ficha del número
-    return <Circle radius={Math.max(0.45, 10 / escala)} fill={transparente} />;
-  };
-
   // orden de pintado: material, jugadores y, encima de todo, los balones
   const orden = (el: Elemento) => (el.tipo === "balon" ? 2 : esJugador(el.tipo) ? 1 : 0);
   const elementosOrdenados = [...p.elementos].sort((a, b) => orden(a) - orden(b));
 
   const posBalon = (id: string): Punto | undefined => {
     if (balonEnVuelo[id]) return balonEnVuelo[id];
+    if (arrastre?.id === id) return { x: arrastre.x, y: arrastre.y };
     const j = poseedores[id];
     if (j && arrastre?.id === j) return { x: arrastre.x + R * 0.8, y: arrastre.y - R * 0.8 };
     if (j && posiciones[j]) return { x: posiciones[j].x + R * 0.8, y: posiciones[j].y - R * 0.8 };
@@ -854,6 +800,119 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     ...AROS,
     ...(p.elementos.filter((e) => e.tipo === "canasta").map((e) => E.pos[e.id]).filter(Boolean) as Punto[]),
   ];
+
+  const posMostrada = (el: Elemento): Punto | undefined =>
+    el.tipo === "balon" ? posBalon(el.id) : arrastre?.id === el.id ? { x: arrastre.x, y: arrastre.y } : posiciones[el.id];
+
+  /** ¿Qué hay en el punto q? (geometría pura, sin leer píxeles) */
+  type Objetivo = { tipo: "elemento"; el: Elemento } | { tipo: "dibujo"; id: string } | { tipo: "canasta"; c: Punto } | null;
+  const buscar = (q: Punto): Objetivo => {
+    const minimo = 11 / escala; // al menos ~11 px de margen para el dedo
+    if (balonSel && grabando) {
+      const c = canastasObjetivo.find((h) => Math.hypot(h.x - q.x, h.y - q.y) < Math.max(0.9, minimo));
+      if (c) return { tipo: "canasta", c };
+    }
+    // De arriba abajo: balones, jugadores, material
+    for (const el of [...elementosOrdenados].reverse()) {
+      const pos = posMostrada(el);
+      if (!pos) continue;
+      const dx = q.x - pos.x, dy = q.y - pos.y;
+      const a = (-(esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0) * Math.PI) / 180;
+      const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
+      const dentro = (() => {
+        switch (el.tipo) {
+          case "atacante": case "defensor": case "entrenador": return Math.hypot(dx, dy) <= Math.max(R * 1.15, minimo);
+          case "balon": return Math.hypot(dx, dy) <= Math.max(0.3, minimo);
+          case "escalera": return Math.abs(lx) <= 0.45 && Math.abs(ly) <= 1.6;
+          case "valla": return Math.abs(lx) <= 0.65 && Math.abs(ly) <= Math.max(0.3, minimo);
+          case "pica": return Math.abs(lx) <= Math.max(0.3, minimo) && Math.abs(ly) <= 0.8;
+          case "canasta": return lx >= -1.25 && lx <= 0.3 && Math.abs(ly) <= 0.95;
+          case "texto": return Math.abs(lx) <= Math.max(0.4, el.etiqueta.length * 0.2) && Math.abs(ly) <= 0.45;
+          default: return Math.hypot(dx, dy) <= Math.max(0.45, minimo);
+        }
+      })();
+      if (dentro) return { tipo: "elemento", el };
+    }
+    // Dibujos visibles: cerca de su trazo
+    const tol = Math.max(0.25, 8 / escala);
+    for (const d of [...dibujosVisibles].reverse()) {
+      for (let i = 2; i < d.puntos.length; i += 2) {
+        const ax = d.puntos[i - 2], ay = d.puntos[i - 1], bx = d.puntos[i], by = d.puntos[i + 1];
+        const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+        const t = Math.max(0, Math.min(1, ((q.x - ax) * (bx - ax) + (q.y - ay) * (by - ay)) / L2));
+        if (Math.hypot(q.x - (ax + t * (bx - ax)), q.y - (ay + t * (by - ay))) < tol) return { tipo: "dibujo", id: d.id };
+      }
+    }
+    return null;
+  };
+
+  const aMetros = (ev: React.PointerEvent<HTMLDivElement>): Punto => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.max(V.x0, Math.min(V.x1, (ev.clientX - r.left) / escala + V.x0)),
+      y: Math.max(0, Math.min(ALTO, (ev.clientY - r.top) / escala)),
+    };
+  };
+
+  const alApretar = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (ocupado || especial || (ev.pointerType === "mouse" && ev.button !== 0)) return;
+    const q = aMetros(ev);
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    if (herramienta !== "mover") { setDibujoVivo([q.x, q.y]); return; }
+    const obj = buscar(q);
+    if (!obj) { limpiarSeleccion(); gestoRef.current = null; return; }
+    if (obj.tipo === "canasta") { tirar(obj.c); return; }
+    if (obj.tipo === "dibujo") { setSelDibujo(obj.id); setSel(null); setBalonSel(null); return; }
+    const el = obj.el;
+    if (balonSel && esJugador(el.tipo)) { darBalon(balonSel, el.id); gestoRef.current = null; return; }
+    // Primero se selecciona; el arrastre solo mueve la ficha ya seleccionada
+    const lista = el.tipo === "balon" ? balonSel === el.id : sel === el.id;
+    const pos = posMostrada(el);
+    gestoRef.current = pos ? { el, ptr: q, pos, lista, arrastrando: false } : null;
+    if (!lista && el.tipo !== "balon") { setSel(el.id); setSelDibujo(null); }
+  };
+
+  const alMover = (ev: React.PointerEvent<HTMLDivElement>) => {
+    const q = aMetros(ev);
+    if (dibujoVivo) { seguirDibujo(q); return; }
+    const g = gestoRef.current;
+    if (!g) {
+      if (ev.pointerType === "mouse" && herramienta === "mover") {
+        ev.currentTarget.style.cursor = buscar(q) ? "pointer" : "default";
+      }
+      return;
+    }
+    if (!g.lista) return;
+    if (!g.arrastrando) {
+      if (Math.hypot(q.x - g.ptr.x, q.y - g.ptr.y) * escala < 6) return; // aún es un toque
+      g.arrastrando = true;
+      ev.currentTarget.style.cursor = "grabbing";
+      inicioArrastre(g.el);
+    }
+    const destino = {
+      x: Math.max(V.x0, Math.min(V.x1, g.pos.x + q.x - g.ptr.x)),
+      y: Math.max(0, Math.min(ALTO, g.pos.y + q.y - g.ptr.y)),
+    };
+    g.destino = destino;
+    durante(g.el, destino);
+  };
+
+  const alSoltar = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) ev.currentTarget.releasePointerCapture(ev.pointerId);
+    if (dibujoVivo) { acabarDibujo(); return; }
+    const g = gestoRef.current;
+    gestoRef.current = null;
+    if (!g) return;
+    ev.currentTarget.style.cursor = "default";
+    if (g.arrastrando && g.destino) { finArrastre(g.el, g.destino); return; }
+    setArrastre(null);
+    // Fue un toque
+    if (g.el.tipo === "balon") { tocar(g.el); return; }
+    const ahora = performance.now();
+    const ult = ultimoToque.current;
+    ultimoToque.current = { id: g.el.id, t: ahora };
+    if (ult && ult.id === g.el.id && ahora - ult.t < 350) editarEtiqueta(g.el); // doble toque
+  };
 
   const contador = anim ? anim.f + 1 : cursor;
   const etiquetaVista = especial
@@ -869,21 +928,18 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       <div>
         {/* ===== Pista ===== */}
         <div ref={contRef} className="relative w-full">
-          <div className="mx-auto overflow-hidden rounded-t-xl border border-b-0 border-linea bg-white" style={{ width: anchoVista * escala, touchAction: "none" }}>
-            <Stage
-              ref={stageRef}
-              width={anchoVista * escala}
-              height={ALTO * escala}
-              onMouseDown={empezarDibujo}
-              onTouchStart={empezarDibujo}
-              onMouseMove={seguirDibujo}
-              onTouchMove={seguirDibujo}
-              onMouseUp={acabarDibujo}
-              onTouchEnd={acabarDibujo}
-              onClick={(ev) => { if (ev.target === ev.target.getStage()) limpiarSeleccion(); }}
-              onTap={(ev) => { if (ev.target === ev.target.getStage()) limpiarSeleccion(); }}
+          <div className="mx-auto overflow-hidden rounded-t-xl border border-b-0 border-linea bg-white" style={{ width: anchoVista * escala + 2 }}>
+            {/* Todos los toques y arrastres se gestionan aquí, con eventos de puntero (ratón, dedo y lápiz igual) */}
+            <div
+              style={{ width: anchoVista * escala, height: ALTO * escala, touchAction: "none" }}
+              onPointerDown={alApretar}
+              onPointerMove={alMover}
+              onPointerUp={alSoltar}
+              onPointerCancel={alSoltar}
+              onContextMenu={(ev) => ev.preventDefault()}
             >
-              <Layer ref={layerRef} x={-V.x0 * escala} scaleX={escala} scaleY={escala}>
+            <Stage ref={stageRef} width={anchoVista * escala} height={ALTO * escala} listening={false}>
+              <Layer ref={layerRef} x={-V.x0 * escala} scaleX={escala} scaleY={escala} listening={false}>
                 <Pista />
 
                 {dibujosVisibles.map((d) => pintarDibujo(d, `d-${d.id}`))}
@@ -899,12 +955,12 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                 {balonSel && grabando && canastasObjetivo.map((c, i) => (
                   <Circle
                     key={`obj-${i}`} x={c.x} y={c.y} radius={0.8} stroke="#fc6401" strokeWidth={0.08} dash={[0.18, 0.12]}
-                    fill="rgba(252,100,1,0.15)" onClick={() => tirar(c)} onTap={() => tirar(c)}
+                    fill="rgba(252,100,1,0.15)"
                   />
                 ))}
 
                 {elementosOrdenados.map((el) => {
-                  const pos = el.tipo === "balon" ? posBalon(el.id) : posiciones[el.id];
+                  const pos = posMostrada(el);
                   if (!pos) return null;
                   const seleccionado = (sel === el.id || balonSel === el.id) && !ocupado && !especial;
                   const receptor = !!balonSel && esJugador(el.tipo) && poseedores[balonSel] !== el.id;
@@ -914,25 +970,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       x={pos.x}
                       y={pos.y}
                       rotation={esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0}
-                      draggable={arrastrable() && (sel === el.id || balonSel === el.id)}
-                      listening={herramienta === "mover" && !especial}
-                      dragBoundFunc={(abs) => ({
-                        x: Math.max(0, Math.min(anchoVista * escala, abs.x)),
-                        y: Math.max(0, Math.min(ALTO * escala, abs.y)),
-                      })}
-                      onDragStart={() => inicioArrastre(el)}
-                      onDragMove={(ev) => durante(el, ev.target)}
-                      onDragEnd={(ev) => finArrastre(el, ev.target)}
-                      onMouseDown={() => apretar(el)}
-                      onTouchStart={() => apretar(el)}
-                      onClick={() => tocar(el)}
-                      onTap={() => tocar(el)}
-                      onDblClick={() => editarEtiqueta(el)}
-                      onDblTap={() => editarEtiqueta(el)}
-                      onMouseEnter={(ev) => { const s = ev.target.getStage(); if (s && !ocupado) s.container().style.cursor = "pointer"; }}
-                      onMouseLeave={(ev) => { const s = ev.target.getStage(); if (s) s.container().style.cursor = "default"; }}
                     >
-                      {zonaTactil(el)}
                       {seleccionado && <Circle radius={el.tipo === "balon" ? 0.42 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
                       {receptor && <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.07} dash={[0.15, 0.1]} listening={false} />}
                       {forma(el)}
@@ -941,6 +979,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                 })}
               </Layer>
             </Stage>
+            </div>
           </div>
 
           {/* avisos sobre la pista (no desplazan nada) */}
@@ -1133,7 +1172,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.2</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.3</span>
       </p>
     </div>
   );
