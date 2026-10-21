@@ -11,7 +11,7 @@ import {
 import Pista from "./Pista";
 import {
   ALTO, AROS, COLOR_DEFECTO, MAX_CAPTURAS, NOMBRE, PALETA, barraFinal, barrasMano, compactar, esJugador,
-  estados, llevaBalon, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
+  enderezar, estados, llevaBalon, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
   siguienteEtiqueta, simplificar, tramoDeCursor, tramoDeFotograma, zigzag,
   type AccionBalon, type Dibujo, type Elemento, type Estado, type Fotograma, type Movimiento, type Pizarra,
   type Punto, type TipoElemento, type TipoTrazo, type Vista,
@@ -56,6 +56,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const [cursor, setCursor] = useState(0);
   const [grabando, setGrabando] = useState(false);
   const [herramienta, setHerramienta] = useState<"mover" | "flecha" | "lapiz">("mover");
+  const [modoBloqueo, setModoBloqueo] = useState(false); // el siguiente arrastre será un bloqueo
+  const [modoMano, setModoMano] = useState(false);       // el siguiente pase será un mano a mano
   const [sel, setSel] = useState<string | null>(null);
   const [selDibujo, setSelDibujo] = useState<string | null>(null);
   const [balonSel, setBalonSel] = useState<string | null>(null);
@@ -217,7 +219,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     }
     const tiene = E.poseedor[balon] ?? null;
     if (tiene === jugador) return;
-    const accion: AccionBalon = tiene ? { balon, tipo: "pase", de: tiene, a: jugador } : { balon, tipo: "coger", a: jugador };
+    const accion: AccionBalon = tiene
+      ? { balon, tipo: "pase", de: tiene, a: jugador, ...(modoMano ? { mano: true } : {}) }
+      : { balon, tipo: "coger", a: jugador };
+    if (modoMano) setModoMano(false);
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
       f.balon = [...f.balon.filter((a) => a.balon !== balon), accion];
@@ -283,7 +288,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   const tipoAuto = (el: Elemento): TipoTrazo =>
-    el.tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
+    modoBloqueo && esJugador(el.tipo) ? "bloqueo" : el.tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
 
   /** Jugador más cercano a un punto (para soltar el balón encima) */
   const jugadorCerca = (q: Punto, excepto?: string | null) => {
@@ -322,12 +327,15 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     vivoRef.current = null;
     setVivo(null);
     const origen = v && v.id === el.id ? v.puntos : actual ? [actual.x, actual.y] : [];
-    const puntos = simplificar([...origen, destino.x, destino.y]);
-    if (puntos.length < 4 || longitud(puntos) < 0.4) return;
+    const crudo = simplificar([...origen, destino.x, destino.y], 0.15);
+    if (crudo.length < 4 || longitud(crudo) < 0.4) return;
+    const puntos = enderezar(crudo); // recta perfecta, esquina nítida o curva suave
+    const tipo = tipoAuto(el);
+    if (modoBloqueo) setModoBloqueo(false);
     const finAntes = est[Math.min(cursor + 1, n)]?.pos[el.id] ?? actual;
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
-      f.movimientos = [...f.movimientos.filter((m) => m.elementoId !== el.id), { elementoId: el.id, tipo: tipoAuto(el), puntos }];
+      f.movimientos = [...f.movimientos.filter((m) => m.elementoId !== el.id), { elementoId: el.id, tipo, puntos }];
       if (cursor + 1 < d.fotogramas.length && finAntes) {
         desplazarRecorridos(d, el.id, cursor + 1, destino.x - finAntes.x, destino.y - finAntes.y);
       }
@@ -644,16 +652,16 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     return (
       <Group key={key} listening={false}>
         {material ? (
-          <Arrow points={pts} {...base} strokeWidth={0.06} dash={[0.12, 0.14]} pointerLength={0.3} pointerWidth={0.26} tension={0.3} />
+          <Arrow points={pts} {...base} strokeWidth={0.06} dash={[0.12, 0.14]} pointerLength={0.3} pointerWidth={0.26} />
         ) : m.tipo === "botar" ? (
           <Arrow points={zigzag(pts)} {...base} pointerLength={0.38} pointerWidth={0.34} />
         ) : m.tipo === "bloqueo" ? (
           <>
-            <Line points={pts} {...base} tension={0.3} />
+            <Line points={pts} {...base} />
             <Line points={barraFinal(pts, 0.42)} {...base} strokeWidth={0.14} />
           </>
         ) : (
-          <Arrow points={pts} {...base} pointerLength={0.38} pointerWidth={0.34} tension={0.3} />
+          <Arrow points={pts} {...base} pointerLength={0.38} pointerWidth={0.34} />
         )}
         {num !== undefined && <T x={medio.x + 0.18} y={medio.y - 0.55} rotation={giroTexto} text={String(num)} fontSize={0.5} fontStyle="bold" fill={color} />}
       </Group>
@@ -672,7 +680,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     const ini = { x: desde.x + u.x * R * 1.1, y: desde.y + u.y * R * 1.1 };
     const fin = a.tipo === "tiro" ? { x: hasta.x - u.x * 0.3, y: hasta.y - u.y * 0.3 } : { x: hasta.x - u.x * R * 1.15, y: hasta.y - u.y * R * 1.15 };
     const base = { stroke: TINTA, fill: TINTA, strokeWidth: 0.08, lineCap: "round" as const, opacity: op, listening: false };
-    const mano = a.tipo === "pase" && d < 1.9; // pase muy corto = mano a mano (entrega)
+    const mano = a.tipo === "pase" && (a.mano || d < 1.9); // botón mano a mano, o pase muy corto
     const medio = { x: (ini.x + fin.x) / 2, y: (ini.y + fin.y) / 2 };
     return (
       <Group key={key} listening={false}>
@@ -1074,6 +1082,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             onClick={() => {
               const empieza = !grabando;
               setGrabando(empieza); limpiarSeleccion(); setEspecial(null); setHerramienta("mover");
+              if (!empieza) { setModoBloqueo(false); setModoMano(false); }
               if (empieza) avisar("Grabando: arrastra jugadores; toca el balón y luego a quien lo recibe.");
             }}
           >
@@ -1081,6 +1090,28 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           </Boton>
           <Boton titulo="Flecha" activo={herramienta === "flecha"} onClick={() => { setHerramienta((h) => (h === "flecha" ? "mover" : "flecha")); limpiarSeleccion(); }}><MoveRight size={18} /></Boton>
           <Boton titulo="Lápiz (dibujo libre)" activo={herramienta === "lapiz"} onClick={() => { setHerramienta((h) => (h === "lapiz" ? "mover" : "lapiz")); limpiarSeleccion(); }}><Pencil size={17} /></Boton>
+          <Boton
+            titulo="Bloqueo: el siguiente jugador que arrastres hará un bloqueo"
+            activo={modoBloqueo}
+            onClick={() => {
+              if (!grabando) { avisar("Pulsa REC para grabar un bloqueo."); return; }
+              setModoBloqueo((m) => !m); setModoMano(false); setHerramienta("mover");
+              if (!modoBloqueo) avisar("Bloqueo: arrastra al jugador hasta donde pone el bloqueo.");
+            }}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 12h15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><path d="M18 5v14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+          </Boton>
+          <Boton
+            titulo="Mano a mano: el siguiente pase será una entrega en mano"
+            activo={modoMano}
+            onClick={() => {
+              if (!grabando) { avisar("Pulsa REC para grabar un mano a mano."); return; }
+              setModoMano((m) => !m); setModoBloqueo(false); setHerramienta("mover");
+              if (!modoMano) avisar("Mano a mano: toca el balón y luego al jugador que lo recibe.");
+            }}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><path d="M11 6v12M15 6v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          </Boton>
 
           <span className="mx-1 h-6 w-px bg-linea" />
           <Boton titulo="Al principio" onClick={() => irA(0)}><ChevronsLeft size={18} /></Boton>
@@ -1206,7 +1237,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.4</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.5</span>
       </p>
     </div>
   );

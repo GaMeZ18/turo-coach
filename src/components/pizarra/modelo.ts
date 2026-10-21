@@ -35,6 +35,7 @@ export interface AccionBalon {
   de?: string;                 // quien lo tenía (pase / tiro)
   a?: string;                  // quien lo recibe (pase / coger)
   destino?: Punto;             // canasta (tiro)
+  mano?: boolean;              // pase dibujado como mano a mano (entrega)
 }
 
 export interface Fotograma {
@@ -211,6 +212,64 @@ export function simplificar(puntos: number[], minDist = 0.3) {
   }
   out.push(puntos[puntos.length - 2], puntos[puntos.length - 1]);
   return out;
+}
+
+/** Ramer–Douglas–Peucker: quita los puntos que no cambian la forma (tolerancia eps en metros) */
+function rdp(pts: Punto[], eps: number): Punto[] {
+  if (pts.length < 3) return pts;
+  const a = pts[0], b = pts[pts.length - 1];
+  const L = Math.hypot(b.x - a.x, b.y - a.y) || 1e-9;
+  let max = 0, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = Math.abs((b.y - a.y) * pts[i].x - (b.x - a.x) * pts[i].y + b.x * a.y - b.y * a.x) / L;
+    if (d > max) { max = d; idx = i; }
+  }
+  if (max <= eps) return [a, b];
+  return [...rdp(pts.slice(0, idx + 1), eps).slice(0, -1), ...rdp(pts.slice(idx), eps)];
+}
+
+/** Curva Catmull-Rom que pasa por los puntos (para suavizar sin perder la forma) */
+function catmullRom(pts: Punto[], porTramo = 10): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 0; k < porTramo; k++) {
+      const t = k / porTramo, t2 = t * t, t3 = t2 * t;
+      out.push(
+        0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+      );
+    }
+  }
+  const u = pts[pts.length - 1];
+  out.push(u.x, u.y);
+  return out;
+}
+
+/**
+ * Limpia un trazo hecho a mano:
+ * - si es casi recto → recta perfecta de inicio a fin
+ * - si no → se queda con los puntos que marcan la forma (cambios de dirección) y lo suaviza
+ */
+export function enderezar(puntos: number[]): number[] {
+  const pts: Punto[] = [];
+  for (let i = 0; i < puntos.length; i += 2) pts.push({ x: puntos[i], y: puntos[i + 1] });
+  if (pts.length < 3) return puntos;
+  const a = pts[0], b = pts[pts.length - 1];
+  const cuerda = Math.hypot(b.x - a.x, b.y - a.y);
+  const L = longitud(puntos);
+  // Casi recto: el recorrido apenas es más largo que la línea directa
+  if (cuerda > 0.5 && L / cuerda < 1.06) return [a.x, a.y, b.x, b.y];
+  const clave = rdp(pts, Math.max(0.35, L * 0.06));
+  if (clave.length === 2) return [a.x, a.y, b.x, b.y];
+  // Con un único cambio de dirección marcado (corte en V/L) se deja el ángulo nítido
+  if (clave.length === 3) {
+    const v1 = { x: clave[1].x - clave[0].x, y: clave[1].y - clave[0].y };
+    const v2 = { x: clave[2].x - clave[1].x, y: clave[2].y - clave[1].y };
+    const cos = (v1.x * v2.x + v1.y * v2.y) / ((Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y)) || 1);
+    if (cos < 0.6) return clave.flatMap((q) => [q.x, q.y]); // giro de más de ~53º: esquina
+  }
+  return catmullRom(clave);
 }
 
 export function recortarFinal(puntos: number[], r: number) {

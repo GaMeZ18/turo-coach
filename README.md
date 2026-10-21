@@ -50,6 +50,8 @@ Funciona como la de Coach Studio:
 - **Mover**: toca y arrastra. Sin grabar, recolocas los elementos. Doble toque para cambiar la etiqueta.
 - **Balón**: toca el balón y después un jugador, y ese jugador lo tiene.
 - **● REC**: arrastra a un jugador y su movimiento queda grabado como un fotograma (`01/01`, `02/02`…). Si lleva el balón, la línea sale en zigzag (bote). Para un **pase**, toca el balón y luego al receptor; si están muy cerca, se dibuja como **mano a mano**. Para un **tiro**, toca el balón y luego una canasta.
+- **Bloqueo** y **Mano a mano**: botones junto al lápiz. Activas uno y la siguiente acción sale con ese símbolo.
+- **Líneas limpias**: al soltar, un trazo casi recto queda perfectamente recto, un cambio de dirección queda con la esquina nítida y una curva sale suave.
 - **Movimientos a la vez**: con **‹** vuelves un fotograma atrás y mueves a otro jugador; los dos se moverán a la vez.
 - **📷 Captura**: limpia las líneas y sigues grabando. Cada captura es una imagen de la tira; ⧉ las superpone todas.
 - **▶** reproduce la jugada; ⏮ ⏭ ‹ › navegan por los fotogramas; **|←** deshace el último paso; **🗑** borra la grabación.
