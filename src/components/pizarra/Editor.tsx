@@ -5,22 +5,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import { Stage, Layer, Group, Line, Arrow, Circle, Text, Rect, RegularPolygon } from "react-konva";
 import {
-  Play, Square, Minus, Download, Undo2, Trash2, RotateCcw, RotateCw, Users, Maximize2, Minimize2,
-  Type, Layers, Camera,
+  Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera, Undo2, Trash2, Settings,
+  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown,
 } from "lucide-react";
 import Pista from "./Pista";
 import {
-  COLOR_DEFECTO, MAX_FASES, NOMBRE, PALETA, barraFinal, barrasMano, canastaCercana, cambiarPista, dimensiones,
-  esJugador, estados, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
-  siguienteEtiqueta, simplificar, zigzag,
-  type AccionBalon, type Elemento, type Fase, type Movimiento, type Pizarra, type Punto, type TipoElemento,
-  type TipoTrazo,
+  ALTO, AROS, COLOR_DEFECTO, MAX_CAPTURAS, NOMBRE, PALETA, VISTAS, barraFinal, barrasMano, compactar, esJugador,
+  estados, llevaBalon, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
+  siguienteEtiqueta, simplificar, tramoDeCursor, tramoDeFotograma, zigzag,
+  type AccionBalon, type Dibujo, type Elemento, type Estado, type Fotograma, type Movimiento, type Pizarra,
+  type Punto, type TipoElemento, type TipoTrazo, type Vista,
 } from "./modelo";
 
-// Arrastres de menos de 5 px cuentan como toque (para seleccionar sin mover)
-Konva.dragDistance = 5;
+Konva.dragDistance = 5; // menos de 5 px = toque, no arrastre
 
-// Texto nítido: se dibuja grande y se reduce (los textos < 1px se ven mal al escalar)
+// Texto nítido al escalar: se dibuja grande y se reduce
 const K = 50;
 function T({ fontSize, width, height, ...resto }: React.ComponentProps<typeof Text>) {
   return (
@@ -36,57 +35,65 @@ function T({ fontSize, width, height, ...resto }: React.ComponentProps<typeof Te
   );
 }
 
-const TINTA = "#121a33";
-const MATERIALES: TipoElemento[] = ["cono", "chino", "aro", "pica", "valla", "escalera", "balon"];
-const TRAZOS: { id: "auto" | TipoTrazo; label: string; ayuda: string }[] = [
-  { id: "auto", label: "Auto", ayuda: "Bota si tiene el balón; si no, corre" },
-  { id: "correr", label: "Desplazamiento", ayuda: "Línea continua con flecha" },
-  { id: "botar", label: "Bote", ayuda: "Línea en zigzag" },
-  { id: "bloqueo", label: "Bloqueo", ayuda: "Línea acabada en T" },
-];
+const TINTA = "#1f2937";
+const esperarPintado = () =>
+  new Promise<void>((r) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => r())), 40));
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const pad = (n: number) => String(n).padStart(2, "0");
+
+type VistaEspecial = null | { tipo: "captura"; seg: number } | { tipo: "todas" };
 
 export interface EditorProps {
   valor?: unknown;
   onChange?: (p: Pizarra) => void;
   registrarCaptura?: (fn: () => Promise<string>) => void;
   altoMax?: number;
+  titulo?: string;
 }
 
-export default function Editor({ valor, onChange, registrarCaptura, altoMax = 620 }: EditorProps) {
+export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra" }: EditorProps) {
   const [p, setP] = useState<Pizarra>(() => normalizar(valor ?? pizarraVacia()));
-  const [historial, setHistorial] = useState<Pizarra[]>([]);
-  const [paso, setPaso] = useState(0); // 0 = posición inicial; k = fase k
+  const [historial, setHistorial] = useState<{ p: Pizarra; cursor: number }[]>([]);
+  const [cursor, setCursor] = useState(0);
+  const [grabando, setGrabando] = useState(false);
+  const [herramienta, setHerramienta] = useState<"mover" | "flecha" | "lapiz">("mover");
   const [sel, setSel] = useState<string | null>(null);
-  const [trazo, setTrazo] = useState<"auto" | TipoTrazo>("auto");
-  const [modoBalon, setModoBalon] = useState<"pase" | "mano" | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [selDibujo, setSelDibujo] = useState<string | null>(null);
+  const [balonSel, setBalonSel] = useState<string | null>(null);
+  const [colorActivo, setColorActivo] = useState<string | null>(null);
   const [vivo, setVivo] = useState<{ id: string; puntos: number[] } | null>(null);
   const vivoRef = useRef<{ id: string; puntos: number[] } | null>(null);
-  const [anim, setAnim] = useState<{ fase: number; t: number } | null>(null);
-  const [verTodo, setVerTodo] = useState(false);
+  const [dibujoVivo, setDibujoVivo] = useState<number[] | null>(null);
+  const [arrastre, setArrastre] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [anim, setAnim] = useState<{ f: number; t: number } | null>(null);
+  const [especial, setEspecial] = useState<VistaEspecial>(null);
   const [grande, setGrande] = useState(false);
+  const [panel, setPanel] = useState<null | "config" | "descargar">(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [exportando, setExportando] = useState<string | null>(null);
   const [caja, setCaja] = useState({ ancho: 400, alto: 800 });
 
   const contRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
+  const layerRef = useRef<Konva.Layer>(null);
   const rafRef = useRef(0);
 
-  const { ancho: W, alto: H } = dimensiones(p.pista);
-  const altoDisponible = grande ? Math.max(200, caja.alto - 150) : altoMax;
-  const escala = Math.max(4, Math.min(caja.ancho / W, altoDisponible / H));
-  const R = p.pista === "completa" ? 0.5 : 0.45;
-  const toque = Math.max(R * 1.5, 22 / escala); // zona táctil mínima ~22 px (dedo)
+  const n = p.fotogramas.length;
   const est = useMemo(() => estados(p), [p]);
-  const e = paso > 0 ? est[paso - 1] : null;
-  const fase: Fase | null = paso > 0 ? p.fases[paso - 1] : null;
+  const E: Estado = est[Math.min(cursor, n)];
+  const V = VISTAS[p.vista];
+  const anchoVista = V.x1 - V.x0;
+  const altoDisp = grande ? Math.max(220, caja.alto - 200) : altoMax;
+  const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / ALTO));
+  const R = 0.5 * p.config.tamano;
+  const toque = Math.max(R * 1.5, 22 / escala);
   const elSel = p.elementos.find((x) => x.id === sel) ?? null;
+  const ocupado = !!anim || !!exportando;
+  const anchoBarra = Math.max(anchoVista * escala, 320);
 
-  // ---------- tamaño ----------
+  // ---------- medida del contenedor ----------
   useEffect(() => {
-    const medir = () => {
-      const w = contRef.current?.clientWidth ?? 400;
-      setCaja({ ancho: w, alto: window.innerHeight });
-    };
+    const medir = () => setCaja({ ancho: contRef.current?.clientWidth ?? 400, alto: window.innerHeight });
     medir();
     const ro = new ResizeObserver(medir);
     if (contRef.current) ro.observe(contRef.current);
@@ -99,239 +106,426 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
   onChangeRef.current = onChange;
   useEffect(() => { onChangeRef.current?.(p); }, [p]);
 
-  const cambiar = (fn: (d: Pizarra) => Pizarra | void) => {
-    setHistorial((h) => [...h.slice(-50), p]);
+  const cambiar = (fn: (d: Pizarra) => Pizarra | void, nuevoCursor?: number) => {
+    setHistorial((h) => [...h.slice(-60), { p, cursor }]);
     const d = structuredClone(p);
     setP((fn(d) as Pizarra | undefined) ?? d);
+    if (nuevoCursor !== undefined) setCursor(nuevoCursor);
   };
   const deshacer = () => {
-    if (!historial.length) return;
-    const ant = historial[historial.length - 1];
+    const ult = historial[historial.length - 1];
+    if (!ult) return;
     setHistorial((h) => h.slice(0, -1));
-    setP(ant);
-    setPaso((k) => Math.min(k, ant.fases.length));
+    setP(ult.p);
+    setCursor(Math.min(ult.cursor, ult.p.fotogramas.length));
+    setEspecial(null);
   };
-
   const avisar = (m: string) => { setAviso(m); window.setTimeout(() => setAviso((a) => (a === m ? null : a)), 3500); };
+  const limpiarSeleccion = () => { setSel(null); setSelDibujo(null); setBalonSel(null); };
 
-  // ---------- elementos ----------
-  const posLibre = (tipo: TipoElemento): Punto => {
-    const n = p.elementos.length;
-    if (p.pista === "completa") {
-      if (esJugador(tipo)) return { x: 9 + (n % 5) * 1.3, y: 3 + Math.floor(n / 5) * 1.4 };
-      return { x: 16 + (n % 8) * 1.3, y: 12.5 - Math.floor(n / 8) * 1.3 };
-    }
-    if (esJugador(tipo)) return { x: 2.5 + (n % 6) * 1.8, y: 10.5 };
-    return { x: 2 + (n % 8) * 1.5, y: 12.6 };
+  // ---------- añadir elementos ----------
+  const enVista = (x: number) => Math.max(V.x0 + 0.6, Math.min(V.x1 - 0.6, x));
+  const posNueva = (tipo: TipoElemento): Punto => {
+    const cuantos = p.elementos.filter((e) => esJugador(e.tipo) === esJugador(tipo)).length;
+    const cx = (V.x0 + V.x1) / 2;
+    if (esJugador(tipo)) return { x: enVista(cx - 3 + (cuantos % 6) * 1.25), y: 2.4 + Math.floor(cuantos / 6) * 1.3 };
+    return { x: enVista(cx - 4 + (cuantos % 8) * 1.15), y: 13 - Math.floor(cuantos / 8) * 1.2 };
   };
 
   const agregar = (tipo: TipoElemento) => {
-    if (anim) return;
+    if (ocupado) return;
     let etiqueta = siguienteEtiqueta(p, tipo);
     if (tipo === "texto") {
       const t = window.prompt("Texto a mostrar en la pista:", "");
       if (!t) return;
-      etiqueta = t;
+      etiqueta = t.slice(0, 40);
     }
     const id = nuevoId();
     cambiar((d) => {
-      d.elementos.push({ id, tipo, etiqueta, color: COLOR_DEFECTO[tipo], rot: esJugador(tipo) ? undefined : 0 });
-      d.inicial[id] = posLibre(tipo);
+      d.elementos.push({ id, tipo, etiqueta, color: colorActivo ?? COLOR_DEFECTO[tipo], rot: esJugador(tipo) ? undefined : 0 });
+      d.inicial[id] = posNueva(tipo);
+      if (tipo === "balon") d.poseedor[id] = null;
     });
     setSel(id);
-    setVerTodo(false);
+    setEspecial(null);
+    if (tipo === "balon") avisar("Toca el balón y después un jugador para dárselo.");
   };
 
-  const quinteto = (defensa: boolean) => {
-    if (p.elementos.length && !window.confirm("Se sustituirá lo que hay en la pizarra. ¿Continuar?")) return;
-    // posiciones 1-2-2 en coordenadas locales de media pista (u a lo ancho, v desde el fondo)
-    const local: Punto[] = [
-      { x: 7.5, y: 8.9 }, { x: 12.6, y: 6.2 }, { x: 2.4, y: 6.2 }, { x: 10.6, y: 2.4 }, { x: 4.4, y: 2.4 },
-    ];
-    const aPista = (q: Punto): Punto => (p.pista === "completa" ? { x: q.y, y: q.x } : q);
-    const aro = p.pista === "completa" ? { x: 1.575, y: 7.5 } : { x: 7.5, y: 1.575 };
+  /** Coordenadas locales de media pista (u a lo ancho, v desde el fondo) → pista */
+  const local = (u: number, v: number): Punto =>
+    p.vista === "defensiva" ? { x: v, y: 15 - u } : { x: 28 - v, y: u };
+  const aroVista = p.vista === "defensiva" ? AROS[0] : AROS[1];
+
+  const cinco = (tipo: "atacante" | "defensor") => {
+    if (ocupado) return;
+    const sitios: [number, number][] = [[7.5, 8.9], [12.6, 6.2], [2.4, 6.2], [10.6, 2.4], [4.4, 2.4]];
     cambiar((d) => {
-      d.elementos = []; d.inicial = {}; d.fases = [{ movimientos: [], balon: null }]; d.balonInicial = null;
-      local.forEach((q, i) => {
+      const atacantes = d.elementos.filter((e) => e.tipo === "atacante");
+      sitios.forEach(([u, v], i) => {
         const id = nuevoId();
-        const pos = aPista(q);
-        d.elementos.push({ id, tipo: "atacante", etiqueta: String(i + 1), color: COLOR_DEFECTO.atacante });
-        d.inicial[id] = pos;
-        if (i === 0) d.balonInicial = id;
-        if (defensa) {
-          const dx = nuevoId();
-          const v = { x: aro.x - pos.x, y: aro.y - pos.y };
-          const L = Math.hypot(v.x, v.y) || 1;
-          d.elementos.push({ id: dx, tipo: "defensor", etiqueta: `X${i + 1}`, color: COLOR_DEFECTO.defensor });
-          d.inicial[dx] = { x: pos.x + (v.x / L) * 1.2, y: pos.y + (v.y / L) * 1.2 };
+        const etiqueta = tipo === "defensor" ? `X${i + 1}` : String(i + 1);
+        if (d.elementos.some((e) => e.tipo === tipo && e.etiqueta === etiqueta)) return;
+        let pos = local(u, v);
+        if (tipo === "defensor") {
+          const par = atacantes.find((a) => a.etiqueta === String(i + 1));
+          const base = par ? est[cursor].pos[par.id] ?? pos : pos;
+          const vx = aroVista.x - base.x, vy = aroVista.y - base.y;
+          const L = Math.hypot(vx, vy) || 1;
+          pos = { x: base.x + (vx / L) * 1.2, y: base.y + (vy / L) * 1.2 };
         }
+        d.elementos.push({ id, tipo, etiqueta, color: colorActivo ?? COLOR_DEFECTO[tipo] });
+        d.inicial[id] = pos;
       });
     });
-    setPaso(0); setSel(null); setVerTodo(false);
   };
 
-  const borrarElemento = (id: string) =>
-    cambiar((d) => {
-      d.elementos = d.elementos.filter((x) => x.id !== id);
-      delete d.inicial[id];
-      if (d.balonInicial === id) d.balonInicial = null;
-      d.fases.forEach((f) => {
-        f.movimientos = f.movimientos.filter((m) => m.elementoId !== id);
-        if (f.balon && (f.balon.de === id || f.balon.a === id)) f.balon = null;
-      });
-    });
+  // ---------- fotogramas ----------
+  /** Asegura el fotograma donde se graba (el siguiente al cursor) y lo devuelve */
+  const fotogramaGrabacion = (d: Pizarra): Fotograma => {
+    if (cursor >= d.fotogramas.length) d.fotogramas.push({ movimientos: [], balon: [] });
+    return d.fotogramas[cursor];
+  };
 
-  const editarElemento = (id: string, campos: Partial<Elemento>) =>
-    cambiar((d) => {
-      const el = d.elementos.find((x) => x.id === id);
-      if (el) Object.assign(el, campos);
-    });
-
-  const borrarSeleccion = () => {
-    if (!elSel) return;
-    if (paso > 0 && fase) {
-      const tieneMov = fase.movimientos.some((m) => m.elementoId === elSel.id);
-      const tieneBalon = fase.balon && (fase.balon.de === elSel.id || fase.balon.a === elSel.id);
-      if (tieneMov || tieneBalon) {
-        cambiar((d) => {
-          const f = d.fases[paso - 1];
-          f.movimientos = f.movimientos.filter((m) => m.elementoId !== elSel.id);
-          if (f.balon && (f.balon.de === elSel.id || f.balon.a === elSel.id)) f.balon = null;
-        });
-        return;
+  const desplazarRecorridos = (d: Pizarra, id: string, desde: number, dx: number, dy: number) => {
+    for (let j = desde; j < d.fotogramas.length; j++) {
+      for (const m of d.fotogramas[j].movimientos) {
+        if (m.elementoId !== id) continue;
+        m.puntos = m.puntos.map((v, i) => v + (i % 2 ? dy : dx));
       }
     }
-    if (window.confirm(`¿Quitar ${NOMBRE[elSel.tipo].toLowerCase()} ${elSel.etiqueta} de la pizarra?`)) {
-      borrarElemento(elSel.id);
-      setSel(null);
-    }
-  };
-
-  // ---------- fases ----------
-  const quitarFase = () => {
-    if (p.fases.length <= 1) return;
-    const ult = p.fases[p.fases.length - 1];
-    if ((ult.movimientos.length || ult.balon) && !window.confirm(`¿Borrar la fase ${p.fases.length} y sus movimientos?`)) return;
-    cambiar((d) => { d.fases.pop(); });
-    setPaso((k) => Math.min(k, p.fases.length - 1));
-  };
-
-  // ---------- grabar / captura (como en Coach Studio) ----------
-  const grabando = paso > 0;
-  const alternarGrabar = () => {
-    setVerTodo(false); setAnim(null); setModoBalon(null); setSel(null);
-    if (grabando) { setPaso(0); return; }
-    if (!p.elementos.length) { avisar("Primero añade jugadores en la pista."); return; }
-    setPaso(p.fases.length); // continúa en la última captura
-    avisar("Grabando: arrastra a los jugadores; cada movimiento se queda grabado.");
-  };
-  const capturar = () => {
-    if (!fase) return;
-    if (!fase.movimientos.length && !fase.balon) { avisar("Haz algún movimiento antes de capturar."); return; }
-    if (paso < p.fases.length) { setPaso(paso + 1); return; }
-    if (p.fases.length >= MAX_FASES) { avisar(`Máximo ${MAX_FASES} capturas por pizarra.`); return; }
-    cambiar((d) => { d.fases.push({ movimientos: [], balon: null }); });
-    setPaso(p.fases.length + 1);
-    setSel(null);
-    avisar(`Captura ${paso} guardada. Sigue moviendo: ahora es la imagen ${paso + 1}.`);
   };
 
   // ---------- balón ----------
-  const accionBalon = (tipo: "pase" | "mano" | "tiro") => {
-    if (!e || !fase) return;
-    const quien = e.balonInicio;
-    if (!quien) {
-      avisar("Nadie tiene el balón en esta fase. Ve a «Inicio», toca un atacante y pulsa «Con balón».");
+  const darBalon = (balon: string, jugador: string) => {
+    setBalonSel(null);
+    if (!grabando) {
+      if (cursor > 0 && n > 0) { avisar("Para pasar el balón durante la jugada, pulsa REC."); return; }
+      cambiar((d) => { d.poseedor[balon] = d.poseedor[balon] === jugador ? null : jugador; });
       return;
     }
-    if (tipo === "tiro") {
-      cambiar((d) => { d.fases[paso - 1].balon = { tipo: "tiro", de: quien }; });
-      setModoBalon(null);
-      return;
-    }
-    setModoBalon((m) => (m === tipo ? null : tipo));
-    setSel(null);
-    avisar(tipo === "pase" ? "Toca al jugador que recibe el pase." : "Toca al jugador que recibe el mano a mano.");
+    const tiene = E.poseedor[balon] ?? null;
+    if (tiene === jugador) return;
+    const accion: AccionBalon = tiene ? { balon, tipo: "pase", de: tiene, a: jugador } : { balon, tipo: "coger", a: jugador };
+    cambiar((d) => {
+      const f = fotogramaGrabacion(d);
+      f.balon = [...f.balon.filter((a) => a.balon !== balon), accion];
+    }, cursor + 1);
   };
 
-  // ---------- interacción ----------
+  const tirar = (destino: Punto) => {
+    const balon = balonSel;
+    setBalonSel(null);
+    if (!balon) return;
+    if (!grabando) { avisar("Para tirar, pulsa REC."); return; }
+    const tiene = E.poseedor[balon];
+    if (!tiene) { avisar("Para tirar, el balón tiene que tenerlo un jugador."); return; }
+    cambiar((d) => {
+      const f = fotogramaGrabacion(d);
+      f.balon = [...f.balon.filter((a) => a.balon !== balon), { balon, tipo: "tiro", de: tiene, destino }];
+    }, cursor + 1);
+  };
+
+  // ---------- toques ----------
   const tocar = (el: Elemento) => {
-    if (anim) return;
-    if (modoBalon && e && fase) {
-      const de = e.balonInicio;
-      if (!de || el.id === de || el.tipo !== "atacante") { avisar("Elige a otro atacante como receptor."); return; }
-      const accion: AccionBalon = { tipo: modoBalon, de, a: el.id };
-      cambiar((d) => { d.fases[paso - 1].balon = accion; });
-      setModoBalon(null);
-      setAviso(null);
+    if (ocupado || herramienta !== "mover") return;
+    setEspecial(null);
+    setSelDibujo(null);
+    if (el.tipo === "balon") {
+      if (balonSel === el.id) { setBalonSel(null); return; }
+      setBalonSel(el.id);
+      setSel(el.id);
+      avisar(grabando ? "Toca al jugador que recibe el pase, o una canasta para tirar." : "Toca al jugador que tendrá el balón.");
       return;
     }
+    if (balonSel && esJugador(el.tipo)) { darBalon(balonSel, el.id); return; }
     setSel((s) => (s === el.id ? null : el.id));
   };
 
-  const posicionMostrada = (id: string): Punto | undefined => (paso === 0 || verTodo ? p.inicial[id] : e?.fin[id]);
-
-  const tipoTrazoPara = (el: Elemento): TipoTrazo => {
-    if (trazo !== "auto") return el.tipo === "atacante" || el.tipo === "defensor" || trazo !== "botar" ? trazo : "correr";
-    if (el.tipo === "atacante" && e?.balonInicio === el.id && !fase?.balon) return "botar";
-    return "correr";
+  const editarEtiqueta = (el: Elemento) => {
+    if (!esJugador(el.tipo) && el.tipo !== "texto") return;
+    const t = window.prompt(el.tipo === "texto" ? "Texto:" : "Etiqueta (número o nombre corto):", el.etiqueta);
+    if (t !== null && t.trim()) cambiar((d) => { const x = d.elementos.find((q) => q.id === el.id); if (x) x.etiqueta = t.trim().slice(0, el.tipo === "texto" ? 40 : 3); });
   };
 
+  // ---------- arrastre ----------
+  const arrastrable = (el: Elemento) =>
+    !ocupado && !especial && herramienta === "mover" && !(el.tipo === "balon" && E.poseedor[el.id]);
+
   const inicioArrastre = (el: Elemento) => {
-    // OJO: no seleccionar aquí. Si aparece algo encima de la pista durante el arrastre,
-    // la pista se desplaza bajo el dedo y el jugador "se escapa".
-    setModoBalon(null);
-    if (paso > 0) {
-      const pos = posicionMostrada(el.id);
+    setBalonSel(null);
+    if (grabando) {
+      const pos = E.pos[el.id];
       vivoRef.current = pos ? { id: el.id, puntos: [pos.x, pos.y] } : null;
       setVivo(vivoRef.current);
     }
   };
 
   const durante = (el: Elemento, node: Konva.Node) => {
+    setArrastre({ id: el.id, x: node.x(), y: node.y() }); // para que el balón le acompañe
     const v = vivoRef.current;
-    if (paso === 0 || !v || v.id !== el.id) return;
+    if (!grabando || !v || v.id !== el.id) return;
     const x = node.x(), y = node.y();
-    const n = v.puntos.length;
-    if (Math.hypot(x - v.puntos[n - 2], y - v.puntos[n - 1]) < 0.12) return;
+    const k = v.puntos.length;
+    if (Math.hypot(x - v.puntos[k - 2], y - v.puntos[k - 1]) < 0.12) return;
     v.puntos = [...v.puntos, x, y];
     setVivo({ id: v.id, puntos: v.puntos });
   };
 
+  const tipoAuto = (el: Elemento): TipoTrazo =>
+    el.tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
+
   const finArrastre = (el: Elemento, node: Konva.Node) => {
+    setArrastre(null);
     const destino = { x: node.x(), y: node.y() };
-    if (paso === 0) {
+    const actual = E.pos[el.id];
+    if (!grabando) {
+      // Sin grabar: recoloca el elemento (y desplaza sus recorridos con él)
+      if (!actual) return;
+      const dx = destino.x - actual.x, dy = destino.y - actual.y;
       cambiar((d) => {
-        d.inicial[el.id] = destino;
-        const m = d.fases[0]?.movimientos.find((x) => x.elementoId === el.id);
-        if (m) { m.puntos[0] = destino.x; m.puntos[1] = destino.y; }
+        d.inicial[el.id] = { x: d.inicial[el.id].x + dx, y: d.inicial[el.id].y + dy };
+        desplazarRecorridos(d, el.id, 0, dx, dy);
       });
       return;
     }
     const v = vivoRef.current;
-    const previa = posicionMostrada(el.id);
-    const origen = v && v.id === el.id ? v.puntos : previa ? [previa.x, previa.y] : [];
     vivoRef.current = null;
     setVivo(null);
+    const origen = v && v.id === el.id ? v.puntos : actual ? [actual.x, actual.y] : [];
     const puntos = simplificar([...origen, destino.x, destino.y]);
     if (puntos.length < 4 || longitud(puntos) < 0.4) {
-      if (previa) node.position(previa); // arrastre demasiado corto: vuelve a su sitio
+      if (actual) node.position(actual);
       return;
     }
+    const finAntes = est[Math.min(cursor + 1, n)]?.pos[el.id] ?? actual;
     cambiar((d) => {
-      const f = d.fases[paso - 1];
-      const existente = f.movimientos.find((m) => m.elementoId === el.id);
-      if (existente) {
-        existente.puntos = [...existente.puntos, ...puntos.slice(2)];
-      } else {
-        f.movimientos.push({ elementoId: el.id, tipo: tipoTrazoPara(el), puntos });
+      const f = fotogramaGrabacion(d);
+      f.movimientos = [...f.movimientos.filter((m) => m.elementoId !== el.id), { elementoId: el.id, tipo: tipoAuto(el), puntos }];
+      if (cursor + 1 < d.fotogramas.length && finAntes) {
+        desplazarRecorridos(d, el.id, cursor + 1, destino.x - finAntes.x, destino.y - finAntes.y);
       }
-    });
+    }, cursor + 1);
   };
 
-  const fondoTocado = (ev: Konva.KonvaEventObject<Event>) => {
-    if (ev.target === ev.target.getStage()) { setSel(null); setModoBalon(null); }
+  // ---------- dibujo libre (flecha y lápiz) ----------
+  const puntero = (): Punto | null => {
+    const s = stageRef.current?.getPointerPosition();
+    return s ? { x: s.x / escala + V.x0, y: s.y / escala } : null;
   };
+  const empezarDibujo = () => {
+    if (herramienta === "mover" || ocupado || especial) return;
+    const q = puntero();
+    if (q) setDibujoVivo([q.x, q.y]);
+  };
+  const seguirDibujo = () => {
+    if (!dibujoVivo) return;
+    const q = puntero();
+    if (!q) return;
+    const k = dibujoVivo.length;
+    if (Math.hypot(q.x - dibujoVivo[k - 2], q.y - dibujoVivo[k - 1]) < 0.1) return;
+    setDibujoVivo(herramienta === "flecha" ? [dibujoVivo[0], dibujoVivo[1], q.x, q.y] : [...dibujoVivo, q.x, q.y]);
+  };
+  const acabarDibujo = () => {
+    if (!dibujoVivo) return;
+    const pts = herramienta === "lapiz" ? simplificar(dibujoVivo, 0.12) : dibujoVivo;
+    setDibujoVivo(null);
+    if (pts.length < 4 || longitud(pts) < 0.4) return;
+    const dib: Dibujo = { id: nuevoId(), tipo: herramienta === "flecha" ? "flecha" : "lapiz", puntos: pts, color: colorActivo ?? TINTA, seg: tramoDeCursor(p, cursor) };
+    cambiar((d) => { d.dibujos.push(dib); });
+  };
+
+  // ---------- borrar ----------
+  const quitarElemento = (id: string) =>
+    cambiar((d) => {
+      d.elementos = d.elementos.filter((x) => x.id !== id);
+      delete d.inicial[id];
+      delete d.poseedor[id];
+      for (const k of Object.keys(d.poseedor)) if (d.poseedor[k] === id) d.poseedor[k] = null;
+      d.fotogramas.forEach((f) => {
+        f.movimientos = f.movimientos.filter((m) => m.elementoId !== id);
+        f.balon = f.balon.filter((a) => a.balon !== id && a.de !== id && a.a !== id);
+      });
+      const c = compactar(d);
+      setCursor((k) => Math.min(k, c.fotogramas.length));
+      return c;
+    });
+
+  const ultimoFot = cursor > 0 ? p.fotogramas[cursor - 1] : null;
+  const movSel = elSel && ultimoFot ? ultimoFot.movimientos.find((m) => m.elementoId === elSel.id) : undefined;
+  const balonSelAccion = elSel && ultimoFot ? ultimoFot.balon.find((a) => a.balon === elSel.id || a.de === elSel.id || a.a === elSel.id) : undefined;
+
+  const borrarSeleccion = () => {
+    if (selDibujo) { cambiar((d) => { d.dibujos = d.dibujos.filter((x) => x.id !== selDibujo); }); setSelDibujo(null); return; }
+    if (!elSel) return;
+    if (movSel || balonSelAccion) {
+      cambiar((d) => {
+        const f = d.fotogramas[cursor - 1];
+        f.movimientos = f.movimientos.filter((m) => m.elementoId !== elSel.id);
+        f.balon = f.balon.filter((a) => a.balon !== elSel.id && a.de !== elSel.id && a.a !== elSel.id);
+        const c = compactar(d);
+        if (c.fotogramas.length < d.fotogramas.length) setCursor((k) => Math.max(0, k - 1));
+        return c;
+      });
+      return;
+    }
+    if (window.confirm(`¿Quitar ${NOMBRE[elSel.tipo].toLowerCase()} ${elSel.etiqueta} de la pizarra?`)) {
+      quitarElemento(elSel.id);
+      setSel(null);
+    }
+  };
+
+  const borrarGrabacion = () => {
+    if (!n && !p.dibujos.length) return;
+    if (!window.confirm("¿Borrar toda la grabación (movimientos, pases, capturas y dibujos)? Los jugadores se quedan en su posición inicial.")) return;
+    cambiar((d) => { d.fotogramas = []; d.capturas = []; d.dibujos = []; }, 0);
+    setEspecial(null);
+  };
+  const reiniciar = () => {
+    if (!p.elementos.length && !n) return;
+    if (!window.confirm("¿Empezar una pizarra nueva? Se borrará todo.")) return;
+    cambiar(() => ({ ...pizarraVacia(), vista: p.vista, config: p.config }), 0);
+    setGrabando(false); setEspecial(null); limpiarSeleccion();
+  };
+
+  // ---------- capturas ----------
+  const capturar = () => {
+    if (!grabando) { avisar("Pulsa REC para grabar y capturar."); return; }
+    const ultimaCaptura = Math.max(0, ...p.capturas.filter((b) => b <= cursor));
+    if (cursor === 0 || cursor <= ultimaCaptura) { avisar("Haz algún movimiento antes de capturar."); return; }
+    if (p.capturas.length >= MAX_CAPTURAS) { avisar(`Máximo ${MAX_CAPTURAS} capturas.`); return; }
+    cambiar((d) => { d.capturas = [...new Set([...d.capturas, cursor])].sort((a, b) => a - b); });
+    avisar(`📷 Captura ${p.capturas.length + 1} hecha. Las líneas se limpian; sigue grabando.`);
+  };
+
+  /** Imágenes (tramos entre capturas) con contenido */
+  const segmentos = useMemo(() => {
+    const cortes = [...p.capturas].sort((a, b) => a - b);
+    const lista: { seg: number; inicio: number; fin: number }[] = [];
+    let ini = 0;
+    cortes.forEach((c, i) => { lista.push({ seg: i, inicio: ini, fin: c }); ini = c; });
+    lista.push({ seg: cortes.length, inicio: ini, fin: p.fotogramas.length });
+    return lista.filter((s) => s.fin > s.inicio || p.dibujos.some((d) => d.seg === s.seg));
+  }, [p]);
+
+  // ---------- reproducción ----------
+  const VEL = 4.2 * p.config.velocidad;
+  const tiempos = (f: Fotograma) => {
+    const maxL = Math.max(0, ...f.movimientos.map((m) => longitud(m.puntos)));
+    const mov = f.movimientos.length ? Math.max(450, (maxL / VEL) * 1000) : 0;
+    const bal = f.balon.length ? 650 / p.config.velocidad : 0;
+    return { mov, bal, total: mov + bal + 250 / p.config.velocidad };
+  };
+
+  const reproducir = (desde?: number) =>
+    new Promise<void>((resolve) => {
+      if (!n) { avisar("Todavía no hay nada grabado."); resolve(); return; }
+      setEspecial(null); limpiarSeleccion();
+      let f = desde ?? (cursor >= n ? 0 : cursor);
+      setCursor(f);
+      let t0 = performance.now();
+      const paso = (ahora: number) => {
+        if (ahora - t0 >= tiempos(p.fotogramas[f]).total) {
+          f++;
+          setCursor(f);
+          if (f >= n) { setAnim(null); resolve(); return; }
+          t0 = ahora;
+        }
+        setAnim({ f, t: ahora - t0 });
+        rafRef.current = requestAnimationFrame(paso);
+      };
+      rafRef.current = requestAnimationFrame(paso);
+    });
+  const parar = () => { cancelAnimationFrame(rafRef.current); setAnim(null); };
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
+  const irA = (k: number) => { if (ocupado) return; setEspecial(null); setCursor(Math.max(0, Math.min(n, k))); limpiarSeleccion(); };
+
+  // ---------- exportar ----------
+  const imagenActual = (calidad = 2) =>
+    stageRef.current?.toDataURL({ pixelRatio: calidad, mimeType: "image/jpeg", quality: 0.92 }) ?? "";
+
+  const descargarPNG = async () => {
+    setPanel(null); limpiarSeleccion();
+    await esperarPintado();
+    const url = stageRef.current?.toDataURL({ pixelRatio: 2 });
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url; a.download = `${titulo}.png`; a.click();
+  };
+
+  const descargarPDF = async () => {
+    setPanel(null);
+    if (!segmentos.length) { avisar("No hay capturas que exportar."); return; }
+    setExportando("Preparando PDF…");
+    limpiarSeleccion();
+    const imgs: string[] = [];
+    for (const s of segmentos) {
+      setEspecial({ tipo: "captura", seg: s.seg });
+      await esperarPintado();
+      imgs.push(imagenActual(2));
+    }
+    setEspecial(null);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const W = 297, H = 210, m = 12;
+      const ratio = anchoVista / ALTO;
+      let w = W - m * 2, h = w / ratio;
+      if (h > H - m * 2 - 10) { h = H - m * 2 - 10; w = h * ratio; }
+      imgs.forEach((src, i) => {
+        if (i) doc.addPage();
+        doc.setFontSize(13);
+        doc.text(`${titulo} · Imagen ${i + 1} de ${imgs.length}`, m, m);
+        doc.addImage(src, "JPEG", (W - w) / 2, m + 6, w, h);
+      });
+      doc.save(`${titulo}.pdf`);
+    } catch {
+      avisar("No se ha podido generar el PDF.");
+    }
+    setExportando(null);
+  };
+
+  const descargarVideo = async () => {
+    setPanel(null);
+    if (!n) { avisar("Graba algún movimiento antes de exportar el vídeo."); return; }
+    const canvas = layerRef.current?.getNativeCanvasElement() as (HTMLCanvasElement & { captureStream?: (fps: number) => MediaStream }) | undefined;
+    if (!canvas?.captureStream || typeof MediaRecorder === "undefined") {
+      avisar("Este navegador no permite grabar vídeo. Prueba con Chrome.");
+      return;
+    }
+    const tipos = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
+    const mime = tipos.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+    const rec = new MediaRecorder(canvas.captureStream(30), mime ? { mimeType: mime } : undefined);
+    const trozos: Blob[] = [];
+    rec.ondataavailable = (ev) => { if (ev.data.size) trozos.push(ev.data); };
+    const terminado = new Promise<void>((r) => { rec.onstop = () => r(); });
+    setExportando("Grabando vídeo…");
+    setCursor(0);
+    await esperarPintado();
+    rec.start();
+    await dormir(500);
+    await reproducir(0);
+    await dormir(800);
+    rec.stop();
+    await terminado;
+    const blob = new Blob(trozos, { type: mime || "video/webm" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${titulo}.${mime.startsWith("video/mp4") ? "mp4" : "webm"}`;
+    a.click();
+    setExportando(null);
+  };
+
+  // miniatura del ejercicio: todas las imágenes superpuestas
+  useEffect(() => {
+    registrarCaptura?.(async () => {
+      setEspecial({ tipo: "todas" }); setSel(null); setSelDibujo(null); setBalonSel(null);
+      await esperarPintado();
+      const url = stageRef.current?.toDataURL({ pixelRatio: Math.min(2, 900 / Math.max(1, anchoVista * escala)), mimeType: "image/jpeg", quality: 0.85 }) ?? "";
+      setEspecial(null);
+      return url;
+    });
+  }, [registrarCaptura, escala, anchoVista]);
 
   // ---------- teclado ----------
   useEffect(() => {
@@ -339,134 +533,97 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
       const t = ev.target as HTMLElement;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); deshacer(); return; }
-      if (ev.key === "Escape") { setSel(null); setModoBalon(null); return; }
-      if ((ev.key === "Delete" || ev.key === "Backspace") && sel) { ev.preventDefault(); borrarSeleccion(); return; }
-      if (ev.key === " ") { ev.preventDefault(); reproducir(); return; }
+      if (ev.key === "Escape") { limpiarSeleccion(); setHerramienta("mover"); return; }
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); irA(cursor - 1); return; }
+      if (ev.key === "ArrowRight") { ev.preventDefault(); irA(cursor + 1); return; }
+      if (ev.key === "Home") { irA(0); return; }
+      if (ev.key === "End") { irA(n); return; }
+      if (ev.key === " ") { ev.preventDefault(); if (anim) parar(); else void reproducir(); return; }
+      if (ev.key.toLowerCase() === "c" && !ev.ctrlKey && !ev.metaKey) { capturar(); return; }
+      if ((ev.key === "Delete" || ev.key === "Backspace") && (sel || selDibujo)) { ev.preventDefault(); borrarSeleccion(); return; }
       if (ev.key.toLowerCase() === "r" && elSel && !esJugador(elSel.tipo)) {
-        editarElemento(elSel.id, { rot: ((elSel.rot ?? 0) + (ev.shiftKey ? -45 : 45) + 360) % 360 });
+        const nuevo = (((elSel.rot ?? 0) + (ev.shiftKey ? -45 : 45)) % 360 + 360) % 360;
+        cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (x) x.rot = nuevo; });
       }
     };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   });
 
-  // ---------- animación ----------
-  const VEL = 4.2; // m/s: todos a la misma velocidad → la duración es proporcional al recorrido
-  const tiempos = (f: Fase) => {
-    const maxL = Math.max(0, ...f.movimientos.map((m) => longitud(m.puntos)));
-    const mov = f.movimientos.length ? Math.max(700, (maxL / VEL) * 1000) : 250;
-    const bal = f.balon ? (f.balon.tipo === "tiro" ? 750 : 600) : 0;
-    return { mov, bal, total: mov + bal + 350 };
-  };
+  // =====================================================================
+  // Escena a dibujar
+  // =====================================================================
+  let posiciones: Record<string, Punto> = {};
+  let poseedores: Record<string, string | null> = {};
+  const balonEnVuelo: Record<string, Punto> = {};
+  type Linea = { m: Movimiento; f: number; op: number; num?: number };
+  type AccLinea = { a: AccionBalon; f: number; op: number; num?: number };
+  const lineas: Linea[] = [];
+  const acciones: AccLinea[] = [];
+  let dibujosVisibles: Dibujo[] = [];
 
-  const reproducir = () => {
-    if (anim) { cancelAnimationFrame(rafRef.current); setAnim(null); return; }
-    setVerTodo(false); setSel(null); setModoBalon(null);
-    let i = 0;
-    let t0 = performance.now();
-    const paso_ = (ahora: number) => {
-      const t = ahora - t0;
-      if (t >= tiempos(p.fases[i]).total) {
-        i++;
-        if (i >= p.fases.length) { setAnim(null); setPaso(p.fases.length); return; }
-        t0 = ahora;
-      }
-      setAnim({ fase: i, t: ahora - t0 });
-      rafRef.current = requestAnimationFrame(paso_);
-    };
-    rafRef.current = requestAnimationFrame(paso_);
-  };
-  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
-
-  // ---------- captura (miniatura con todas las fases) ----------
-  useEffect(() => {
-    registrarCaptura?.(async () => {
-      setVerTodo(true); setSel(null);
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const url = stageRef.current?.toDataURL({
-        pixelRatio: Math.min(2, 900 / Math.max(1, W * escala)), mimeType: "image/jpeg", quality: 0.85,
-      }) ?? "";
-      setVerTodo(false);
-      return url;
-    });
-  }, [registrarCaptura, escala, W]);
-
-  const descargar = () => {
-    setSel(null);
-    requestAnimationFrame(() => {
-      const url = stageRef.current?.toDataURL({ pixelRatio: 2 });
-      if (!url) return;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = verTodo ? "pizarra-completa.png" : paso === 0 ? "pizarra-inicio.png" : `pizarra-fase-${paso}.png`;
-      a.click();
-    });
-  };
-
-  // ---------- qué se dibuja ----------
-  const posiciones: Record<string, Punto> = {};
-  let balonEn: Punto | null = null;
-  let lineas: { m: Movimiento; fase: number }[] = [];
-  let accionesBalon: { a: AccionBalon; fase: number; desde: Punto; hasta: Punto }[] = [];
-
-  const destinoAccion = (a: AccionBalon, pos: Record<string, Punto>): Punto | null =>
-    a.tipo === "tiro" ? (pos[a.de] ? canastaCercana(p.pista, pos[a.de]) : null) : a.a ? pos[a.a] ?? null : null;
-
-  if (anim) {
-    const ea = est[anim.fase];
-    const fa = p.fases[anim.fase];
-    const { mov, bal } = tiempos(fa);
-    const maxL = Math.max(0.001, ...fa.movimientos.map((m) => longitud(m.puntos)));
-    const recorrido = (Math.min(anim.t, mov) / mov) * maxL; // metros recorridos por todos a la misma velocidad
-    for (const el of p.elementos) {
-      const m = fa.movimientos.find((x) => x.elementoId === el.id);
-      posiciones[el.id] = m ? puntoEn(m.puntos, recorrido / Math.max(0.001, longitud(m.puntos))) : ea.inicio[el.id];
+  const lineasDe = (desde: number, hasta: number, op = 1, numerar?: (f: number) => number) => {
+    for (let f = desde; f < hasta; f++) {
+      const fot = p.fotogramas[f];
+      if (!fot) continue;
+      fot.movimientos.forEach((m) => lineas.push({ m, f, op, num: numerar?.(f) }));
+      fot.balon.forEach((a) => acciones.push({ a, f, op, num: numerar?.(f) }));
     }
-    lineas = fa.movimientos.map((m) => ({ m, fase: anim.fase }));
-    if (fa.balon && anim.t > mov) {
+  };
+
+  if (anim && p.fotogramas[anim.f]) {
+    const f = anim.f;
+    const fot = p.fotogramas[f];
+    const S0 = est[f];
+    const { mov, bal } = tiempos(fot);
+    const maxL = Math.max(0.001, ...fot.movimientos.map((m) => longitud(m.puntos)));
+    const recorrido = mov ? (Math.min(anim.t, mov) / mov) * maxL : 0;
+    posiciones = { ...S0.pos };
+    for (const m of fot.movimientos) posiciones[m.elementoId] = puntoEn(m.puntos, recorrido / Math.max(0.001, longitud(m.puntos)));
+    poseedores = { ...S0.poseedor };
+    for (const a of fot.balon) {
+      if (anim.t <= mov) continue;
       const k = Math.min(1, (anim.t - mov) / Math.max(1, bal));
-      const desde = posiciones[fa.balon.de];
-      const hasta = destinoAccion(fa.balon, posiciones);
-      if (desde && hasta) balonEn = { x: desde.x + (hasta.x - desde.x) * k, y: desde.y + (hasta.y - desde.y) * k };
-    } else if (ea.balonInicio && posiciones[ea.balonInicio]) {
-      balonEn = posiciones[ea.balonInicio];
-    }
-  } else if (verTodo) {
-    Object.assign(posiciones, p.inicial);
-    p.fases.forEach((f, i) => {
-      lineas.push(...f.movimientos.map((m) => ({ m, fase: i })));
-      if (f.balon) {
-        const desde = est[i].fin[f.balon.de];
-        const hasta = destinoAccion(f.balon, est[i].fin);
-        if (desde && hasta) accionesBalon.push({ a: f.balon, fase: i, desde, hasta });
+      const desde = a.de ? posiciones[a.de] : S0.pos[a.balon];
+      const hasta = a.tipo === "tiro" ? a.destino : a.a ? posiciones[a.a] : undefined;
+      if (desde && hasta) {
+        poseedores[a.balon] = null;
+        balonEnVuelo[a.balon] = { x: desde.x + (hasta.x - desde.x) * k, y: desde.y + (hasta.y - desde.y) * k };
       }
-    });
-    if (p.balonInicial && p.inicial[p.balonInicial]) balonEn = p.inicial[p.balonInicial];
-  } else if (paso === 0) {
-    Object.assign(posiciones, p.inicial);
-    if (p.balonInicial && p.inicial[p.balonInicial]) balonEn = p.inicial[p.balonInicial];
-  } else if (e && fase) {
-    Object.assign(posiciones, e.fin);
-    lineas = fase.movimientos.map((m) => ({ m, fase: paso - 1 }));
-    if (fase.balon) {
-      const desde = e.fin[fase.balon.de];
-      const hasta = destinoAccion(fase.balon, e.fin);
-      if (desde && hasta) accionesBalon = [{ a: fase.balon, fase: paso - 1, desde, hasta }];
     }
-    const portador = fase.balon?.tipo === "tiro" ? null : e.balonFin;
-    if (portador && e.fin[portador]) balonEn = e.fin[portador];
+    const inicioSeg = Math.max(0, ...p.capturas.filter((b) => b < f + 1));
+    lineasDe(inicioSeg, f, 1);
+    lineasDe(f, f + 1, 0.35);
+    dibujosVisibles = p.dibujos.filter((d) => d.seg === tramoDeFotograma(p, f + 1));
+  } else if (especial?.tipo === "captura") {
+    const s = segmentos.find((x) => x.seg === especial.seg) ?? { seg: 0, inicio: 0, fin: 0 };
+    posiciones = { ...est[s.inicio].pos };
+    poseedores = { ...est[s.inicio].poseedor };
+    lineasDe(s.inicio, s.fin);
+    dibujosVisibles = p.dibujos.filter((d) => d.seg === s.seg);
+  } else if (especial?.tipo === "todas") {
+    posiciones = { ...est[0].pos };
+    poseedores = { ...est[0].poseedor };
+    lineasDe(0, n, 1, p.capturas.length ? (f) => tramoDeFotograma(p, f + 1) + 1 : undefined);
+    dibujosVisibles = p.dibujos;
+  } else {
+    posiciones = { ...E.pos };
+    poseedores = { ...E.poseedor };
+    const inicioSeg = Math.max(0, ...p.capturas.filter((b) => b <= cursor));
+    lineasDe(inicioSeg, cursor);
+    dibujosVisibles = p.dibujos.filter((d) => d.seg === tramoDeCursor(p, cursor));
   }
 
-  const tipoDe = (id: string) => p.elementos.find((x) => x.id === id)?.tipo;
-  const colorLinea = (m: Movimiento) => (tipoDe(m.elementoId) === "defensor" ? "#ca010c" : TINTA);
+  const elemento = (id?: string) => p.elementos.find((x) => x.id === id);
 
-  const dibujarMovimiento = (m: Movimiento, key: string, opacidad = 1, numero?: number) => {
-    const tipoEl = tipoDe(m.elementoId);
-    const material = tipoEl ? !esJugador(tipoEl) : false;
-    const color = material ? "#6b7686" : colorLinea(m);
+  // ---------- pintar líneas ----------
+  const pintarMovimiento = (m: Movimiento, key: string, op: number, num?: number) => {
+    const el = elemento(m.elementoId);
+    if (!el) return null;
+    const material = !esJugador(el.tipo);
+    const color = material ? "#6b7280" : el.tipo === "defensor" ? "#ca010c" : TINTA;
     const pts = material ? m.puntos : recortarFinal(m.puntos, R * 1.05);
-    const base = { stroke: color, fill: color, strokeWidth: 0.09, lineCap: "round" as const, lineJoin: "round" as const, opacity: opacidad, listening: false };
-    const n = m.puntos.length;
+    const base = { stroke: color, fill: color, strokeWidth: 0.09, lineCap: "round" as const, lineJoin: "round" as const, opacity: op, listening: false };
     const medio = puntoEn(m.puntos, 0.35);
     return (
       <Group key={key} listening={false}>
@@ -482,25 +639,29 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
         ) : (
           <Arrow points={pts} {...base} pointerLength={0.38} pointerWidth={0.34} tension={0.3} />
         )}
-        {numero !== undefined && n >= 4 && (
-          <T x={medio.x + 0.18} y={medio.y - 0.55} text={String(numero + 1)} fontSize={0.5} fontStyle="bold" fill={color} />
-        )}
+        {num !== undefined && <T x={medio.x + 0.18} y={medio.y - 0.55} text={String(num)} fontSize={0.5} fontStyle="bold" fill={color} />}
       </Group>
     );
   };
 
-  const dibujarAccion = (x: { a: AccionBalon; fase: number; desde: Punto; hasta: Punto }, key: string, opacidad = 1, numero?: number) => {
-    const { a, desde, hasta } = x;
+  const pintarAccion = (x: AccLinea, key: string) => {
+    const { a, f, op, num } = x;
+    if (a.tipo === "coger") return null;
+    const S = est[f + 1];
+    const desde = a.de ? S.pos[a.de] : undefined;
+    const hasta = a.tipo === "tiro" ? a.destino : a.a ? S.pos[a.a] : undefined;
+    if (!desde || !hasta) return null;
     const d = Math.hypot(hasta.x - desde.x, hasta.y - desde.y) || 1;
     const u = { x: (hasta.x - desde.x) / d, y: (hasta.y - desde.y) / d };
     const ini = { x: desde.x + u.x * R * 1.1, y: desde.y + u.y * R * 1.1 };
     const fin = a.tipo === "tiro" ? { x: hasta.x - u.x * 0.3, y: hasta.y - u.y * 0.3 } : { x: hasta.x - u.x * R * 1.15, y: hasta.y - u.y * R * 1.15 };
-    const base = { stroke: TINTA, fill: TINTA, strokeWidth: 0.08, lineCap: "round" as const, opacity: opacidad, listening: false };
+    const base = { stroke: TINTA, fill: TINTA, strokeWidth: 0.08, lineCap: "round" as const, opacity: op, listening: false };
+    const mano = a.tipo === "pase" && d < 1.9; // pase muy corto = mano a mano (entrega)
     const medio = { x: (ini.x + fin.x) / 2, y: (ini.y + fin.y) / 2 };
     return (
       <Group key={key} listening={false}>
-        {a.tipo === "pase" && <Arrow points={[ini.x, ini.y, fin.x, fin.y]} {...base} dash={[0.25, 0.18]} pointerLength={0.38} pointerWidth={0.34} />}
-        {a.tipo === "mano" && (
+        {a.tipo === "pase" && !mano && <Arrow points={[ini.x, ini.y, fin.x, fin.y]} {...base} dash={[0.25, 0.18]} pointerLength={0.38} pointerWidth={0.34} />}
+        {mano && (
           <>
             <Line points={[ini.x, ini.y, fin.x, fin.y]} {...base} />
             {barrasMano(ini, fin).map((b, i) => <Line key={i} points={b} {...base} strokeWidth={0.1} />)}
@@ -512,13 +673,26 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
             <Arrow points={[fin.x - u.x * 0.3, fin.y - u.y * 0.3, fin.x, fin.y]} {...base} pointerLength={0.4} pointerWidth={0.42} />
           </>
         )}
-        {numero !== undefined && (
-          <T x={medio.x + 0.15} y={medio.y - 0.6} text={String(numero + 1)} fontSize={0.5} fontStyle="bold" fill={TINTA} />
-        )}
+        {num !== undefined && <T x={medio.x + 0.15} y={medio.y - 0.6} text={String(num)} fontSize={0.5} fontStyle="bold" fill={TINTA} />}
       </Group>
     );
   };
 
+  const pintarDibujo = (d: Dibujo, key: string) => {
+    const seleccionado = selDibujo === d.id;
+    const elegir = () => { setSelDibujo(d.id); setSel(null); setBalonSel(null); };
+    const comun = {
+      stroke: d.color, fill: d.color, strokeWidth: 0.08, lineCap: "round" as const, lineJoin: "round" as const,
+      hitStrokeWidth: 0.6, listening: herramienta === "mover" && !ocupado && !especial,
+      shadowColor: "#eab308", shadowBlur: seleccionado ? 0.3 : 0, shadowOpacity: seleccionado ? 1 : 0,
+      onClick: elegir, onTap: elegir,
+    };
+    return d.tipo === "flecha"
+      ? <Arrow key={key} points={d.puntos} {...comun} pointerLength={0.38} pointerWidth={0.34} />
+      : <Line key={key} points={d.puntos} {...comun} tension={0.4} />;
+  };
+
+  // ---------- formas ----------
   const forma = (el: Elemento) => {
     const c = el.color;
     switch (el.tipo) {
@@ -526,7 +700,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
         return (
           <>
             <Circle radius={R} fill="#ffffff" stroke={c} strokeWidth={0.09} shadowColor="#000" shadowOpacity={0.2} shadowBlur={0.12} shadowOffsetY={0.04} />
-            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={el.etiqueta.length > 1 ? 0.5 : 0.62} fontStyle="bold" fill={c} />
+            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={(el.etiqueta.length > 1 ? 0.5 : 0.62) * p.config.tamano} fontStyle="bold" fill={c === "#ffffff" ? TINTA : c} />
           </>
         );
       case "defensor": {
@@ -537,7 +711,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
             <Circle radius={R} fill="rgba(255,255,255,0.55)" />
             <Line points={[-s, -s, s, s]} stroke={c} strokeWidth={0.14} lineCap="round" />
             <Line points={[-s, s, s, -s]} stroke={c} strokeWidth={0.14} lineCap="round" />
-            {num && <T x={s * 0.95} y={s * 0.05} text={num} fontSize={0.42} fontStyle="bold" fill={c} />}
+            {num && <T x={s * 0.95} y={s * 0.05} text={num} fontSize={0.42 * p.config.tamano} fontStyle="bold" fill={c} />}
           </>
         );
       }
@@ -545,7 +719,23 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
         return (
           <>
             <Rect x={-R} y={-R} width={R * 2} height={R * 2} cornerRadius={0.08} fill={c} />
-            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={0.58} fontStyle="bold" fill="#fff" />
+            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={0.58 * p.config.tamano} fontStyle="bold" fill="#fff" />
+          </>
+        );
+      case "balon":
+        return (
+          <>
+            <Circle radius={0.23} fill={c} stroke="#7a2c00" strokeWidth={0.045} />
+            <Line points={[-0.23, 0, 0.23, 0]} stroke="#7a2c00" strokeWidth={0.03} />
+            <Line points={[0, -0.23, 0, 0.23]} stroke="#7a2c00" strokeWidth={0.03} />
+          </>
+        );
+      case "canasta":
+        return (
+          <>
+            <Rect x={-1.2} y={-0.25} width={0.7} height={0.5} fill="#6b7280" />
+            <Line points={[-0.45, -0.9, -0.45, 0.9]} stroke={c} strokeWidth={0.12} />
+            <Circle radius={0.23} stroke="#fc6401" strokeWidth={0.08} />
           </>
         );
       case "cono":
@@ -576,347 +766,359 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 62
         );
       case "escalera": {
         const largo = 3, ancho = 0.55;
-        const peldaños = Array.from({ length: 7 }, (_, i) => -largo / 2 + (i * largo) / 6);
+        const peldanos = Array.from({ length: 7 }, (_, i) => -largo / 2 + (i * largo) / 6);
         return (
           <>
-            <Rect x={-ancho / 2} y={-largo / 2} width={ancho} height={largo} fill="rgba(255,255,255,0.01)" />
             <Line points={[-ancho / 2, -largo / 2, -ancho / 2, largo / 2]} stroke={c} strokeWidth={0.07} />
             <Line points={[ancho / 2, -largo / 2, ancho / 2, largo / 2]} stroke={c} strokeWidth={0.07} />
-            {peldaños.map((y, i) => <Line key={i} points={[-ancho / 2, y, ancho / 2, y]} stroke={c} strokeWidth={0.06} />)}
+            {peldanos.map((y, i) => <Line key={i} points={[-ancho / 2, y, ancho / 2, y]} stroke={c} strokeWidth={0.06} />)}
           </>
         );
       }
-      case "balon":
-        return (
-          <>
-            <Circle radius={0.24} fill={c} stroke="#7a2c00" strokeWidth={0.04} />
-            <Line points={[-0.24, 0, 0.24, 0]} stroke="#7a2c00" strokeWidth={0.03} />
-            <Line points={[0, -0.24, 0, 0.24]} stroke="#7a2c00" strokeWidth={0.03} />
-          </>
-        );
       case "texto":
         return <T text={el.etiqueta} fontSize={0.75} fontStyle="bold" fill={c} offsetX={(el.etiqueta.length * 0.75 * K) / 4} offsetY={(0.75 * K) / 2} />;
     }
   };
 
-  const enMovimiento = !!anim;
-  const pasoActual = anim ? anim.fase + 1 : verTodo ? -1 : paso;
+  const zonaTactil = (el: Elemento) => {
+    const transparente = "rgba(0,0,0,0.001)";
+    if (el.tipo === "escalera") return <Rect x={-0.5} y={-1.7} width={1} height={3.4} fill={transparente} />;
+    if (el.tipo === "valla") return <Rect x={-0.75} y={-0.35} width={1.5} height={0.7} fill={transparente} />;
+    if (el.tipo === "pica") return <Rect x={-0.35} y={-0.9} width={0.7} height={1.8} fill={transparente} />;
+    if (el.tipo === "canasta") return <Rect x={-1.25} y={-1} width={1.6} height={2} fill={transparente} />;
+    if (el.tipo === "balon") return <Circle radius={Math.max(0.42, 16 / escala)} fill={transparente} />;
+    return <Circle radius={esJugador(el.tipo) ? toque : Math.min(toque, 0.6)} fill={transparente} />;
+  };
 
+  // orden de pintado: material, jugadores y, encima de todo, los balones
+  const orden = (el: Elemento) => (el.tipo === "balon" ? 2 : esJugador(el.tipo) ? 1 : 0);
+  const elementosOrdenados = [...p.elementos].sort((a, b) => orden(a) - orden(b));
+
+  const posBalon = (id: string): Punto | undefined => {
+    if (balonEnVuelo[id]) return balonEnVuelo[id];
+    const j = poseedores[id];
+    if (j && arrastre?.id === j) return { x: arrastre.x + R * 0.8, y: arrastre.y - R * 0.8 };
+    if (j && posiciones[j]) return { x: posiciones[j].x + R * 0.8, y: posiciones[j].y - R * 0.8 };
+    return posiciones[id];
+  };
+
+  const canastasObjetivo: Punto[] = [
+    ...AROS,
+    ...(p.elementos.filter((e) => e.tipo === "canasta").map((e) => E.pos[e.id]).filter(Boolean) as Punto[]),
+  ];
+
+  const contador = anim ? anim.f + 1 : cursor;
+  const etiquetaVista = especial
+    ? especial.tipo === "todas" ? "Todas las imágenes" : `Imagen ${segmentos.findIndex((s) => s.seg === especial.seg) + 1}`
+    : null;
+
+  // =====================================================================
   return (
     <div
-      className={grande ? "fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-4" : "space-y-2 select-none"}
+      className={grande ? "fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-3" : "select-none space-y-2"}
       style={grande ? { paddingTop: "max(env(safe-area-inset-top), 8px)" } : undefined}
     >
-      {/* ===== Grabar / Captura / imágenes ===== */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={alternarGrabar}
-          disabled={enMovimiento}
-          className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition ${grabando ? "border-rojo bg-rojo text-white" : "border-linea bg-white text-rojo hover:bg-red-50"}`}
-          title={grabando ? "Parar de grabar y volver a colocar" : "Grabar movimientos"}
-        >
-          <span className={`inline-block h-3 w-3 rounded-full ${grabando ? "animate-pulse bg-white" : "bg-rojo"}`} />
-          {grabando ? "Parar" : "Grabar"}
-        </button>
-        {grabando && (
-          <button
-            type="button"
-            onClick={capturar}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-azul bg-azul px-3 text-sm font-semibold text-white hover:bg-azul-oscuro"
-            title="Captura: cierra esta imagen y empieza otra limpia"
-          >
-            <Camera size={16} /> Captura
-          </button>
-        )}
-        <span className="ml-1 text-[11px] font-semibold uppercase tracking-wide text-tinta/50">Imágenes</span>
-        <button
-          type="button"
-          onClick={() => { setPaso(0); setVerTodo(false); setAnim(null); setModoBalon(null); }}
-          className={`h-8 rounded-lg border px-2 text-xs font-semibold ${pasoActual === 0 ? "border-azul bg-azul text-white" : "border-linea bg-white hover:bg-suave"}`}
-          title="Posición inicial"
-        >
-          Inicio
-        </button>
-        {p.fases.map((f, i) => (
-          <button
-            key={i} type="button"
-            onClick={() => { setPaso(i + 1); setVerTodo(false); setAnim(null); setModoBalon(null); }}
-            className={`h-8 w-8 rounded-lg border text-sm font-semibold ${pasoActual === i + 1 ? "border-azul bg-azul text-white" : f.movimientos.length || f.balon ? "border-linea bg-white hover:bg-suave" : "border-dashed border-linea bg-white text-tinta/40"}`}
-            title={`Captura ${i + 1}`}
-          >
-            {i + 1}
-          </button>
-        ))}
-        <button type="button" onClick={quitarFase} disabled={p.fases.length <= 1} className="h-8 rounded-lg border border-linea bg-white px-2 hover:bg-suave disabled:opacity-40" title="Borrar la última captura"><Minus size={16} /></button>
-        <button
-          type="button"
-          onClick={() => { setVerTodo((v) => !v); setAnim(null); setSel(null); }}
-          className={`flex h-8 items-center gap-1 rounded-lg border px-2.5 text-sm ${verTodo ? "border-azul bg-azul text-white" : "border-linea bg-white hover:bg-suave"}`}
-          title="Ver todas las capturas a la vez"
-        >
-          <Layers size={15} /> <span className="hidden sm:inline">Todas</span>
-        </button>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button type="button" onClick={deshacer} disabled={!historial.length} className="h-8 rounded-lg border border-linea bg-white px-2 hover:bg-suave disabled:opacity-40" title="Deshacer (Ctrl+Z)"><Undo2 size={16} /></button>
-          <button type="button" onClick={descargar} className="h-8 rounded-lg border border-linea bg-white px-2 hover:bg-suave" title="Descargar imagen"><Download size={16} /></button>
-          <button type="button" onClick={() => setGrande((g) => !g)} className="h-8 rounded-lg border border-linea bg-white px-2 hover:bg-suave" title={grande ? "Salir de pantalla completa" : "Pantalla completa"}>
-            {grande ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-          <button type="button" onClick={reproducir} className="btn-primario h-8 !px-3 !py-0">
-            {anim ? <><Square size={15} /> Parar</> : <><Play size={15} /> Animar</>}
-          </button>
-        </div>
-      </div>
+      <div>
+        {/* ===== Pista ===== */}
+        <div ref={contRef} className="relative w-full">
+          <div className="mx-auto overflow-hidden rounded-t-xl border border-b-0 border-linea bg-white" style={{ width: anchoVista * escala, touchAction: "none" }}>
+            <Stage
+              ref={stageRef}
+              width={anchoVista * escala}
+              height={ALTO * escala}
+              onMouseDown={empezarDibujo}
+              onTouchStart={empezarDibujo}
+              onMouseMove={seguirDibujo}
+              onTouchMove={seguirDibujo}
+              onMouseUp={acabarDibujo}
+              onTouchEnd={acabarDibujo}
+              onClick={(ev) => { if (ev.target === ev.target.getStage()) limpiarSeleccion(); }}
+              onTap={(ev) => { if (ev.target === ev.target.getStage()) limpiarSeleccion(); }}
+            >
+              <Layer ref={layerRef} x={-V.x0 * escala} scaleX={escala} scaleY={escala}>
+                <Pista />
 
-      {/* ===== Herramientas según el paso ===== */}
-      {!enMovimiento && !verTodo && paso === 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-tinta/50">Jugadores</span>
-          <Chip onClick={() => agregar("atacante")}><span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-azul text-[9px] font-bold text-azul">1</span> Atacante</Chip>
-          <Chip onClick={() => agregar("defensor")}><span className="text-base font-black leading-none text-rojo">✕</span> Defensor</Chip>
-          <Chip onClick={() => agregar("entrenador")}><span className="flex h-4 w-4 items-center justify-center rounded-sm bg-tinta text-[9px] font-bold text-white">E</span> Entrenador</Chip>
-          <Chip onClick={() => quinteto(false)} title="5 atacantes en 1-2-2"><Users size={14} /> 5 ataque</Chip>
-          <Chip onClick={() => quinteto(true)} title="5 contra 5"><Users size={14} /> 5 vs 5</Chip>
-          <span className="ml-1 text-[11px] font-semibold uppercase tracking-wide text-tinta/50">Material</span>
-          {MATERIALES.map((m) => (
-            <Chip key={m} onClick={() => agregar(m)}><IconoMaterial tipo={m} /> {NOMBRE[m]}</Chip>
-          ))}
-          <Chip onClick={() => agregar("texto")}><Type size={14} /> Texto</Chip>
-          <select
-            value={p.pista}
-            onChange={(ev) => { const nueva = ev.target.value as Pizarra["pista"]; cambiar((d) => cambiarPista(d, nueva)); }}
-            className="ml-auto h-8 rounded-lg border border-linea bg-white px-2"
-            aria-label="Tipo de pista"
-          >
-            <option value="completa">Pista completa</option>
-            <option value="media">Media pista</option>
-          </select>
-        </div>
-      )}
+                {dibujosVisibles.map((d) => pintarDibujo(d, `d-${d.id}`))}
+                {dibujoVivo && <Line points={dibujoVivo} stroke={colorActivo ?? TINTA} strokeWidth={0.08} tension={0.4} opacity={0.7} listening={false} />}
+                {lineas.map((l, i) => pintarMovimiento(l.m, `m-${l.f}-${i}`, l.op, l.num))}
+                {acciones.map((a, i) => pintarAccion(a, `a-${a.f}-${i}`))}
+                {vivo && (() => {
+                  const el = elemento(vivo.id);
+                  return el ? pintarMovimiento({ elementoId: vivo.id, tipo: tipoAuto(el), puntos: vivo.puntos }, "vivo", 0.75) : null;
+                })()}
 
-      {!enMovimiento && !verTodo && paso > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-tinta/50">Al arrastrar</span>
-          {TRAZOS.map((t) => (
-            <Chip key={t.id} activo={trazo === t.id} onClick={() => setTrazo(t.id)} title={t.ayuda}>
-              <IconoTrazo tipo={t.id} /> {t.label}
-            </Chip>
-          ))}
-          <span className="ml-1 text-[11px] font-semibold uppercase tracking-wide text-tinta/50">Balón</span>
-          <Chip activo={modoBalon === "pase"} onClick={() => accionBalon("pase")} title="Pase: línea discontinua"><IconoTrazo tipo="pase" /> Pase</Chip>
-          <Chip activo={modoBalon === "mano"} onClick={() => accionBalon("mano")} title="Mano a mano (entrega)"><IconoTrazo tipo="mano" /> Mano a mano</Chip>
-          <Chip onClick={() => accionBalon("tiro")} title="Tiro a canasta: doble línea"><IconoTrazo tipo="tiro" /> Tiro</Chip>
-          {fase?.balon && (
-            <Chip onClick={() => cambiar((d) => { d.fases[paso - 1].balon = null; })} title="Quitar la acción de balón de esta fase">
-              <Trash2 size={13} /> Quitar {fase.balon.tipo === "mano" ? "mano a mano" : fase.balon.tipo}
-            </Chip>
-          )}
-        </div>
-      )}
+                {/* Canastas a las que se puede tirar */}
+                {balonSel && grabando && canastasObjetivo.map((c, i) => (
+                  <Circle
+                    key={`obj-${i}`} x={c.x} y={c.y} radius={0.8} stroke="#fc6401" strokeWidth={0.08} dash={[0.18, 0.12]}
+                    fill="rgba(252,100,1,0.15)" onClick={() => tirar(c)} onTap={() => tirar(c)}
+                  />
+                ))}
 
-      {/* ===== Pista ===== */}
-      <div ref={contRef} className="relative w-full">
-        <div className="mx-auto overflow-hidden rounded-xl border border-linea shadow-sm" style={{ width: W * escala, touchAction: "none" }}>
-          <Stage ref={stageRef} width={W * escala} height={H * escala} onClick={fondoTocado} onTap={fondoTocado}>
-            <Layer scaleX={escala} scaleY={escala}>
-              <Pista tipo={p.pista} />
-
-              {/* Posición de salida (sombra) de quien se mueve en esta fase */}
-              {!anim && !verTodo && paso > 0 && e && fase?.movimientos.map((m) => {
-                const ini = e.inicio[m.elementoId];
-                const el = p.elementos.find((x) => x.id === m.elementoId);
-                if (!ini || !el || !esJugador(el.tipo)) return null;
-                return <Circle key={`s-${m.elementoId}`} x={ini.x} y={ini.y} radius={R} fill={el.color} opacity={0.15} listening={false} />;
-              })}
-
-              {lineas.map(({ m, fase: fi }, i) => dibujarMovimiento(m, `l-${fi}-${i}`, anim ? 0.35 : 1, verTodo ? fi : undefined))}
-              {accionesBalon.map((x, i) => dibujarAccion(x, `b-${i}`, 1, verTodo ? x.fase : undefined))}
-              {anim && p.fases[anim.fase].balon && (() => {
-                const fa = p.fases[anim.fase];
-                const ea = est[anim.fase];
-                const desde = ea.fin[fa.balon!.de];
-                const hasta = destinoAccion(fa.balon!, ea.fin);
-                return desde && hasta ? dibujarAccion({ a: fa.balon!, fase: anim.fase, desde, hasta }, "b-anim", 0.35) : null;
-              })()}
-              {vivo && (() => {
-                const el = p.elementos.find((x) => x.id === vivo.id);
-                return el ? dibujarMovimiento({ elementoId: vivo.id, tipo: tipoTrazoPara(el), puntos: vivo.puntos }, "vivo", 0.7) : null;
-              })()}
-
-              {/* Material debajo, jugadores encima (así siempre se pueden coger) */}
-              {[...p.elementos].sort((a, b) => Number(esJugador(a.tipo)) - Number(esJugador(b.tipo))).map((el) => {
-                const pos = posiciones[el.id];
-                if (!pos) return null;
-                const seleccionado = sel === el.id && !anim && !verTodo;
-                return (
-                  <Group
-                    key={el.id}
-                    x={pos.x}
-                    y={pos.y}
-                    rotation={esJugador(el.tipo) ? 0 : el.rot ?? 0}
-                    draggable={!anim && !verTodo}
-                    dragBoundFunc={(abs) => ({
-                      x: Math.max(0, Math.min(W * escala, abs.x)),
-                      y: Math.max(0, Math.min(H * escala, abs.y)),
-                    })}
-                    onDragStart={() => inicioArrastre(el)}
-                    onDragMove={(ev) => durante(el, ev.target)}
-                    onDragEnd={(ev) => finArrastre(el, ev.target)}
-                    onClick={() => tocar(el)}
-                    onTap={() => tocar(el)}
-                    onMouseEnter={(ev) => { const s = ev.target.getStage(); if (s && !anim) s.container().style.cursor = "grab"; }}
-                    onMouseLeave={(ev) => { const s = ev.target.getStage(); if (s) s.container().style.cursor = "default"; }}
-                  >
-                    {/* zona táctil generosa */}
-                    {el.tipo === "escalera" ? (
-                      <Rect x={-0.5} y={-1.7} width={1} height={3.4} fill="rgba(0,0,0,0.001)" />
-                    ) : el.tipo === "valla" || el.tipo === "pica" ? (
-                      <Rect x={el.tipo === "valla" ? -0.75 : -0.35} y={el.tipo === "valla" ? -0.35 : -0.9} width={el.tipo === "valla" ? 1.5 : 0.7} height={el.tipo === "valla" ? 0.7 : 1.8} fill="rgba(0,0,0,0.001)" />
-                    ) : (
-                      <Circle radius={esJugador(el.tipo) ? toque : Math.min(toque, 0.6)} fill="rgba(0,0,0,0.001)" />
-                    )}
-                    {seleccionado && <Circle radius={(el.tipo === "escalera" ? 1.7 : R * 1.45)} stroke="#fde302" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
-                    {modoBalon && el.tipo === "atacante" && e?.balonInicio !== el.id && (
-                      <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.08} dash={[0.15, 0.1]} listening={false} />
-                    )}
-                    {forma(el)}
-                  </Group>
-                );
-              })}
-
-              {balonEn && (
-                <Circle x={balonEn.x + R * 0.85} y={balonEn.y - R * 0.85} radius={0.21} fill="#fc6401" stroke="#7a2c00" strokeWidth={0.045} listening={false} />
-              )}
-            </Layer>
-          </Stage>
-        </div>
-        {aviso && (
-          <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
-            <span className="rounded-full bg-tinta/90 px-3 py-1.5 text-xs text-white shadow">{aviso}</span>
+                {elementosOrdenados.map((el) => {
+                  const pos = el.tipo === "balon" ? posBalon(el.id) : posiciones[el.id];
+                  if (!pos) return null;
+                  const seleccionado = (sel === el.id || balonSel === el.id) && !ocupado && !especial;
+                  const receptor = !!balonSel && esJugador(el.tipo) && poseedores[balonSel] !== el.id;
+                  return (
+                    <Group
+                      key={el.id}
+                      x={pos.x}
+                      y={pos.y}
+                      rotation={esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0}
+                      draggable={arrastrable(el)}
+                      listening={herramienta === "mover" && !especial}
+                      dragBoundFunc={(abs) => ({
+                        x: Math.max(0, Math.min(anchoVista * escala, abs.x)),
+                        y: Math.max(0, Math.min(ALTO * escala, abs.y)),
+                      })}
+                      onDragStart={() => inicioArrastre(el)}
+                      onDragMove={(ev) => durante(el, ev.target)}
+                      onDragEnd={(ev) => finArrastre(el, ev.target)}
+                      onClick={() => tocar(el)}
+                      onTap={() => tocar(el)}
+                      onDblClick={() => editarEtiqueta(el)}
+                      onDblTap={() => editarEtiqueta(el)}
+                      onMouseEnter={(ev) => { const s = ev.target.getStage(); if (s && !ocupado) s.container().style.cursor = "pointer"; }}
+                      onMouseLeave={(ev) => { const s = ev.target.getStage(); if (s) s.container().style.cursor = "default"; }}
+                    >
+                      {zonaTactil(el)}
+                      {seleccionado && <Circle radius={el.tipo === "balon" ? 0.42 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
+                      {receptor && <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.07} dash={[0.15, 0.1]} listening={false} />}
+                      {forma(el)}
+                    </Group>
+                  );
+                })}
+              </Layer>
+            </Stage>
           </div>
-        )}
-      </div>
 
-      {/* ===== Elemento seleccionado ===== */}
-      {elSel && !enMovimiento && !verTodo && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-oro bg-oro/10 px-2 py-1.5 text-sm">
-          <span className="font-semibold text-azul">{NOMBRE[elSel.tipo]} {elSel.tipo !== "texto" ? elSel.etiqueta : ""}</span>
-          {(esJugador(elSel.tipo) || elSel.tipo === "texto") && (
-            <Chip onClick={() => {
-              const t = window.prompt(elSel.tipo === "texto" ? "Texto:" : "Etiqueta (número o nombre corto):", elSel.etiqueta);
-              if (t !== null && t.trim()) editarElemento(elSel.id, { etiqueta: t.trim().slice(0, elSel.tipo === "texto" ? 40 : 3) });
-            }}>Etiqueta</Chip>
-          )}
-          <div className="flex items-center gap-1">
+          {/* avisos sobre la pista (no desplazan nada) */}
+          <div className="pointer-events-none absolute inset-x-0 top-2 flex flex-col items-center gap-1">
+            {grabando && !anim && (
+              <span className="flex items-center gap-1.5 rounded-full bg-rojo px-2.5 py-1 text-xs font-bold text-white shadow">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> REC
+              </span>
+            )}
+            {etiquetaVista && <span className="rounded-full bg-azul px-3 py-1 text-xs font-semibold text-white shadow">{etiquetaVista}</span>}
+            {aviso && <span className="max-w-[90%] rounded-full bg-tinta/90 px-3 py-1.5 text-center text-xs text-white shadow">{aviso}</span>}
+            {exportando && <span className="rounded-full bg-azul px-3 py-1.5 text-xs font-semibold text-white shadow">{exportando}</span>}
+          </div>
+        </div>
+
+        {/* ===== Fila de elementos + colores ===== */}
+        <div className="mx-auto flex w-full flex-wrap items-center gap-0.5 border-x border-t border-linea bg-white px-2 py-1" style={{ maxWidth: anchoBarra }}>
+          <Pieza titulo="Atacante" onClick={() => agregar("atacante")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#1f2937" strokeWidth="1.6" /></svg></Pieza>
+          <Pieza titulo="5 atacantes" onClick={() => cinco("atacante")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#1f2937" strokeWidth="1.6" /><text x="12" y="15.5" fontSize="9" fontWeight="700" textAnchor="middle" fill="#1f2937">x5</text></svg></Pieza>
+          <Pieza titulo="Balón" onClick={() => agregar("balon")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="8" fill="#fc6401" stroke="#7a2c00" /><path d="M4 12h16M12 4v16" stroke="#7a2c00" strokeWidth="1" /></svg></Pieza>
+          <Pieza titulo="Defensor" onClick={() => agregar("defensor")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M6 6l12 12M18 6L6 18" stroke="#ca010c" strokeWidth="2.6" strokeLinecap="round" /></svg></Pieza>
+          <Pieza titulo="5 defensores" onClick={() => cinco("defensor")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M4 4l9 9M13 4l-9 9" stroke="#ca010c" strokeWidth="2.4" strokeLinecap="round" /><text x="18" y="22" fontSize="9" fontWeight="700" textAnchor="middle" fill="#1f2937">x5</text></svg></Pieza>
+          <Pieza titulo="Entrenador" onClick={() => agregar("entrenador")}><svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="4" y="4" width="16" height="16" rx="2" fill="#1f2937" /><text x="12" y="16.5" fontSize="11" fontWeight="700" textAnchor="middle" fill="#fff">E</text></svg></Pieza>
+          <Pieza titulo="Canasta" onClick={() => agregar("canasta")}><svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="2" y="9" width="5" height="6" fill="#6b7280" /><path d="M9 4v16" stroke="#1f2937" strokeWidth="2" /><circle cx="15" cy="12" r="4" fill="none" stroke="#fc6401" strokeWidth="1.8" /></svg></Pieza>
+          <span className="mx-1 h-6 w-px bg-linea" />
+          <Pieza titulo="Cono" onClick={() => agregar("cono")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M12 3l7 17H5z" fill="#fc6401" /><path d="M8.5 13h7" stroke="#fff" strokeWidth="1.5" /></svg></Pieza>
+          <Pieza titulo="Aro" onClick={() => agregar("aro")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="8" fill="none" stroke="#1f2937" strokeWidth="1.8" /></svg></Pieza>
+          <Pieza titulo="Escalera" onClick={() => agregar("escalera")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M5 3v18M19 3v18M5 6h14M5 10h14M5 14h14M5 18h14" stroke="#1f2937" strokeWidth="1.5" /></svg></Pieza>
+          <Pieza titulo="Valla" onClick={() => agregar("valla")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M4 18V8h16v10" fill="none" stroke="#1f2937" strokeWidth="1.8" /><path d="M2 18h4M18 18h4" stroke="#1f2937" strokeWidth="1.8" /></svg></Pieza>
+          <Pieza titulo="Chino" onClick={() => agregar("chino")}><svg viewBox="0 0 24 24" className="h-6 w-6"><ellipse cx="12" cy="15" rx="9" ry="3.5" fill="#eab308" /><ellipse cx="12" cy="12.5" rx="4" ry="1.6" fill="#fff" stroke="#1f2937" strokeWidth="0.8" /></svg></Pieza>
+          <Pieza titulo="Pica" onClick={() => agregar("pica")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M12 3v14" stroke="#1f2937" strokeWidth="2" /><path d="M7 21l5-4 5 4z" fill="#1f2937" /></svg></Pieza>
+          <Pieza titulo="Texto" onClick={() => agregar("texto")}><svg viewBox="0 0 24 24" className="h-6 w-6"><text x="12" y="18" fontSize="16" fontWeight="700" textAnchor="middle" fill="#1f2937">T</text></svg></Pieza>
+          <div className="ml-auto flex items-center gap-1">
             {PALETA.map((c) => (
               <button
-                key={c} type="button" aria-label={`Color ${c}`} onClick={() => editarElemento(elSel.id, { color: c })}
-                className={`h-6 w-6 rounded-full border ${elSel.color === c ? "ring-2 ring-azul ring-offset-1" : "border-black/20"}`}
+                key={c}
+                type="button"
+                aria-label={`Color ${c}`}
+                title="Color para lo que añadas o para lo seleccionado"
+                onClick={() => {
+                  setColorActivo((a) => (a === c && !sel && !selDibujo ? null : c));
+                  if (sel) cambiar((d) => { const x = d.elementos.find((q) => q.id === sel); if (x) x.color = c; });
+                  if (selDibujo) cambiar((d) => { const x = d.dibujos.find((q) => q.id === selDibujo); if (x) x.color = c; });
+                }}
+                className={`h-7 w-7 rounded-full border transition ${colorActivo === c ? "scale-110 ring-2 ring-tinta ring-offset-1" : "border-black/25"}`}
                 style={{ background: c }}
               />
             ))}
           </div>
-          {!esJugador(elSel.tipo) && (
+        </div>
+
+        {/* ===== Fila de controles: grabar, fotogramas, capturas ===== */}
+        <div className="mx-auto flex w-full flex-wrap items-center gap-1 rounded-b-xl border border-linea bg-white px-2 py-1.5" style={{ maxWidth: anchoBarra }}>
+          <Boton
+            titulo={grabando ? "Parar de grabar" : "Grabar (REC)"}
+            activo={grabando}
+            rojo
+            onClick={() => {
+              const empieza = !grabando;
+              setGrabando(empieza); limpiarSeleccion(); setEspecial(null); setHerramienta("mover");
+              if (empieza) avisar("Grabando: arrastra jugadores; toca el balón y luego a quien lo recibe.");
+            }}
+          >
+            <span className="text-[10px] font-black">REC</span>
+          </Boton>
+          <Boton titulo="Flecha" activo={herramienta === "flecha"} onClick={() => { setHerramienta((h) => (h === "flecha" ? "mover" : "flecha")); limpiarSeleccion(); }}><MoveRight size={18} /></Boton>
+          <Boton titulo="Lápiz (dibujo libre)" activo={herramienta === "lapiz"} onClick={() => { setHerramienta((h) => (h === "lapiz" ? "mover" : "lapiz")); limpiarSeleccion(); }}><Pencil size={17} /></Boton>
+
+          <span className="mx-1 h-6 w-px bg-linea" />
+          <Boton titulo="Al principio" onClick={() => irA(0)}><ChevronsLeft size={18} /></Boton>
+          <Boton titulo={anim ? "Pausa" : "Reproducir"} onClick={() => (anim ? parar() : void reproducir())}>{anim ? <Pause size={17} /> : <Play size={17} />}</Boton>
+          <Boton titulo="Fotograma anterior" onClick={() => irA(cursor - 1)}><ChevronLeft size={18} /></Boton>
+          <span className="min-w-14 text-center font-mono text-base font-bold tabular-nums text-tinta">{pad(contador)}/{pad(n)}</span>
+          <Boton titulo="Fotograma siguiente" onClick={() => irA(cursor + 1)}><ChevronRight size={18} /></Boton>
+          <Boton titulo="Al final" onClick={() => irA(n)}><ChevronsRight size={18} /></Boton>
+
+          <span className="mx-1 h-6 w-px bg-linea" />
+          <Boton titulo="Captura (limpia las líneas y sigue grabando)" onClick={capturar}><Camera size={18} /></Boton>
+          <div className="flex max-w-[45%] items-center gap-1 overflow-x-auto rounded bg-suave px-1 py-0.5">
+            {segmentos.map((s, i) => (
+              <button
+                key={s.seg}
+                type="button"
+                onClick={() => { if (ocupado) return; setEspecial((e) => (e?.tipo === "captura" && e.seg === s.seg ? null : { tipo: "captura", seg: s.seg })); limpiarSeleccion(); }}
+                className={`h-7 min-w-7 rounded px-1.5 text-xs font-bold ${especial?.tipo === "captura" && especial.seg === s.seg ? "bg-azul text-white" : "bg-white text-tinta hover:bg-linea"}`}
+                title={`Ver imagen ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => { if (ocupado) return; setEspecial((e) => (e?.tipo === "todas" ? null : { tipo: "todas" })); limpiarSeleccion(); }}
+              className={`flex h-7 items-center rounded px-1.5 ${especial?.tipo === "todas" ? "bg-azul text-white" : "bg-white text-tinta hover:bg-linea"}`}
+              title="Todas las imágenes superpuestas"
+            >
+              <Layers size={14} />
+            </button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1">
+            <Boton titulo="Deshacer el último movimiento (Ctrl+Z)" onClick={deshacer} desactivado={!historial.length}><Undo2 size={18} /></Boton>
+            <Boton titulo="Borrar la grabación" onClick={borrarGrabacion}><Trash2 size={17} /></Boton>
+            <Boton titulo="Configuración" activo={panel === "config"} onClick={() => setPanel((x) => (x === "config" ? null : "config"))}><Settings size={17} /></Boton>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Paneles ===== */}
+      {panel === "config" && (
+        <div className="mx-auto flex w-full flex-wrap items-center gap-4 rounded-xl border border-linea bg-white p-3 text-sm" style={{ maxWidth: anchoBarra }}>
+          <label className="flex items-center gap-2">Tamaño de jugadores
+            <select className="campo !w-auto !py-1" value={p.config.tamano} onChange={(ev) => { const v = Number(ev.target.value); cambiar((d) => { d.config.tamano = v; }); }}>
+              <option value={0.8}>Pequeño</option><option value={1}>Normal</option><option value={1.25}>Grande</option><option value={1.5}>Muy grande</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">Velocidad de la animación
+            <select className="campo !w-auto !py-1" value={p.config.velocidad} onChange={(ev) => { const v = Number(ev.target.value); cambiar((d) => { d.config.velocidad = v; }); }}>
+              <option value={0.6}>Lenta</option><option value={1}>Normal</option><option value={1.6}>Rápida</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => setPanel(null)} className="ml-auto text-tinta/50 hover:text-tinta" aria-label="Cerrar"><X size={16} /></button>
+        </div>
+      )}
+
+      {/* ===== Elemento seleccionado (debajo: no mueve la pista) ===== */}
+      {(elSel || selDibujo) && !ocupado && !especial && (
+        <div className="mx-auto flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-oro bg-oro/10 px-2 py-1.5 text-sm" style={{ maxWidth: anchoBarra }}>
+          {selDibujo ? (
+            <span className="font-semibold text-azul">Dibujo</span>
+          ) : elSel && (
             <>
-              <Chip onClick={() => editarElemento(elSel.id, { rot: (((elSel.rot ?? 0) - 45) + 360) % 360 })} title="Girar (Mayús+R)"><RotateCcw size={14} /></Chip>
-              <Chip onClick={() => editarElemento(elSel.id, { rot: ((elSel.rot ?? 0) + 45) % 360 })} title="Girar (R)"><RotateCw size={14} /></Chip>
-            </>
-          )}
-          {paso === 0 && elSel.tipo === "atacante" && (
-            <Chip activo={p.balonInicial === elSel.id} onClick={() => cambiar((d) => { d.balonInicial = d.balonInicial === elSel.id ? null : elSel.id; })}>
-              <span className="inline-block h-3 w-3 rounded-full bg-naranja" /> Con balón
-            </Chip>
-          )}
-          {paso > 0 && fase?.movimientos.some((m) => m.elementoId === elSel.id) && esJugador(elSel.tipo) && (
-            <>
-              <span className="text-[11px] uppercase text-tinta/50">Su línea:</span>
-              {(["correr", "botar", "bloqueo"] as TipoTrazo[]).map((t) => (
-                <Chip
-                  key={t}
-                  activo={fase.movimientos.find((m) => m.elementoId === elSel.id)?.tipo === t}
-                  onClick={() => cambiar((d) => { const m = d.fases[paso - 1].movimientos.find((x) => x.elementoId === elSel.id); if (m) m.tipo = t; })}
-                >
-                  <IconoTrazo tipo={t} />
-                </Chip>
-              ))}
+              <span className="font-semibold text-azul">{NOMBRE[elSel.tipo]} {elSel.tipo !== "texto" ? elSel.etiqueta : ""}</span>
+              {(esJugador(elSel.tipo) || elSel.tipo === "texto") && <Chip onClick={() => editarEtiqueta(elSel)}>Etiqueta</Chip>}
+              {!esJugador(elSel.tipo) && elSel.tipo !== "balon" && (
+                <>
+                  <Chip titulo="Girar (Mayús+R)" onClick={() => cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (x) x.rot = (((x.rot ?? 0) - 45) % 360 + 360) % 360; })}><RotateCcw size={14} /></Chip>
+                  <Chip titulo="Girar (R)" onClick={() => cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (x) x.rot = ((x.rot ?? 0) + 45) % 360; })}><RotateCw size={14} /></Chip>
+                </>
+              )}
+              {movSel && esJugador(elSel.tipo) && (
+                <>
+                  <span className="text-[11px] uppercase text-tinta/50">Su línea:</span>
+                  {(["correr", "botar", "bloqueo"] as TipoTrazo[]).map((t) => (
+                    <Chip key={t} activo={movSel.tipo === t} onClick={() => cambiar((d) => { const m = d.fotogramas[cursor - 1].movimientos.find((x) => x.elementoId === elSel.id); if (m) m.tipo = t; })}>
+                      {t === "correr" ? "Desplazamiento" : t === "botar" ? "Bote" : "Bloqueo"}
+                    </Chip>
+                  ))}
+                </>
+              )}
             </>
           )}
           <button type="button" onClick={borrarSeleccion} className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-red-700 hover:bg-red-50">
-            <Trash2 size={14} />
-            {paso > 0 && fase && (fase.movimientos.some((m) => m.elementoId === elSel.id) || fase.balon?.de === elSel.id || fase.balon?.a === elSel.id)
-              ? "Borrar su movimiento"
-              : "Quitar"}
+            <Trash2 size={14} /> {selDibujo ? "Borrar dibujo" : movSel || balonSelAccion ? "Borrar su movimiento" : "Quitar"}
           </button>
         </div>
       )}
 
-      {/* ===== Nota y ayuda ===== */}
-      {paso > 0 && !verTodo && fase && (
-        <input
-          value={fase.nota ?? ""}
-          onChange={(ev) => { const v = ev.target.value; setP((prev) => { const d = structuredClone(prev); d.fases[paso - 1].nota = v; return d; }); }}
-          placeholder={`Nota de la imagen ${paso} (opcional)`}
-          className="campo"
-          disabled={!!anim}
-        />
-      )}
-      {anim && p.fases[anim.fase]?.nota && <p className="rounded-lg bg-oro/15 p-2 text-sm">{p.fases[anim.fase].nota}</p>}
-      <p className="text-xs text-tinta/55">
-        {anim
-          ? `Animando imagen ${anim.fase + 1} de ${p.fases.length}…`
-          : verTodo
-            ? "Todas las fases a la vez. Así queda la imagen del ejercicio."
-            : paso === 0
-              ? "COLOCAR: añade jugadores y material y arrástralos a su sitio. Toca uno para cambiar color, etiqueta, girarlo o darle el balón. Luego pulsa ● Grabar."
-              : `GRABANDO · imagen ${paso}: arrastra a los jugadores y cada recorrido se queda grabado. Usa Pase, Mano a mano o Tiro para el balón. Pulsa 📷 Captura para cerrar esta imagen y empezar otra limpia.`}
-        {!anim && " · Teclado: Supr borra, R gira, Espacio anima, Ctrl+Z deshace."}
+      {/* ===== Pista, descargas y opciones ===== */}
+      <div className="mx-auto flex w-full flex-wrap items-center gap-2" style={{ maxWidth: anchoBarra }}>
+        <div className="flex overflow-hidden rounded-lg border border-linea">
+          {(Object.keys(VISTAS) as Vista[]).map((v) => (
+            <button
+              key={v} type="button"
+              onClick={() => cambiar((d) => { d.vista = v; })}
+              className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${p.vista === v ? "bg-azul text-white" : "bg-white text-tinta hover:bg-suave"}`}
+            >
+              {v === "completa" ? "Completa" : v === "ofensiva" ? "Media ofensiva" : "Media defensiva"}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <button type="button" onClick={() => setPanel((x) => (x === "descargar" ? null : "descargar"))} className="btn-secundario !py-1.5"><Download size={15} /> Descargar</button>
+          {panel === "descargar" && (
+            <div className="absolute bottom-full left-0 z-20 mb-1 w-56 overflow-hidden rounded-lg border border-linea bg-white text-sm shadow-lg">
+              <button type="button" onClick={descargarPDF} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><FileDown size={15} /> PDF con las capturas</button>
+              <button type="button" onClick={descargarVideo} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><Film size={15} /> Vídeo de la animación</button>
+              <button type="button" onClick={descargarPNG} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><ImageDown size={15} /> Imagen de lo que se ve</button>
+            </div>
+          )}
+        </div>
+        <button type="button" onClick={reiniciar} className="btn-secundario !py-1.5"><RefreshCw size={15} /> Reiniciar</button>
+        <button type="button" onClick={() => setGrande((g) => !g)} className="btn-secundario !py-1.5">
+          {grande ? <><Minimize2 size={15} /> Salir</> : <><Maximize2 size={15} /> Pantalla completa</>}
+        </button>
+      </div>
+
+      <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
+        {grabando
+          ? "GRABANDO: arrastra a un jugador (si lleva el balón, bota). Toca el balón y después a otro jugador para pasar, o una canasta para tirar. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
+          : "Añade jugadores y material y arrástralos a su sitio. Toca el balón y luego un jugador para dárselo. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
+        {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
       </p>
     </div>
   );
 }
 
-// ---------- piezas de la barra ----------
+// ---------- botones ----------
 
-function Chip({ children, onClick, activo, title }: { children: React.ReactNode; onClick: () => void; activo?: boolean; title?: string }) {
+function Pieza({ titulo, onClick, children }: { titulo: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" title={titulo} aria-label={titulo} onClick={onClick} className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-suave">
+      {children}
+    </button>
+  );
+}
+
+function Boton({ titulo, onClick, children, activo, rojo, desactivado }: {
+  titulo: string; onClick: () => void; children: React.ReactNode; activo?: boolean; rojo?: boolean; desactivado?: boolean;
+}) {
+  const color = activo ? (rojo ? "bg-rojo text-white border-rojo" : "bg-azul text-white border-azul") : rojo ? "bg-white text-rojo border-rojo/40" : "bg-white text-tinta border-linea";
   return (
     <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`flex h-8 items-center gap-1.5 rounded-lg border px-2 transition ${activo ? "border-azul bg-azul text-white" : "border-linea bg-white hover:bg-suave"}`}
+      type="button" title={titulo} aria-label={titulo} onClick={onClick} disabled={desactivado}
+      className={`flex h-9 min-w-9 items-center justify-center rounded-lg border px-1.5 transition hover:brightness-95 disabled:opacity-35 ${color}`}
     >
       {children}
     </button>
   );
 }
 
-function IconoTrazo({ tipo }: { tipo: "auto" | TipoTrazo | "pase" | "mano" | "tiro" }) {
-  const c = "currentColor";
+function Chip({ children, onClick, activo, titulo }: { children: React.ReactNode; onClick: () => void; activo?: boolean; titulo?: string }) {
   return (
-    <svg width="26" height="12" viewBox="0 0 26 12" aria-hidden className="shrink-0">
-      {tipo === "auto" && <text x="2" y="10" fontSize="10" fontWeight="700" fill={c}>A</text>}
-      {tipo === "correr" && <><line x1="1" y1="6" x2="20" y2="6" stroke={c} strokeWidth="1.8" /><path d="M19 2 L25 6 L19 10 Z" fill={c} /></>}
-      {tipo === "botar" && <><path d="M1 6 L4 2 L7 10 L10 2 L13 10 L16 2 L19 6" fill="none" stroke={c} strokeWidth="1.6" /><path d="M19 2 L25 6 L19 10 Z" fill={c} /></>}
-      {tipo === "bloqueo" && <><line x1="1" y1="6" x2="22" y2="6" stroke={c} strokeWidth="1.8" /><line x1="22" y1="1" x2="22" y2="11" stroke={c} strokeWidth="2.4" /></>}
-      {tipo === "pase" && <><line x1="1" y1="6" x2="20" y2="6" stroke={c} strokeWidth="1.8" strokeDasharray="3 2.5" /><path d="M19 2 L25 6 L19 10 Z" fill={c} /></>}
-      {tipo === "mano" && <><line x1="1" y1="6" x2="25" y2="6" stroke={c} strokeWidth="1.8" /><line x1="13" y1="1" x2="13" y2="11" stroke={c} strokeWidth="1.8" /><line x1="17" y1="1" x2="17" y2="11" stroke={c} strokeWidth="1.8" /></>}
-      {tipo === "tiro" && <><line x1="1" y1="4" x2="19" y2="4" stroke={c} strokeWidth="1.5" /><line x1="1" y1="8" x2="19" y2="8" stroke={c} strokeWidth="1.5" /><path d="M18 1 L25 6 L18 11 Z" fill={c} /></>}
-    </svg>
-  );
-}
-
-function IconoMaterial({ tipo }: { tipo: TipoElemento }) {
-  const c = COLOR_DEFECTO[tipo];
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0">
-      {tipo === "cono" && <path d="M8 2 L14 14 L2 14 Z" fill={c} />}
-      {tipo === "chino" && <><circle cx="8" cy="8" r="6" fill={c} stroke="#0003" /><circle cx="8" cy="8" r="2" fill="#fff" /></>}
-      {tipo === "aro" && <circle cx="8" cy="8" r="5.5" fill="none" stroke={c} strokeWidth="2" />}
-      {tipo === "pica" && <><rect x="7" y="1" width="2" height="12" fill={c} stroke="#0004" strokeWidth="0.5" /><circle cx="8" cy="13.5" r="1.8" fill="#121a33" /></>}
-      {tipo === "valla" && <><rect x="1" y="7" width="14" height="2.4" fill={c} /><line x1="1.5" y1="4" x2="1.5" y2="12" stroke="#121a33" strokeWidth="1.4" /><line x1="14.5" y1="4" x2="14.5" y2="12" stroke="#121a33" strokeWidth="1.4" /></>}
-      {tipo === "escalera" && <><line x1="4" y1="1" x2="4" y2="15" stroke="#b59a00" strokeWidth="1.5" /><line x1="12" y1="1" x2="12" y2="15" stroke="#b59a00" strokeWidth="1.5" />{[3, 6.5, 10, 13.5].map((y) => <line key={y} x1="4" y1={y} x2="12" y2={y} stroke="#b59a00" strokeWidth="1.2" />)}</>}
-      {tipo === "balon" && <><circle cx="8" cy="8" r="6" fill={c} stroke="#7a2c00" /><line x1="2" y1="8" x2="14" y2="8" stroke="#7a2c00" strokeWidth="0.8" /><line x1="8" y1="2" x2="8" y2="14" stroke="#7a2c00" strokeWidth="0.8" /></>}
-    </svg>
+    <button
+      type="button" onClick={onClick} title={titulo}
+      className={`flex h-8 items-center gap-1.5 rounded-lg border px-2 transition ${activo ? "border-azul bg-azul text-white" : "border-linea bg-white hover:bg-suave"}`}
+    >
+      {children}
+    </button>
   );
 }

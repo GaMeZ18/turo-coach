@@ -44,16 +44,21 @@ Supabase → **Authentication → Users → Invite user** con tu email. El **pri
   En *Mi cuenta* hay un botón de instalar y las instrucciones para cada dispositivo. Las actualizaciones llegan solas: cada vez que subes cambios a GitHub, la app instalada los recibe al abrirla.
 
 ### Pizarra
-Funciona como Coach Studio: **colocar → ● Grabar → 📷 Captura**.
+Funciona como la de Coach Studio:
 
-1. **Colocar** (imagen *Inicio*): añade jugadores (atacante, defensor, entrenador o los presets *5 ataque* / *5 vs 5*) y material (cono, chino, aro, pica, valla, escalera, balón, texto). Arrástralos a su sitio. Si tocas uno, puedes cambiarle la etiqueta, el color o la rotación, o darle el balón.
-2. **● Grabar**: arrastra a los jugadores por donde se mueven y cada recorrido se queda grabado. El tipo de línea sale solo (*Auto*: bote si lleva el balón, desplazamiento si no) o lo eliges tú: desplazamiento, bote o bloqueo.
-3. Para el balón: **Pase** (y tocas al receptor), **Mano a mano** (y tocas al receptor) o **Tiro**.
-4. **📷 Captura**: cierra la imagen actual y empieza otra limpia (máx. 6). *Animar* las reproduce todas seguidas; *Todas* las superpone numeradas (es la miniatura del ejercicio).
+- **Añadir**: atacante, 5 atacantes, balón, defensor, 5 defensores, entrenador, canasta, cono, aro, escalera, valla, chino, pica y texto. El color elegido se aplica a lo que añadas o a lo que tengas seleccionado.
+- **Mover**: toca y arrastra. Sin grabar, recolocas los elementos. Doble toque para cambiar la etiqueta.
+- **Balón**: toca el balón y después un jugador, y ese jugador lo tiene.
+- **● REC**: arrastra a un jugador y su movimiento queda grabado como un fotograma (`01/01`, `02/02`…). Si lleva el balón, la línea sale en zigzag (bote). Para un **pase**, toca el balón y luego al receptor; si están muy cerca, se dibuja como **mano a mano**. Para un **tiro**, toca el balón y luego una canasta.
+- **Movimientos a la vez**: con **‹** vuelves un fotograma atrás y mueves a otro jugador; los dos se moverán a la vez.
+- **📷 Captura**: limpia las líneas y sigues grabando. Cada captura es una imagen de la tira; ⧉ las superpone todas.
+- **▶** reproduce la jugada; ⏮ ⏭ ‹ › navegan por los fotogramas; **|←** deshace el último paso; **🗑** borra la grabación.
+- **Descargar**: PDF con una página por captura, vídeo de la animación (MP4, o WebM según el navegador) o imagen PNG.
+- **Completa / Media ofensiva / Media defensiva**, **Reiniciar**, **Pantalla completa** y ⚙ (tamaño de los jugadores y velocidad).
 
-Símbolos (los universales): atacante = número en círculo · defensor = X · desplazamiento = línea continua con flecha · bote = zigzag · pase = discontinua · bloqueo = línea en T · mano a mano = línea con dos barras · tiro = doble línea.
+Símbolos universales: atacante = número en círculo · defensor = X · desplazamiento = línea continua · bote = zigzag · pase = discontinua · bloqueo = línea en T · mano a mano = línea con dos barras · tiro = doble línea.
 
-Teclado: `Supr` borra · `R` / `Mayús+R` gira · `Espacio` anima · `Ctrl+Z` deshace · `Esc` deselecciona.
+Teclado: `←` `→` fotogramas · `Espacio` reproducir · `C` captura · `Supr` borrar · `R` girar · `Ctrl+Z` deshacer · `Esc` deseleccionar.
 
 ## Desarrollo en local
 ```bash

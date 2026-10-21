@@ -62,9 +62,9 @@ function useImagen(src: string) {
   return img;
 }
 
-export default function Pista({ tipo }: { tipo: "media" | "completa" }) {
+export default function Pista() {
   const escudo = useImagen("/marca/escudo.png");
-  const completa = tipo === "completa";
+  const completa = true;
   const ancho = completa ? 28 : 15;
   const alto = completa ? 15 : 14;
   const proporcion = escudo ? escudo.width / escudo.height : 0.93;

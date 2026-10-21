@@ -70,7 +70,7 @@ export default function FormEjercicio({
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
-        {listo && <PizarraEditor valor={d.pizarra ?? undefined} onChange={onPizarra} registrarCaptura={registrarCaptura} />}
+        {listo && <PizarraEditor valor={d.pizarra ?? undefined} onChange={onPizarra} registrarCaptura={registrarCaptura} titulo={d.titulo || "Ejercicio"} />}
       </div>
 
       <div className="space-y-3">
