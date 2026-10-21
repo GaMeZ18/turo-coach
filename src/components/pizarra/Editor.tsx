@@ -1083,6 +1083,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: arrastra a un jugador (si lleva el balón, bota). Toca el balón y después a otro jugador para pasar, o una canasta para tirar. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
           : "Añade jugadores y material y arrástralos a su sitio. Toca el balón y luego un jugador para dárselo. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3</span>
       </p>
     </div>
   );
