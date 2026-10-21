@@ -248,12 +248,11 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   // ---------- arrastre ----------
-  const arrastrable = (el: Elemento) =>
-    !ocupado && !especial && herramienta === "mover" && !(el.tipo === "balon" && E.poseedor[el.id]);
+  const arrastrable = () => !ocupado && !especial && herramienta === "mover";
 
   const inicioArrastre = (el: Elemento) => {
-    setBalonSel(null);
-    if (grabando) {
+    if (el.tipo !== "balon") setBalonSel(null);
+    if (grabando && !(el.tipo === "balon" && E.poseedor[el.id])) {
       const pos = E.pos[el.id];
       vivoRef.current = pos ? { id: el.id, puntos: [pos.x, pos.y] } : null;
       setVivo(vivoRef.current);
@@ -274,9 +273,51 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const tipoAuto = (el: Elemento): TipoTrazo =>
     el.tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
 
+  /** Jugador más cercano a un punto (para soltar el balón encima) */
+  const jugadorCerca = (q: Punto, excepto?: string | null) => {
+    let mejor: string | null = null, dist = Math.max(1.3, R * 2.6);
+    for (const el of p.elementos) {
+      if (!esJugador(el.tipo) || el.id === excepto) continue;
+      const pos = E.pos[el.id];
+      if (!pos) continue;
+      const d = Math.hypot(pos.x - q.x, pos.y - q.y);
+      if (d < dist) { dist = d; mejor = el.id; }
+    }
+    return mejor;
+  };
+
   const finArrastre = (el: Elemento, node: Konva.Node) => {
     setArrastre(null);
     const destino = { x: node.x(), y: node.y() };
+    const inicio = el.tipo === "balon" ? posBalon(el.id) : E.pos[el.id];
+
+    // Un "arrastre" de pocos píxeles es en realidad un toque (el dedo siempre se mueve un poco)
+    if (inicio && Math.hypot(destino.x - inicio.x, destino.y - inicio.y) * escala < 12) {
+      node.position(inicio);
+      vivoRef.current = null;
+      setVivo(null);
+      tocar(el);
+      return;
+    }
+
+    // Balón soltado encima de un jugador: se lo da (o es un pase, si se está grabando)
+    if (el.tipo === "balon") {
+      const tiene = E.poseedor[el.id] ?? null;
+      const receptor = jugadorCerca(destino, tiene);
+      if (receptor) {
+        if (inicio) node.position(inicio);
+        vivoRef.current = null;
+        setVivo(null);
+        darBalon(el.id, receptor);
+        return;
+      }
+      if (tiene) {
+        // con dueño y sin receptor: vuelve a su sitio
+        if (inicio) node.position(inicio);
+        avisar("Suelta el balón encima de un jugador para dárselo.");
+        return;
+      }
+    }
     const actual = E.pos[el.id];
     if (!grabando) {
       // Sin grabar: recoloca el elemento (y desplaza sus recorridos con él)
@@ -866,7 +907,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       x={pos.x}
                       y={pos.y}
                       rotation={esJugador(el.tipo) || el.tipo === "balon" ? 0 : el.rot ?? 0}
-                      draggable={arrastrable(el)}
+                      draggable={arrastrable()}
                       listening={herramienta === "mover" && !especial}
                       dragBoundFunc={(abs) => ({
                         x: Math.max(0, Math.min(anchoVista * escala, abs.x)),
@@ -1080,10 +1121,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
         {grabando
-          ? "GRABANDO: arrastra a un jugador (si lleva el balón, bota). Toca el balón y después a otro jugador para pasar, o una canasta para tirar. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
-          : "Añade jugadores y material y arrástralos a su sitio. Toca el balón y luego un jugador para dárselo. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
+          ? "GRABANDO: arrastra a un jugador (si lleva el balón, bota). Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
+          : "Añade jugadores y material y arrástralos a su sitio. Para dar el balón: tócalo y toca al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.1</span>
       </p>
     </div>
   );
