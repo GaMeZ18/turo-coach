@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Identidad CB Turó — colores sacados del escudo
+   Cambia aquí y se aplica en toda la app.
+   ============================================================ */
+@theme {
+  --color-azul: #002b8e;          /* azul del escudo */
+  --color-azul-oscuro: #001a5c;
+  --color-azul-noche: #0b1430;    /* fondos oscuros (login, 10 anys) */
+  --color-rojo: #ca010c;          /* rojo del escudo */
+  --color-rojo-oscuro: #9a0009;
+  --color-oro: #fde302;           /* amarillo de las estrellas y filetes */
+  --color-naranja: #fc6401;       /* balón */
+
+  /* Alias semánticos que usa el resto de la app */
+  --color-club: var(--color-rojo);
+  --color-club-oscuro: var(--color-rojo-oscuro);
+  --color-tinta: #121a33;
+  --color-suave: #f3f4f8;
+  --color-linea: #dfe2ec;
+
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-titulo: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+  --font-escudo: var(--font-graduate), Georgia, serif;
+}
+
+html,
+body {
+  background: var(--color-suave);
+  color: var(--color-tinta);
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Títulos con el aire deportivo del club */
+h1,
+h2.titulo {
+  font-family: var(--font-titulo);
+  letter-spacing: 0.01em;
+}
+h1 {
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-azul);
+}
+
+/* Filete tricolor (azul · oro · rojo), como el borde del escudo */
+.filete {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-azul) 0 45%, var(--color-oro) 45% 55%, var(--color-rojo) 55% 100%);
+}
+
+.btn-primario {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 bg-rojo text-white shadow-sm shadow-rojo/20 hover:bg-rojo-oscuro;
+}
+.btn-azul {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 bg-azul text-white hover:bg-azul-oscuro;
+}
+.btn-secundario {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 border border-linea bg-white text-azul hover:border-azul/40 hover:bg-azul/5;
+}
+.btn-peligro {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 text-red-700 hover:bg-red-50;
+}
+.campo {
+  @apply w-full rounded-lg border border-linea bg-white px-3 py-2 text-sm outline-none focus:border-azul focus:ring-2 focus:ring-azul/15;
+}
+.etiqueta {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-azul/70;
+}
+.tarjeta {
+  @apply rounded-xl border border-linea bg-white;
+}

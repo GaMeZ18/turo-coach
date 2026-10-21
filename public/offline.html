@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#002b8e" />
+  <title>Sin conexión · Turó Coach</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px; background: #0b1430; color: #fff; text-align: center;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .caja { max-width: 340px; }
+    img { height: 110px; width: auto; filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
+    h1 { font-size: 22px; margin: 18px 0 6px; }
+    p { color: rgba(255,255,255,.7); font-size: 15px; line-height: 1.45; margin: 0 0 20px; }
+    .filete { height: 4px; width: 120px; margin: 0 auto 20px; border-radius: 2px;
+      background: linear-gradient(90deg, #002b8e 0 45%, #fde302 45% 55%, #ca010c 55% 100%); }
+    button { background: #ca010c; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
+      font-size: 15px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="caja">
+    <img src="/marca/escudo.png" alt="CB Turó" />
+    <h1>Sin conexión</h1>
+    <div class="filete"></div>
+    <p>Turó Coach necesita internet para cargar los datos del club. Comprueba la conexión y vuelve a intentarlo.</p>
+    <button onclick="location.reload()">Reintentar</button>
+  </div>
+</body>
+</html>
