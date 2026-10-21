@@ -99,7 +99,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const altoDisp = grande ? Math.max(220, caja.alto - 200) : altoMax;
   const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / altoVista));
   // Radio de la ficha: 0,5 m, pero nunca menos de ~13 px en pantalla (para poder tocar el número)
-  const R = Math.max(0.5, 13 / escala) * p.config.tamano;
+  // Proporción parecida a Coach Studio (≈0,38 m), con un mínimo de ~11 px para poder tocarla en el móvil
+  const R = Math.max(0.38, 11 / escala) * p.config.tamano;
+  const RB = R * 0.5; // radio del balón
   const elSel = p.elementos.find((x) => x.id === sel) ?? null;
   const ocupado = !!anim || !!exportando;
   const anchoBarra = Math.max(anchoVista * escala, 320);
@@ -721,8 +723,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       case "atacante":
         return (
           <>
-            <Circle radius={R} fill="#ffffff" stroke={c} strokeWidth={0.09} shadowColor="#000" shadowOpacity={0.2} shadowBlur={0.12} shadowOffsetY={0.04} />
-            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={(el.etiqueta.length > 1 ? 0.5 : 0.62) * p.config.tamano} fontStyle="bold" fill={c === "#ffffff" ? TINTA : c} />
+            <Circle radius={R} fill="#ffffff" stroke={c} strokeWidth={R * 0.17} shadowColor="#000" shadowOpacity={0.2} shadowBlur={0.12} shadowOffsetY={0.04} />
+            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={R * (el.etiqueta.length > 1 ? 1.0 : 1.25)} fontStyle="bold" fill={c === "#ffffff" ? TINTA : c} />
           </>
         );
       case "defensor": {
@@ -731,9 +733,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         return (
           <>
             <Circle radius={R} fill="rgba(255,255,255,0.55)" />
-            <Line points={[-s, -s, s, s]} stroke={c} strokeWidth={0.14} lineCap="round" />
-            <Line points={[-s, s, s, -s]} stroke={c} strokeWidth={0.14} lineCap="round" />
-            {num && <T x={s * 0.95} y={s * 0.05} text={num} fontSize={0.42 * p.config.tamano} fontStyle="bold" fill={c} />}
+            <Line points={[-s, -s, s, s]} stroke={c} strokeWidth={R * 0.26} lineCap="round" />
+            <Line points={[-s, s, s, -s]} stroke={c} strokeWidth={R * 0.26} lineCap="round" />
+            {num && <T x={s * 0.95} y={s * 0.05} text={num} fontSize={R * 0.85} fontStyle="bold" fill={c} />}
           </>
         );
       }
@@ -741,15 +743,15 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         return (
           <>
             <Rect x={-R} y={-R} width={R * 2} height={R * 2} cornerRadius={0.08} fill={c} />
-            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={0.58 * p.config.tamano} fontStyle="bold" fill="#fff" />
+            <T x={-R} y={-R} width={R * 2} height={R * 2} text={el.etiqueta} align="center" verticalAlign="middle" fontSize={R * 1.15} fontStyle="bold" fill="#fff" />
           </>
         );
       case "balon":
         return (
           <>
-            <Circle radius={0.23} fill={c} stroke="#7a2c00" strokeWidth={0.045} />
-            <Line points={[-0.23, 0, 0.23, 0]} stroke="#7a2c00" strokeWidth={0.03} />
-            <Line points={[0, -0.23, 0, 0.23]} stroke="#7a2c00" strokeWidth={0.03} />
+            <Circle radius={RB} fill={c} stroke="#7a2c00" strokeWidth={RB * 0.2} />
+            <Line points={[-RB, 0, RB, 0]} stroke="#7a2c00" strokeWidth={RB * 0.13} />
+            <Line points={[0, -RB, 0, RB]} stroke="#7a2c00" strokeWidth={RB * 0.13} />
           </>
         );
       case "canasta":
@@ -845,7 +847,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       const dentro = (() => {
         switch (el.tipo) {
           case "atacante": case "defensor": case "entrenador": return Math.hypot(dx, dy) <= Math.max(R * 1.15, minimo);
-          case "balon": return Math.hypot(dx, dy) <= Math.max(0.3, minimo);
+          case "balon": return Math.hypot(dx, dy) <= Math.max(RB * 1.3, minimo);
           case "escalera": return Math.abs(lx) <= 0.45 && Math.abs(ly) <= 1.6;
           case "valla": return Math.abs(lx) <= 0.65 && Math.abs(ly) <= Math.max(0.3, minimo);
           case "pica": return Math.abs(lx) <= Math.max(0.3, minimo) && Math.abs(ly) <= 0.8;
@@ -1004,7 +1006,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                       y={pos.y}
                       rotation={rotVisual(el)}
                     >
-                      {seleccionado && <Circle radius={el.tipo === "balon" ? 0.42 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
+                      {seleccionado && <Circle radius={el.tipo === "balon" ? RB * 1.8 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
                       {receptor && <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.07} dash={[0.15, 0.1]} listening={false} />}
                       {forma(el)}
                     </Group>
@@ -1237,7 +1239,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.5</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.6</span>
       </p>
     </div>
   );
