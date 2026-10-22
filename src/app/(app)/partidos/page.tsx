@@ -10,7 +10,14 @@ import { Resultado, type Partido } from "./comun";
 export default async function PartidosPage() {
   const { supabase } = await requireUser();
   const equipo = await equipoActivo(supabase);
-  if (!equipo) return <SinEquipo que="sus partidos" />;
+  if (!equipo) {
+    return (
+      <div className="space-y-3">
+        <SinEquipo que="sus partidos" />
+        <p className="text-center text-sm"><Link href="/partidos/importar" className="font-medium text-azul underline">o importa los partidos de todo el club desde la FCBQ</Link></p>
+      </div>
+    );
+  }
 
   const { data } = await supabase
     .from("partidos")
@@ -54,6 +61,7 @@ export default async function PartidosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Partidos</h1>
           <p className="text-sm text-tinta/60">{equipo.nombre}</p>
+          <Link href="/partidos/importar" className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-azul hover:underline">⇣ Importar de la FCBQ</Link>
         </div>
         {jugados.length > 0 && (
           <div className="flex gap-4 text-center">
