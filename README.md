@@ -91,8 +91,14 @@ public/icons/             Iconos de la app (generados a partir del escudo)
 
 > Requiere ejecutar en el SQL Editor de Supabase `0002_partidos_calendario.sql`, `0003_fcbq.sql` y `0004_liga_fcbq.sql`.
 
+### Planificaciones
+- Árbol de objetivos (y subobjetivos) con color y descripción. Del club (las crea el coordinador y las usa cualquier equipo) o de un equipo. «Copiar a» duplica una planificación con todo su árbol para adaptarla.
+- En cada entrenamiento, «Objetivos del entreno» marca qué se trabaja (de varias planificaciones a la vez).
+- «Cuándo se ha trabajado»: cuadrícula por semanas de septiembre a junio con los entrenos de cada objetivo y su total.
+
+> Requiere ejecutar `0005_planificaciones.sql`.
+
 ## Próximas fases
-- Planificaciones (árbol de objetivos vinculados a entrenos)
 - Partidos y scouting (rivales, notas, control de periodos de minibásquet, informe PDF)
 - Vídeo (etiquetado por categorías y descriptores)
 - Biblioteca de enlaces · Catalán como segundo idioma

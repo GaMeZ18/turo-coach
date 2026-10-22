@@ -5,6 +5,8 @@ import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
 import { borrarEntreno, duplicarEntreno, editarEntreno } from "../actions";
 import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
+import Objetivos from "./Objetivos";
+import type { Objetivo } from "@/lib/objetivos";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
 
@@ -19,7 +21,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!e) notFound();
 
-  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }] = await Promise.all([
+  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }] = await Promise.all([
     supabase
       .from("entreno_actividades")
       .select("id, orden, tipo, titulo, duracion, notas, ejercicio_id, ejercicios(titulo, preview, descripcion)")
@@ -31,7 +33,15 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       .select("dorsal, jugadores(id, nombre, apellidos)")
       .eq("equipo_id", e.equipo_id),
     supabase.from("asistencias").select("jugador_id, estado, motivo").eq("entrenamiento_id", id),
+    // Planificaciones del club y de este equipo (si aún no existe la tabla, simplemente no hay)
+    supabase.from("planificaciones").select("id, nombre, equipo_id, temporada_id, objetivos(id, planificacion_id, padre_id, nombre, descripcion, color, orden)").or(`equipo_id.is.null,equipo_id.eq.${e.equipo_id}`).order("created_at"),
+    supabase.from("entreno_objetivos").select("objetivo_id").eq("entrenamiento_id", id),
+    supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
   ]);
+  const planesEntreno = ((planes ?? []) as unknown as { id: string; nombre: string; equipo_id: string | null; temporada_id: string | null; objetivos: Objetivo[] }[])
+    .filter((p) => !p.temporada_id || p.temporada_id === temporada?.id)
+    .sort((a, b) => (a.equipo_id ? 0 : 1) - (b.equipo_id ? 0 : 1))
+    .map((p) => ({ id: p.id, nombre: p.nombre, club: !p.equipo_id, objetivos: p.objetivos ?? [] }));
 
   const jugadores = ((plantilla ?? []) as unknown as {
     dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null };
@@ -79,6 +89,8 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           <Enviar>Guardar</Enviar>
         </form>
       </details>
+
+      <Objetivos entrenoId={e.id} planes={planesEntreno} seleccionados={(marcados ?? []).map((m) => m.objetivo_id as string)} />
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px]">
         <Actividades

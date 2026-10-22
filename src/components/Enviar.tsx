@@ -15,6 +15,7 @@ export default function Enviar({
   pendiente,
   title,
   formAction,
+  disabled = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -22,6 +23,7 @@ export default function Enviar({
   pendiente?: React.ReactNode;
   title?: string;
   formAction?: (fd: FormData) => void | Promise<void>;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -30,7 +32,7 @@ export default function Enviar({
       title={title}
       aria-label={title}
       formAction={formAction}
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       className={`${className} disabled:cursor-wait`}
       onClick={(e) => {
