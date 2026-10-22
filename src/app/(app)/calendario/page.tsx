@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { requireUser } from "@/lib/supabase/server";
-import { equipoActivo } from "@/lib/equipo-activo";
+import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
+import { colorEquipo } from "@/lib/colores";
 import { TZ, diaInput, hora, hoyLocal } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
 import { borrarEvento, crearEvento } from "./actions";
@@ -15,6 +17,7 @@ type Item = {
   href?: string;
   detalle?: string;
   borrable?: boolean;
+  color?: string;        // color del equipo (vista de todo el club)
 };
 
 const ESTILO: Record<Item["tipo"], { chip: string; punto: string; nombre: string }> = {
@@ -28,12 +31,16 @@ const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
 export default async function CalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; todo?: string }>;
+  searchParams: Promise<{ mes?: string; todo?: string; eq?: string; entrenos?: string }>;
 }) {
-  const { mes: mesParam, todo } = await searchParams;
+  const { mes: mesParam, todo, eq, entrenos: conEntrenos } = await searchParams;
   const { supabase, perfil } = await requireUser();
-  const equipo = await equipoActivo(supabase);
+  const [equipo, { equipos: delClub }] = await Promise.all([equipoActivo(supabase), equiposDeTemporada(supabase)]);
   const verTodo = todo === "1" || !equipo;
+  // Vista del club: todos los equipos (o uno, con ?eq=) con su color
+  const filtro = verTodo && eq && delClub.some((e) => e.id === eq) ? eq : null;
+  const mostrarEntrenos = !verTodo || !!filtro || conEntrenos === "1";
+  const color = (id: string | null | undefined) => (verTodo && id ? colorEquipo(id, delClub) : undefined);
   const esCoord = perfil.rol === "coordinador";
 
   // Mes visible (YYYY-MM)
@@ -48,15 +55,16 @@ export default async function CalendarioPage({
   const desde = new Date(Date.UTC(y, m - 1, 1) - 8 * 864e5).toISOString();
   const hasta = new Date(Date.UTC(y, m, 1) + 8 * 864e5).toISOString();
 
-  let qEntrenos = supabase.from("entrenamientos").select("id, fecha, titulo, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
-  let qPartidos = supabase.from("partidos").select("id, fecha, rival, local, puntos_favor, puntos_contra, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
-  if (!verTodo && equipo) {
-    qEntrenos = qEntrenos.eq("equipo_id", equipo.id);
-    qPartidos = qPartidos.eq("equipo_id", equipo.id);
+  let qEntrenos = supabase.from("entrenamientos").select("id, fecha, titulo, equipo_id, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
+  let qPartidos = supabase.from("partidos").select("id, fecha, rival, local, puntos_favor, puntos_contra, estado, equipo_id, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
+  const soloEquipo = !verTodo && equipo ? equipo.id : filtro;
+  if (soloEquipo) {
+    qEntrenos = qEntrenos.eq("equipo_id", soloEquipo);
+    qPartidos = qPartidos.eq("equipo_id", soloEquipo);
   }
 
   const [entrenos, partidos, eventos, plantilla] = await Promise.all([
-    qEntrenos,
+    mostrarEntrenos ? qEntrenos : Promise.resolve({ data: [] as unknown[] }),
     qPartidos,
     supabase.from("eventos").select("id, fecha, titulo, tipo, lugar, descripcion, equipo_id, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta),
     equipo && !verTodo
@@ -66,23 +74,25 @@ export default async function CalendarioPage({
 
   const items: Item[] = [];
   type ConEquipo = { equipos: { nombre: string } | null };
-  for (const e of (entrenos.data ?? []) as unknown as ({ id: string; fecha: string; titulo: string | null } & ConEquipo)[]) {
+  for (const e of (entrenos.data ?? []) as unknown as ({ id: string; fecha: string; titulo: string | null; equipo_id: string } & ConEquipo)[]) {
     items.push({
-      id: e.id, dia: diaInput(e.fecha), hora: hora(e.fecha), tipo: "entreno", href: `/entrenamientos/${e.id}`,
+      id: e.id, dia: diaInput(e.fecha), hora: hora(e.fecha), tipo: "entreno", href: `/entrenamientos/${e.id}`, color: color(e.equipo_id),
       titulo: `${verTodo && e.equipos ? e.equipos.nombre + " · " : ""}${e.titulo ?? "Entreno"}`,
     });
   }
-  for (const p of (partidos.data ?? []) as unknown as ({ id: string; fecha: string; rival: string; local: boolean; puntos_favor: number | null; puntos_contra: number | null } & ConEquipo)[]) {
-    const res = p.puntos_favor !== null && p.puntos_contra !== null ? ` (${p.puntos_favor}-${p.puntos_contra})` : "";
+  for (const p of (partidos.data ?? []) as unknown as ({ id: string; fecha: string; rival: string; local: boolean; puntos_favor: number | null; puntos_contra: number | null; estado: string; equipo_id: string } & ConEquipo)[]) {
+    const jugado = p.puntos_favor !== null && p.puntos_contra !== null;
+    const res = jugado ? ` ${p.puntos_favor! > p.puntos_contra! ? "✓" : p.puntos_favor! < p.puntos_contra! ? "✗" : "="} ${p.local ? `${p.puntos_favor}-${p.puntos_contra}` : `${p.puntos_contra}-${p.puntos_favor}`}` : p.estado === "aplazado" ? " (aplazado)" : "";
     items.push({
-      id: p.id, dia: diaInput(p.fecha), hora: hora(p.fecha), tipo: "partido", href: `/partidos/${p.id}`,
+      id: p.id, dia: diaInput(p.fecha), hora: hora(p.fecha), tipo: "partido", href: `/partidos/${p.id}`, color: color(p.equipo_id),
       titulo: `${verTodo && p.equipos ? p.equipos.nombre + " " : ""}${p.local ? "vs" : "@"} ${p.rival}${res}`,
     });
   }
   for (const ev of (eventos.data ?? []) as unknown as ({ id: string; fecha: string; titulo: string; tipo: string; lugar: string | null; descripcion: string | null; equipo_id: string | null } & ConEquipo)[]) {
     if (!verTodo && ev.equipo_id && ev.equipo_id !== equipo?.id) continue; // eventos de otros equipos
+    if (filtro && ev.equipo_id && ev.equipo_id !== filtro) continue;
     items.push({
-      id: ev.id, dia: diaInput(ev.fecha), hora: hora(ev.fecha), tipo: "evento",
+      id: ev.id, dia: diaInput(ev.fecha), hora: hora(ev.fecha), tipo: "evento", color: color(ev.equipo_id),
       titulo: `${ev.equipo_id ? (verTodo && ev.equipos ? ev.equipos.nombre + " · " : "") : "🏀 Club · "}${ev.titulo}`,
       detalle: [ev.lugar, ev.descripcion].filter(Boolean).join(" · ") || undefined,
       borrable: ev.equipo_id ? true : esCoord,
@@ -108,8 +118,15 @@ export default async function CalendarioPage({
     return { clave: d.toISOString().slice(0, 10), num: d.getUTCDate(), delMes: d.getUTCMonth() === m - 1 };
   });
   const agenda = items.filter((i) => i.dia.startsWith(mes));
+  // Estilo de un elemento: con color de equipo (vista del club) o el de su tipo
+  const estilo = (it: Item): { className: string; style?: CSSProperties } => {
+    if (!it.color) return { className: ESTILO[it.tipo].chip };
+    if (it.tipo === "partido") return { className: "font-semibold text-white", style: { background: it.color } };
+    return { className: "", style: { background: `${it.color}1f`, color: it.color, boxShadow: `inset 3px 0 0 ${it.color}` } };
+  };
   const q = (extra: Record<string, string>) => {
-    const sp = new URLSearchParams({ mes, ...(verTodo && equipo ? { todo: "1" } : {}), ...extra });
+    const sp = new URLSearchParams({ mes, ...(verTodo && equipo ? { todo: "1" } : {}), ...(filtro ? { eq: filtro } : {}), ...(conEntrenos === "1" ? { entrenos: "1" } : {}), ...extra });
+    for (const [k, v] of [...sp.entries()]) if (!v) sp.delete(k);
     return `/calendario?${sp.toString()}`;
   };
 
@@ -118,7 +135,7 @@ export default async function CalendarioPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Calendario</h1>
-          <p className="text-sm text-tinta/60">{verTodo ? "Todo el club" : equipo?.nombre}</p>
+          <p className="text-sm text-tinta/60">{verTodo ? (filtro ? delClub.find((e) => e.id === filtro)?.nombre : "Todo el club · partidos de todos los equipos") : equipo?.nombre}</p>
         </div>
         <div className="flex items-center gap-2">
           {equipo && (
@@ -154,16 +171,17 @@ export default async function CalendarioPage({
                 <div className={`mb-0.5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${esHoy ? "bg-rojo text-white" : ""}`}>{d.num}</div>
                 {/* Móvil: puntos de color */}
                 <div className="flex flex-wrap gap-0.5 sm:hidden">
-                  {delDia.map((it) => <span key={it.id} className={`h-1.5 w-1.5 rounded-full ${ESTILO[it.tipo].punto}`} />)}
+                  {delDia.map((it) => <span key={it.id} className={`rounded-full ${it.tipo === "partido" ? "h-2 w-2" : "h-1.5 w-1.5"} ${it.color ? "" : ESTILO[it.tipo].punto}`} style={it.color ? { background: it.color, opacity: it.tipo === "partido" ? 1 : 0.45 } : undefined} />)}
                 </div>
                 {/* Ordenador: chips con texto */}
                 <div className="hidden space-y-0.5 sm:block">
                   {delDia.slice(0, 4).map((it) => {
                     const contenido = <>{it.hora && <span className="opacity-70">{it.hora} </span>}{it.titulo}</>;
-                    const cls = `block truncate rounded px-1 py-0.5 text-[11px] leading-tight ${ESTILO[it.tipo].chip}`;
+                    const e = estilo(it);
+                    const cls = `block truncate rounded px-1 py-0.5 text-[11px] leading-tight ${e.className}`;
                     return it.href
-                      ? <Link key={it.id} href={it.href} className={`${cls} hover:brightness-95`} title={it.titulo}>{contenido}</Link>
-                      : <span key={it.id} className={cls} title={it.detalle ? `${it.titulo} · ${it.detalle}` : it.titulo}>{contenido}</span>;
+                      ? <Link key={it.id} href={it.href} className={`${cls} hover:brightness-95`} style={e.style} title={it.titulo}>{contenido}</Link>
+                      : <span key={it.id} className={cls} style={e.style} title={it.detalle ? `${it.titulo} · ${it.detalle}` : it.titulo}>{contenido}</span>;
                   })}
                   {delDia.length > 4 && <span className="block px-1 text-[11px] text-tinta/50">+{delDia.length - 4} más</span>}
                 </div>
@@ -172,11 +190,33 @@ export default async function CalendarioPage({
           })}
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-3 text-xs text-tinta/60">
-        {(Object.keys(ESTILO) as Item["tipo"][]).map((t) => (
-          <span key={t} className="flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-full ${ESTILO[t].punto}`} />{ESTILO[t].nombre}</span>
-        ))}
-      </div>
+      {verTodo ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="mr-1 text-tinta/50">Equipos:</span>
+          <Link href={q({ eq: "" })} className={`rounded-full border px-2.5 py-1 font-semibold ${!filtro ? "border-tinta bg-tinta text-white" : "border-linea bg-white hover:bg-suave"}`}>Todos</Link>
+          {delClub.map((e) => {
+            const c = colorEquipo(e.id, delClub);
+            const activo = filtro === e.id;
+            return (
+              <Link key={e.id} href={q({ eq: activo ? "" : e.id })} className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold"
+                style={activo ? { background: c, borderColor: c, color: "white" } : { borderColor: `${c}66`, color: c, background: "white" }}>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: activo ? "white" : c }} />{e.nombre}
+              </Link>
+            );
+          })}
+          {!filtro && (
+            <Link href={q({ entrenos: conEntrenos === "1" ? "" : "1" })} className="ml-auto text-tinta/60 underline hover:text-azul">
+              {conEntrenos === "1" ? "Ocultar entrenos" : "Mostrar también entrenos"}
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-3 text-xs text-tinta/60">
+          {(Object.keys(ESTILO) as Item["tipo"][]).map((t) => (
+            <span key={t} className="flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-full ${ESTILO[t].punto}`} />{ESTILO[t].nombre}</span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
         {/* Agenda del mes */}
@@ -188,7 +228,7 @@ export default async function CalendarioPage({
               const cuerpo = (
                 <>
                   <span className="w-20 shrink-0 text-xs capitalize text-tinta/60">{fecha}{it.hora ? ` · ${it.hora}` : ""}</span>
-                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${ESTILO[it.tipo].chip}`}>{ESTILO[it.tipo].nombre}</span>
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${estilo(it).className}`} style={estilo(it).style}>{ESTILO[it.tipo].nombre}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{it.titulo}</span>
                     {it.detalle && <span className="block truncate text-xs text-tinta/50">{it.detalle}</span>}
