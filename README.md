@@ -85,7 +85,7 @@ public/icons/             Iconos de la app (generados a partir del escudo)
 - **Partidos**: rival, casa/fuera, competición, jornada, resultado (V/D y balance), notas y **convocatoria** (con botón para copiarla y pegarla en WhatsApp).
 - **Calendario**: mes con entrenos, partidos, eventos y cumpleaños de la plantilla; del equipo activo o de todo el club. Eventos del equipo (staff) o del club (coordinador).
 
-- **Importar de la FCBQ** (Partidos → Importar): copia o guarda el *Calendari Mensual Club* de basquetcatala.cat y la app crea o actualiza los partidos de todos los equipos, sin duplicar (usa el número de partido de la FCBQ). Recuerda qué equipo de la FCBQ es cada equipo de Turó Coach.
+- **Importar de la FCBQ** (Partidos → Importar): botón de marcadores «Enviar a Turó Coach» que, pulsado en basquetcatala.cat, manda la página a la app (corre en el navegador del usuario, así el captcha de la FCBQ lo resuelve él). Lee el *Calendari Mensual Club* (partidos de todos los equipos) y las páginas de *Resultats* de cada competición (marcadores y jornada). Crea o actualiza sin duplicar y recuerda qué equipo de la FCBQ es cada equipo de Turó Coach. También admite pegar el texto o subir la página guardada.
 
 > Requiere ejecutar en el SQL Editor de Supabase `0002_partidos_calendario.sql` y `0003_fcbq.sql`.
 
