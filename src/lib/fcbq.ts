@@ -41,11 +41,22 @@ function crear(p: Base): PartidoFCBQ {
 
 const esTuro = (s: string) => /TURO/.test(s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase());
 
+export interface ResultadoLiga {
+  jornada: number | null;
+  dia: string;
+  hora: string;
+  local: string;
+  visitante: string;
+  pl: number | null;        // puntos del local
+  pv: number | null;        // puntos del visitante
+  statsId: string | null;
+}
+type PartidoLiga = ResultadoLiga & { idLocal: string | null; idVisit: string | null };
+
 /** Página de resultados de una competición: cada partido tiene dos enlaces .teamNameLink,
  *  el marcador en un div "col-md-4 col-xs-4" ("78-65", o "-" si no se ha jugado), la fecha
  *  "dd-mm-aaaa hh:mm" y, si hay estadísticas, un enlace /estadistica/partit/<id>. */
-function desdeResultats(html: string): PartidoFCBQ[] {
-  const doc = new DOMParser().parseFromString(html, "text/html");
+function partidosLiga(doc: Document): PartidoLiga[] {
   const enlaces = Array.from(doc.querySelectorAll("a.teamNameLink"));
 
   // Contenedor de cada partido: el ancestro más pequeño que tiene exactamente dos equipos
@@ -58,7 +69,7 @@ function desdeResultats(html: string): PartidoFCBQ[] {
   const set = new Set(contenedores);
 
   // Recorremos el documento en orden para saber la jornada y la última fecha vista antes de cada partido
-  const res: PartidoFCBQ[] = [];
+  const res: PartidoLiga[] = [];
   let jornada: number | null = null;
   let ultimaFecha: { dia: string; hora: string } | null = null;
   const RE_F = /(\d{2})[-/](\d{2})[-/](\d{4})(?:\s+(\d{1,2}:\d{2}))?/;
@@ -66,7 +77,7 @@ function desdeResultats(html: string): PartidoFCBQ[] {
   for (let n: Node | null = walker.currentNode; n; n = walker.nextNode()) {
     if (n.nodeType === Node.TEXT_NODE) {
       const t = n.textContent ?? "";
-      const j = t.match(/Jornada(?:\s|&nbsp;|\u00a0)+(\d+)/i);
+      const j = t.match(/Jornada(?:\s|&nbsp;| )+(\d+)/i);
       if (j) jornada = Number(j[1]);
       const f = t.match(RE_F);
       if (f) ultimaFecha = { dia: `${f[3]}-${f[2]}-${f[1]}`, hora: f[4]?.padStart(5, "0") ?? "12:00" };
@@ -76,12 +87,10 @@ function desdeResultats(html: string): PartidoFCBQ[] {
     if (!set.has(el)) continue;
 
     const [a1, a2] = Array.from(el.querySelectorAll("a.teamNameLink"));
-    const local = limpio(a1.textContent), visitante = limpio(a2.textContent);
     const f = (el.textContent ?? "").match(RE_F);
     const fecha: { dia: string; hora: string } | null = f ? { dia: `${f[3]}-${f[2]}-${f[1]}`, hora: f[4]?.padStart(5, "0") ?? "12:00" } : ultimaFecha;
     if (f) ultimaFecha = fecha;
-    const somosLocal = esTuro(local), somosVisit = esTuro(visitante);
-    if (!fecha || somosLocal === somosVisit) continue; // partidos de otros equipos de la liga
+    if (!fecha) continue;
 
     // Marcador
     let marcador: [number, number] | null = null;
@@ -95,23 +104,119 @@ function desdeResultats(html: string): PartidoFCBQ[] {
     const stats = Array.from(el.querySelectorAll("a")).map((x) => x.getAttribute("href") ?? "")
       .map((h) => h.match(/estadistica\/partit\/([0-9a-fA-F-]{20,})/)?.[1]).find(Boolean) ?? null;
     const idEquipo = (a: Element) => a.getAttribute("href")?.match(/equip\/(\d+)/)?.[1] ?? null;
+    res.push({
+      jornada, dia: fecha.dia, hora: fecha.hora,
+      local: limpio(a1.textContent), visitante: limpio(a2.textContent),
+      pl: marcador?.[0] ?? null, pv: marcador?.[1] ?? null, statsId: stats,
+      idLocal: idEquipo(a1), idVisit: idEquipo(a2),
+    });
+  }
+  return res;
+}
 
+function desdeResultats(html: string): PartidoFCBQ[] {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const res: PartidoFCBQ[] = [];
+  for (const x of partidosLiga(doc)) {
+    const somosLocal = esTuro(x.local), somosVisit = esTuro(x.visitante);
+    if (somosLocal === somosVisit) continue; // partidos de otros equipos de la liga
+    const jugado = x.pl !== null && x.pv !== null;
     res.push(crear({
-      fcbqId: null, statsId: stats,
-      dia: fecha.dia, hora: fecha.hora,
-      nuestro: somosLocal ? local : visitante,
-      nuestroId: idEquipo(somosLocal ? a1 : a2),
-      rival: somosLocal ? visitante : local,
+      fcbqId: null, statsId: x.statsId,
+      dia: x.dia, hora: x.hora,
+      nuestro: somosLocal ? x.local : x.visitante,
+      nuestroId: somosLocal ? x.idLocal : x.idVisit,
+      rival: somosLocal ? x.visitante : x.local,
       local: somosLocal,
       categoria: "", // la categoría buena viene del calendario del club
       lugar: "",
-      jornada,
-      pf: marcador ? (somosLocal ? marcador[0] : marcador[1]) : null,
-      pc: marcador ? (somosLocal ? marcador[1] : marcador[0]) : null,
+      jornada: x.jornada,
+      pf: jugado ? (somosLocal ? x.pl : x.pv) : null,
+      pc: jugado ? (somosLocal ? x.pv : x.pl) : null,
     }));
   }
   return res;
 }
+
+// ---------- Liga: resultados de todos los equipos y clasificación ----------
+
+export interface TablaFCBQ { cabeceras: string[]; filas: string[][] }
+export interface LigaFCBQ {
+  nuestro: string;           // nombre FCBQ de nuestro equipo en esta liga
+  nuestroId: string | null;
+  nombre: string;            // nombre de la competición
+  url: string | null;
+  resultados: ResultadoLiga[];
+  clasificacion: TablaFCBQ | null;
+}
+
+/** Tabla de clasificación: la que tiene una columna "Equip" y una fila del Turó */
+function tablaClasificacion(doc: Document): { tabla: TablaFCBQ; nuestro: string } | null {
+  for (const t of Array.from(doc.querySelectorAll("table"))) {
+    const filas = Array.from(t.querySelectorAll("tr"));
+    if (filas.length < 3) continue;
+    const celdas = (tr: Element) => Array.from(tr.querySelectorAll("th, td")).map((c) => limpio(c.textContent));
+    const iCab = filas.findIndex((tr) => tr.querySelector("th") || /\bEquip/i.test(tr.textContent ?? ""));
+    if (iCab < 0) continue;
+    const cabeceras = celdas(filas[iCab]);
+    const iEquipo = cabeceras.findIndex((c) => /^Equip/i.test(c));
+    if (iEquipo < 0 || cabeceras.length < 4) continue;
+    const cuerpo = filas.slice(iCab + 1).map(celdas).filter((f) => f.length >= cabeceras.length - 1 && f.some(Boolean));
+    const nuestra = cuerpo.find((f) => esTuro(f[iEquipo] ?? ""));
+    // Una clasificación tiene casi todo números fuera de la columna del equipo
+    const numerica = cuerpo.length > 1 && cuerpo.every((f) => f.filter((c, i) => i !== iEquipo && /^-?\d+([.,]\d+)?%?$/.test(c)).length >= 3);
+    if (!nuestra || !numerica) continue;
+    return { tabla: { cabeceras, filas: cuerpo }, nuestro: nuestra[iEquipo] };
+  }
+  return null;
+}
+
+/** Lee la parte "de liga" de una página de resultados o de clasificación (null si no hay) */
+export function leerLigaFCBQ(html: string, url?: string | null): LigaFCBQ | null {
+  if (!/<(table|a)[\s>]/i.test(html)) return null;
+  url = url ?? html.match(/saved from url=\(\d+\)(\S+?)\s*-->/)?.[1] ?? null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const lista = /teamNameLink/.test(html) ? partidosLiga(doc) : [];
+  const tabla = tablaClasificacion(doc);
+  const nuestroPartido = lista.find((x) => esTuro(x.local) || esTuro(x.visitante));
+  const nuestro = nuestroPartido ? (esTuro(nuestroPartido.local) ? nuestroPartido.local : nuestroPartido.visitante) : tabla?.nuestro;
+  if (!nuestro || (!lista.length && !tabla)) return null;
+  const nuestroId = nuestroPartido ? (esTuro(nuestroPartido.local) ? nuestroPartido.idLocal : nuestroPartido.idVisit) : null;
+  const titulo = Array.from(doc.querySelectorAll("h1, h2, h3, h4"))
+    .map((h) => limpio(h.textContent)).find((t) => t.length > 4 && !/jornada|resultats|classificaci|calendari/i.test(t)) ?? "";
+  return {
+    nuestro, nuestroId, nombre: titulo,
+    url: url && /\/competicions\//.test(url) ? url : null,
+    resultados: lista.map(({ idLocal: _a, idVisit: _b, ...r }) => r),
+    clasificacion: tabla?.tabla ?? null,
+  };
+}
+
+/** Une resultados nuevos con los guardados (por jornada + equipos) */
+export function unirResultados(antes: ResultadoLiga[], nuevos: ResultadoLiga[]) {
+  const n = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  const clave = (r: ResultadoLiga) => `${n(r.local)}|${n(r.visitante)}|${r.jornada ?? r.dia}`;
+  const mapa = new Map(antes.map((r) => [clave(r), r]));
+  for (const r of nuevos) mapa.set(clave(r), r);
+  return [...mapa.values()].sort((a, b) => (a.jornada ?? 0) - (b.jornada ?? 0) || (a.dia + a.hora).localeCompare(b.dia + b.hora));
+}
+
+export interface FilaClasificacion { equipo: string; pj: number; g: number; p: number; pf: number; pc: number; pts: number }
+/** Clasificación calculada con los resultados (FCBQ: 2 puntos la victoria, 1 la derrota) */
+export function calcularClasificacion(resultados: ResultadoLiga[]): FilaClasificacion[] {
+  const t = new Map<string, FilaClasificacion>();
+  const fila = (e: string) => t.get(e) ?? (t.set(e, { equipo: e, pj: 0, g: 0, p: 0, pf: 0, pc: 0, pts: 0 }), t.get(e)!);
+  for (const r of resultados) {
+    const l = fila(r.local), v = fila(r.visitante);
+    if (r.pl === null || r.pv === null) continue;
+    l.pj++; v.pj++;
+    l.pf += r.pl; l.pc += r.pv; v.pf += r.pv; v.pc += r.pl;
+    if (r.pl > r.pv) { l.g++; v.p++; l.pts += 2; v.pts += 1; } else if (r.pv > r.pl) { v.g++; l.p++; v.pts += 2; l.pts += 1; }
+  }
+  return [...t.values()].sort((a, b) => b.pts - a.pts || (b.pf - b.pc) - (a.pf - a.pc) || b.pf - a.pf);
+}
+
+export const esNuestro = esTuro;
 
 /** Desde el HTML guardado: tablas "Partits com a LOCAL" y "Partits com a VISITANT" */
 function desdeHTML(html: string): PartidoFCBQ[] {

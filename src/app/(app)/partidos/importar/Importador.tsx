@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Bookmark, CheckCircle2, Copy, FileUp, Loader2 } from "lucide-react";
-import { buscarExistente, cambiosFCBQ, leerCalendarioFCBQ, sugerirEquipo, type PartidoFCBQ } from "@/lib/fcbq";
+import { buscarExistente, cambiosFCBQ, leerCalendarioFCBQ, leerLigaFCBQ, sugerirEquipo, type LigaFCBQ, type PartidoFCBQ } from "@/lib/fcbq";
 import { importarFCBQ, type ResultadoImportacion } from "./actions";
 
 type Equipo = { id: string; nombre: string; fcbq_nombre: string | null };
@@ -20,6 +20,7 @@ const fechaBonita = (dia: string) => new Date(`${dia}T12:00:00Z`).toLocaleDateSt
 export default function Importador({ equipos, existentes, temporada }: { equipos: Equipo[]; existentes: Existente[]; temporada: string | null }) {
   const [texto, setTexto] = useState("");
   const [partidos, setPartidos] = useState<PartidoFCBQ[] | null>(null);
+  const [liga, setLiga] = useState<LigaFCBQ | null>(null);
   const [asignacion, setAsignacion] = useState<Record<string, string>>({});
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,17 +30,19 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
   const [copiado, setCopiado] = useState(false);
   const enlace = useRef<HTMLAnchorElement>(null);
 
-  const leer = (entrada: string) => {
+  const leer = (entrada: string, url?: string | null) => {
     setResultado(null);
     setError(null);
     const lista = leerCalendarioFCBQ(entrada);
-    if (!lista.length) {
+    const lg = leerLigaFCBQ(entrada, url);
+    setLiga(lg);
+    if (!lista.length && !lg) {
       setPartidos(null);
       setError("No he encontrado partidos del Turó. Tiene que ser el «Calendari Mensual Club» o la página de «Resultats» de una competición.");
       return;
     }
     setPartidos(lista);
-    const nombres = [...new Set(lista.map((p) => p.nuestro))];
+    const nombres = [...new Set([...lista.map((p) => p.nuestro), ...(lg ? [lg.nuestro] : [])])];
     setAsignacion(Object.fromEntries(nombres.map((n) => [n, sugerirEquipo(n, equipos) ?? ""])));
   };
 
@@ -58,7 +61,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
       (e.source as Window | null)?.postMessage("fcbq-ok", e.origin);
       setTexto("");
       setOrigen(d.url ?? "basquetcatala.cat");
-      leerRef.current(d.html);
+      leerRef.current(d.html, d.url);
     };
     window.addEventListener("message", alRecibir);
     return () => window.removeEventListener("message", alRecibir);
@@ -71,8 +74,8 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
     leer(contenido);
   };
 
-  const nombresFCBQ = useMemo(() => [...new Set((partidos ?? []).map((p) => p.nuestro))].sort(), [partidos]);
-  const idFCBQ = (nombre: string) => (partidos ?? []).find((p) => p.nuestro === nombre && p.nuestroId)?.nuestroId ?? null;
+  const nombresFCBQ = useMemo(() => [...new Set([...(partidos ?? []).map((p) => p.nuestro), ...(liga ? [liga.nuestro] : [])])].sort(), [partidos, liga]);
+  const idFCBQ = (nombre: string) => (partidos ?? []).find((p) => p.nuestro === nombre && p.nuestroId)?.nuestroId ?? (liga?.nuestro === nombre ? liga.nuestroId : null);
 
   const estado = (p: PartidoFCBQ): "sin equipo" | "nuevo" | "actualizar" | "igual" => {
     const eq = asignacion[p.nuestro];
@@ -85,6 +88,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
   const conEstado = (partidos ?? []).map((p) => ({ p, e: estado(p) })).sort((a, b) => (a.p.dia + a.p.hora).localeCompare(b.p.dia + b.p.hora));
   const cuenta = (e: string) => conEstado.filter((x) => x.e === e).length;
   const aImportar = conEstado.filter((x) => x.e === "nuevo" || x.e === "actualizar").length;
+  const ligaLista = !!liga && !!asignacion[liga.nuestro];
 
   const importar = () => {
     if (!partidos) return;
@@ -93,7 +97,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
       .map(([nombre, equipoId]) => ({ nombre, equipoId, fcbqEquipoId: idFCBQ(nombre) }));
     start(async () => {
       try {
-        setResultado(await importarFCBQ(partidos, asignaciones));
+        setResultado(await importarFCBQ(partidos, asignaciones, ligaLista ? liga : null));
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se ha podido importar.");
       }
@@ -195,7 +199,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
           {/* Vista previa */}
           <section>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <h2 className="mr-2 font-semibold">{partidos.length} partidos leídos</h2>
+              <h2 className="mr-2 font-semibold">{partidos.length} partidos del Turó leídos</h2>
               {(["nuevo", "actualizar", "igual", "sin equipo"] as const).map((e) => cuenta(e) > 0 && (
                 <span key={e} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ESTILO[e]}`}>{cuenta(e)} {e === "igual" ? "sin cambios" : e === "actualizar" ? "a actualizar" : e === "nuevo" ? "nuevos" : "sin equipo"}</span>
               ))}
@@ -229,11 +233,20 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
             </div>
           </section>
 
+          {liga && (
+            <p className="tarjeta max-w-3xl p-3 text-sm">
+              <strong>Liga{liga.nombre ? ` · ${liga.nombre}` : ""}:</strong>{" "}
+              {liga.resultados.length} partidos de todos los equipos ({liga.resultados.filter((r) => r.pl !== null).length} con resultado)
+              {liga.clasificacion ? " y la clasificación oficial" : ""}. Se verán en Partidos de{" "}
+              {equipos.find((e) => e.id === asignacion[liga.nuestro])?.nombre ?? <em>(elige el equipo de {liga.nuestro})</em>}.
+            </p>
+          )}
+
           {resultado ? (
             <div className="tarjeta flex max-w-3xl items-start gap-3 border-green-200 bg-green-50 p-4 text-sm">
               <CheckCircle2 className="mt-0.5 shrink-0 text-green-700" size={20} />
               <div>
-                <p className="font-semibold text-green-800">Importación hecha: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados, {resultado.iguales} sin cambios.</p>
+                <p className="font-semibold text-green-800">Importación hecha: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados, {resultado.iguales} sin cambios{resultado.liga ? " · liga y clasificación guardadas" : ""}.</p>
                 {resultado.errores.length > 0 && (
                   <ul className="mt-2 list-inside list-disc text-red-700">{resultado.errores.map((x, i) => <li key={i}>{x}</li>)}</ul>
                 )}
@@ -244,8 +257,8 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
               </div>
             </div>
           ) : (
-            <button type="button" onClick={importar} disabled={pendiente || aImportar === 0} className="btn-primario">
-              {pendiente ? <><Loader2 size={16} className="animate-spin" /> Importando…</> : aImportar ? `Importar ${aImportar} partidos` : "Nada que importar"}
+            <button type="button" onClick={importar} disabled={pendiente || (aImportar === 0 && !ligaLista)} className="btn-primario">
+              {pendiente ? <><Loader2 size={16} className="animate-spin" /> Importando…</> : aImportar ? `Importar ${aImportar} partidos${ligaLista ? " y la liga" : ""}` : ligaLista ? "Guardar liga y clasificación" : "Nada que importar"}
             </button>
           )}
         </>

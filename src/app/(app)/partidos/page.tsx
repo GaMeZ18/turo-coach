@@ -6,6 +6,7 @@ import SinEquipo from "@/components/SinEquipo";
 import Enviar from "@/components/Enviar";
 import { crearPartido } from "./actions";
 import { Resultado, type Partido } from "./comun";
+import Liga, { type LigaGuardada } from "./Liga";
 
 export default async function PartidosPage() {
   const { supabase } = await requireUser();
@@ -19,11 +20,15 @@ export default async function PartidosPage() {
     );
   }
 
-  const { data } = await supabase
-    .from("partidos")
-    .select("id, fecha, rival, local, lugar, competicion, jornada, puntos_favor, puntos_contra, estado")
-    .eq("equipo_id", equipo.id)
-    .order("fecha", { ascending: true });
+  const [{ data }, { data: liga }] = await Promise.all([
+    supabase
+      .from("partidos")
+      .select("id, fecha, rival, local, lugar, competicion, jornada, puntos_favor, puntos_contra, estado")
+      .eq("equipo_id", equipo.id)
+      .order("fecha", { ascending: true }),
+    // Si aún no se ha ejecutado 0004_liga_fcbq.sql, la consulta falla y simplemente no hay liga
+    supabase.from("ligas_fcbq").select("nombre, url, resultados, clasificacion, updated_at").eq("equipo_id", equipo.id).maybeSingle(),
+  ]);
   const lista = (data ?? []) as Partido[];
   const ahora = Date.now() - 3 * 3600 * 1000;
   const proximos = lista.filter((p) => p.estado !== "jugado" && new Date(p.fecha).getTime() >= ahora);
@@ -100,6 +105,8 @@ export default async function PartidosPage() {
         {anteriores.map((p) => <Fila key={p.id} p={p} />)}
         {anteriores.length === 0 && <p className="text-sm text-tinta/50">Todavía no hay partidos jugados.</p>}
       </div>
+
+      <Liga liga={(liga as LigaGuardada | null) ?? null} />
     </div>
   );
 }
