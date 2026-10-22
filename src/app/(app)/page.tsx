@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen,
+  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy,
 } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
@@ -12,9 +12,10 @@ const MODULOS = [
   { href: "/entrenamientos", titulo: "Entrenamientos", texto: "Prepara la sesión y pasa lista", icono: Timer },
   { href: "/ejercicios", titulo: "Ejercicios y sistemas", texto: "La biblioteca del club y la tuya", icono: TrafficCone },
   { href: "/pizarra", titulo: "Pizarra", texto: "Dibuja y anima jugadas al momento", icono: PenTool },
-  { titulo: "Calendario", texto: "Partidos, entrenos y eventos", icono: CalendarDays },
+  { href: "/calendario", titulo: "Calendario", texto: "Partidos, entrenos, eventos y cumpleaños", icono: CalendarDays },
+  { href: "/partidos", titulo: "Partidos", texto: "Resultados y convocatorias", icono: Trophy },
   { titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
-  { titulo: "Partidos y scouting", texto: "Rivales, notas y control de periodos", icono: Binoculars },
+  { titulo: "Scouting", texto: "Rivales, notas y control de periodos", icono: Binoculars },
   { titulo: "Vídeo", texto: "Etiqueta acciones por categorías", icono: Video },
   { titulo: "Biblioteca", texto: "Libros, artículos y enlaces", icono: BookOpen },
 ];

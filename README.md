@@ -81,8 +81,13 @@ public/marca/             Escudo e imagen del 10º aniversario
 public/icons/             Iconos de la app (generados a partir del escudo)
 ```
 
+### Partidos y calendario
+- **Partidos**: rival, casa/fuera, competición, jornada, resultado (V/D y balance), notas y **convocatoria** (con botón para copiarla y pegarla en WhatsApp).
+- **Calendario**: mes con entrenos, partidos, eventos y cumpleaños de la plantilla; del equipo activo o de todo el club. Eventos del equipo (staff) o del club (coordinador).
+
+> Requiere ejecutar `supabase/migrations/0002_partidos_calendario.sql` en el SQL Editor de Supabase.
+
 ## Próximas fases
-- Calendario (partidos + entrenos + eventos)
 - Planificaciones (árbol de objetivos vinculados a entrenos)
 - Partidos y scouting (rivales, notas, control de periodos de minibásquet, informe PDF)
 - Vídeo (etiquetado por categorías y descriptores)
