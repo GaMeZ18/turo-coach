@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const publica = path.startsWith("/login") || path.startsWith("/auth");
+  const publica = path.startsWith("/login") || path.startsWith("/auth") || path === "/api/fcbq-diag"; // diag: temporal
 
   if (!user && !publica) {
     const url = request.nextUrl.clone();
