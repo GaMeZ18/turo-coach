@@ -61,6 +61,8 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
   const [asignacion, setAsignacion] = useState<Record<string, string>>({});
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [numStats, setNumStats] = useState(0);
+  const [informe, setInforme] = useState<string>("");
+  const [copiado, setCopiado] = useState(false);
   const equipoDeStats = useRef(new Map<string, string>());
   const equiposRef = useRef(equipos);
   equiposRef.current = equipos;
@@ -145,6 +147,21 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         recibido = true;
         setAvisos(d.avisos ?? []);
         const l = procesar(d.paginas);
+        // Informe para diagnosticar si algo no llega
+        const tipo = (u: string) => (/calendari_club/.test(u) ? "calendario" : /\/equip\//.test(u) ? "equipo" : /resultats/.test(u) ? "resultados" : /classifica/.test(u) ? "clasificación" : "otra");
+        const cuenta: Record<string, number> = {};
+        for (const pg of d.paginas) cuenta[tipo(pg.url)] = (cuenta[tipo(pg.url)] ?? 0) + 1;
+        const enlacesEquipo = d.paginas.filter((pg) => tipo(pg.url) === "equipo").slice(0, 2)
+          .map((pg) => `${pg.url}\n  ` + [...new Set([...pg.html.matchAll(/href="([^"#]+)"/g)].map((m) => m[1]).filter((h) => /competici|resultat|classific|calendari|partit/i.test(h)))].slice(0, 25).join("\n  "));
+        setInforme([
+          `Turó Coach · informe FCBQ ${new Date().toLocaleString("es-ES")}`,
+          `Páginas: ${Object.entries(cuenta).map(([k, v]) => `${k} ${v}`).join(", ")}`,
+          `Partidos del Turó leídos: ${l.partidos.length} · con marcador: ${l.partidos.filter((x) => x.pf !== null).length}`,
+          `Ligas: ${l.ligas.map((x) => `${x.nuestro} (${x.resultados.length} partidos, ${x.resultados.filter((r) => r.statsId).length} con stats, clasif. ${x.clasificacion ? "sí" : "no"})`).join("; ") || "ninguna"}`,
+          `Equipos FCBQ: ${l.nombres.join(", ")}`,
+          `Avisos: ${(d.avisos ?? []).join(" | ") || "—"}`,
+          `Enlaces en páginas de equipo:\n${enlacesEquipo.join("\n") || "—"}`,
+        ].join("\n"));
         if (!l.partidos.length && !l.ligas.length) { setEstado("error"); setTexto("La FCBQ no ha devuelto partidos del Turó."); return; }
         const eqs = equiposRef.current;
         const asig = Object.fromEntries(l.nombres.map((n) => [n, sugerirEquipo(n, eqs) ?? ""]));
@@ -201,6 +218,16 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
           ))}
           <button type="button" className="btn-primario" onClick={() => importar(leido, asignacion)}>Guardar</button>
         </div>
+      )}
+
+      {informe && (estado === "hecho" || estado === "error") && (
+        <details className="max-w-xl text-xs text-tinta/60">
+          <summary className="cursor-pointer">Detalle de lo leído</summary>
+          <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-suave p-2">{informe}</pre>
+          <button type="button" className="btn-secundario mt-1 !py-1 text-xs" onClick={async () => { try { await navigator.clipboard.writeText(informe); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch {} }}>
+            {copiado ? "Copiado" : "Copiar informe"}
+          </button>
+        </details>
       )}
 
       {estado === "hecho" && resultado && (
