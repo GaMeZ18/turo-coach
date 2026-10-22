@@ -15,21 +15,39 @@ chrome.runtime.onConnect.addListener((puerto) => {
       avisar("Abriendo basquetcatala.cat…");
       tab = await chrome.tabs.create({ url: `${FCBQ}/partits/calendari_club_mensual/${club}`, active: true, ...(pestanaApp ? { windowId: pestanaApp.windowId, index: pestanaApp.index + 1 } : {}) });
 
-      // Esperar a que cargue y a que pase la verificación de seguridad (hasta 3 minutos)
-      let avisado = false;
-      for (let i = 0; ; i++) {
+      // Esperar a que la pestaña muestre la web de verdad (no la verificación) y deje de recargarse
+      let avisado = false, estable = 0, ultima = "";
+      for (let i = 0; estable < 3; i++) {
+        if (i > 240) throw new Error("La página de la FCBQ no ha terminado de cargar. Vuelve a probar.");
         await esperar(1000);
-        const t = await chrome.tabs.get(tab.id);
+        const t = await chrome.tabs.get(tab.id).catch(() => null);
+        if (!t) throw new Error("Se ha cerrado la pestaña de la FCBQ.");
         const url = t.url || t.pendingUrl || "";
-        if (/security-check/.test(url)) {
+        let verificando = /security-check/.test(url);
+        if (!verificando && t.status === "complete") {
+          const titulo = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => document.title }).then((r) => r[0]?.result ?? "").catch(() => null);
+          if (titulo === null) { estable = 0; continue; } // estaba navegando
+          verificando = /verificaci|seguretat|security/i.test(titulo);
+        }
+        if (verificando) {
+          estable = 0;
           if (!avisado) { avisar("La FCBQ pide una verificación de seguridad: resuélvela en su pestaña."); avisado = true; }
-        } else if (t.status === "complete" && url.startsWith(FCBQ)) break;
-        if (i > 180) throw new Error("La página de la FCBQ no ha terminado de cargar.");
+          continue;
+        }
+        estable = t.status === "complete" && url === ultima ? estable + 1 : 0;
+        ultima = url;
       }
 
-      avisar("Leyendo calendario, resultados y clasificaciones…");
-      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: recolectar, args: [club] });
-      if (!result || result.error) throw new Error(result?.error || "No se ha podido leer la FCBQ.");
+      avisar("Leyendo calendario, resultados y clasificaciones (tarda un minuto)…");
+      // Primero desde la extensión (no depende de que la pestaña siga quieta)…
+      let result = await recolectar(club, FCBQ).catch((e) => ({ error: e.message }));
+      // …y si la FCBQ no lo acepta, desde dentro de la pestaña, reintentando si la página se recarga
+      for (let intento = 0; (!result || result.error || !result.paginas?.length) && intento < 3; intento++) {
+        if (intento) await esperar(2000);
+        result = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: recolectar, args: [club, FCBQ] })
+          .then((r) => r[0]?.result).catch((e) => ({ error: e.message }));
+      }
+      if (!result || result.error) throw new Error(/Frame|removed/i.test(result?.error ?? "") ? "La pestaña de la FCBQ se ha recargado mientras leía. Vuelve a pulsar Actualizar." : result?.error || "No se ha podido leer la FCBQ.");
 
       puerto.postMessage({ tipo: "datos", paginas: result.paginas, avisos: result.avisos });
       chrome.tabs.remove(tab.id).catch(() => {});
@@ -45,13 +63,14 @@ chrome.runtime.onConnect.addListener((puerto) => {
   });
 });
 
-// Se ejecuta DENTRO de la pestaña de basquetcatala.cat (mismo origen, con su sesión)
-async function recolectar(club) {
+// Se ejecuta en la extensión o DENTRO de la pestaña de basquetcatala.cat (con su sesión).
+// Solo usa fetch y expresiones regulares para funcionar en los dos sitios.
+async function recolectar(club, base) {
   const paginas = [], avisos = [], vistas = new Set();
   const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   const limpiar = (h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<svg[\s\S]*?<\/svg>|<!--(?!\s*saved)[\s\S]*?-->/gi, "");
   const leer = async (url) => {
-    const abs = new URL(url, location.origin).href.replace(/#.*$/, "");
+    const abs = new URL(url, base).href.replace(/#.*$/, "");
     if (vistas.has(abs)) return null;
     vistas.add(abs);
     await pausa(250);
