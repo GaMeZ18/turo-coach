@@ -88,3 +88,18 @@ export async function alternarConvocado(partido: string, jugador: string, convoc
   }
   revalidatePath(`/partidos/${partido}`);
 }
+
+/** Control de periodos: qué periodos ha jugado cada jugador */
+export async function guardarPeriodos(partidoId: string, numPeriodos: number, filas: { jugadorId: string; periodos: number[] }[]) {
+  const supabase = await createClient();
+  const { error: e1 } = await supabase.from("partidos").update({ num_periodos: numPeriodos }).eq("id", partidoId);
+  if (e1) throw new Error(/num_periodos/.test(e1.message) ? "Ejecuta antes 0006_scouting.sql en Supabase." : e1.message);
+  const { error: e2 } = await supabase.from("partido_periodos").delete().eq("partido_id", partidoId);
+  if (e2) throw new Error(e2.message);
+  const datos = filas.filter((f) => f.periodos.length).map((f) => ({ partido_id: partidoId, jugador_id: f.jugadorId, periodos: [...new Set(f.periodos)].sort((a, b) => a - b) }));
+  if (datos.length) {
+    const { error } = await supabase.from("partido_periodos").insert(datos);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath(`/partidos/${partidoId}`);
+}

@@ -6,9 +6,9 @@ window.addEventListener("message", (e) => {
     window.postMessage({ tipo: "turo-fcbq-pong", version: chrome.runtime.getManifest().version }, location.origin);
     return;
   }
-  if (e.data.tipo !== "turo-fcbq-pedir") return;
+  if (e.data.tipo !== "turo-fcbq-pedir" && e.data.tipo !== "turo-fcbq-pedir-stats") return;
   const puerto = chrome.runtime.connect({ name: "fcbq" });
   puerto.onMessage.addListener((m) => window.postMessage({ ...m, tipo: "turo-fcbq-" + m.tipo }, location.origin));
   puerto.onDisconnect.addListener(() => window.postMessage({ tipo: "turo-fcbq-fin" }, location.origin));
-  puerto.postMessage({ club: String(e.data.club || "3373") });
+  puerto.postMessage(e.data.tipo === "turo-fcbq-pedir-stats" ? { stats: e.data.ids || [] } : { club: String(e.data.club || "3373") });
 });

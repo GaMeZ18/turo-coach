@@ -6,20 +6,30 @@ import Enviar from "@/components/Enviar";
 import { borrarPartido, editarPartido, guardarResultado } from "../actions";
 import { Resultado, type Partido } from "../comun";
 import Convocatoria from "./Convocatoria";
+import Periodos from "./Periodos";
+import type { StatsPartido } from "@/lib/stats-fcbq";
 import { MapPin, Pencil, Trash2 } from "lucide-react";
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user, perfil } = await requireUser();
   const { data } = await supabase.from("partidos").select("*, equipos(nombre)").eq("id", id).maybeSingle();
   if (!data) notFound();
-  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string } | null };
+  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string } | null; fcbq_stats_id?: string | null; num_periodos?: number | null };
   const equipo = p.equipos?.nombre ?? "Equipo";
 
-  const [{ data: plantilla }, { data: conv }] = await Promise.all([
+  const [{ data: plantilla }, { data: conv }, { data: staff }, { data: periodos }, { data: stats }] = await Promise.all([
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", p.equipo_id),
     supabase.from("convocatorias").select("jugador_id").eq("partido_id", id),
+    supabase.from("equipo_staff").select("perfil_id").eq("equipo_id", p.equipo_id).eq("perfil_id", user.id).maybeSingle(),
+    supabase.from("partido_periodos").select("jugador_id, periodos").eq("partido_id", id),
+    p.fcbq_stats_id
+      ? supabase.from("fcbq_stats").select("datos").eq("equipo_id", p.equipo_id).eq("stats_id", p.fcbq_stats_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+  const esStaff = perfil.rol === "coordinador" || !!staff;
+  const st = (stats as { datos: StatsPartido } | null)?.datos ?? null;
+  const nuestroLado = st ? (/TUR[OÓ]/i.test(st.local.nombre) ? st.local : st.visitante) : null;
   const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
     .map((x) => ({ id: x.jugadores.id, nombre: `${x.jugadores.nombre} ${x.jugadores.apellidos ?? ""}`.trim(), dorsal: x.dorsal }))
     .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
@@ -99,6 +109,18 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
 
         <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} />
       </div>
+
+      {esStaff && (
+        <div className="mt-5">
+          <Periodos
+            partidoId={p.id}
+            jugadores={convocados.length ? jugadores.filter((j) => convocados.includes(j.id)) : jugadores}
+            inicial={Object.fromEntries((periodos ?? []).map((x) => [x.jugador_id as string, (x.periodos as number[]) ?? []]))}
+            numInicial={p.num_periodos ?? st?.numPeriodos ?? 4}
+            fcbq={nuestroLado ? nuestroLado.jugadores.map((j) => ({ nombre: j.nombre, dorsal: j.dorsal, periodos: j.periodos })) : null}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -14,8 +14,8 @@ const MODULOS = [
   { href: "/pizarra", titulo: "Pizarra", texto: "Dibuja y anima jugadas al momento", icono: PenTool },
   { href: "/calendario", titulo: "Calendario", texto: "Partidos, entrenos, eventos y cumpleaños", icono: CalendarDays },
   { href: "/partidos", titulo: "Partidos", texto: "Resultados y convocatorias", icono: Trophy },
-  { titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
-  { titulo: "Scouting", texto: "Rivales, notas y control de periodos", icono: Binoculars },
+  { href: "/planificaciones", titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
+  { href: "/scouting", titulo: "Scouting", texto: "Liga, rivales, estadísticas y fichas", icono: Binoculars },
   { titulo: "Vídeo", texto: "Etiqueta acciones por categorías", icono: Video },
   { titulo: "Biblioteca", texto: "Libros, artículos y enlaces", icono: BookOpen },
 ];

@@ -1,17 +1,45 @@
 {
   "manifest_version": 3,
   "name": "Turó Coach · FCBQ",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Botón «Actualizar desde la FCBQ» de Turó Coach: trae partidos, resultados y clasificaciones de basquetcatala.cat.",
-  "permissions": ["scripting", "tabs"],
-  "host_permissions": ["https://www.basquetcatala.cat/*"],
-  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.basquetcatala.cat/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://turo-coach1.vercel.app/*", "http://localhost:3000/*"],
-      "js": ["puente.js"],
+      "matches": [
+        "https://turo-coach1.vercel.app/*",
+        "http://localhost:3000/*"
+      ],
+      "js": [
+        "puente.js"
+      ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.basquetcatala.cat/estadistica/*"
+      ],
+      "js": [
+        "captura.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
-  "icons": { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" }
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "minimum_chrome_version": "111"
 }

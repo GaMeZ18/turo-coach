@@ -98,6 +98,15 @@ public/icons/             Iconos de la app (generados a partir del escudo)
 
 > Requiere ejecutar `0005_planificaciones.sql`.
 
+### Scouting
+Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
+- **Liga**: todos los equipos con balance, puntos a favor y en contra, triples, % de tiros libres y faltas por partido. Próximo rival destacado.
+- **Equipo**: medias, puntos por periodo, resultados, jugadores (minutos, puntos, canastas de 2 y de 3, tiros libres, faltas, +/-, máximo) y fichas del equipo y de cada jugador (posición, mano, etiquetas, notas).
+- Las estadísticas de cada partido las descarga el botón «Actualizar desde la FCBQ» (extensión 1.1). La FCBQ solo da los tiros de campo anotados, no los intentados.
+- **Control de periodos** (en cada partido): rejilla jugador × periodo, rellenable desde la FCBQ, con mínimo por jugador; resumen de la temporada en el scouting del propio equipo.
+
+> Requiere ejecutar `0006_scouting.sql`.
+
 ## Próximas fases
 - Partidos y scouting (rivales, notas, control de periodos de minibásquet, informe PDF)
 - Vídeo (etiquetado por categorías y descriptores)
