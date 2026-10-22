@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import Importador from "./Importador";
+import ActualizarFCBQ from "./ActualizarFCBQ";
 
 export default async function ImportarPage() {
   const { supabase } = await requireUser();
@@ -25,8 +26,37 @@ export default async function ImportarPage() {
         lo que ya esté se actualiza (hora, pista, marcador…) y no se duplica.
       </p>
       <div className="mt-5">
-        <Importador equipos={equipos ?? []} existentes={existentes ?? []} temporada={temporada?.nombre ?? null} />
+        <ActualizarFCBQ equipos={equipos ?? []} />
       </div>
+
+      <section id="extension" className="tarjeta mt-6 max-w-3xl scroll-mt-24 p-4 text-sm text-tinta/80">
+        <h2 className="text-base font-semibold text-tinta">Instalar el botón (una sola vez por ordenador)</h2>
+        <p className="mt-1 text-tinta/60">
+          La FCBQ no deja que un servidor lea su web (pide verificación de seguridad), así que la lectura la hace una pequeña extensión
+          en tu navegador. Funciona en Chrome, Brave y Edge de ordenador.
+        </p>
+        <ol className="mt-3 list-inside list-decimal space-y-1.5">
+          <li><a href="/extension/turo-coach-fcbq.zip" download className="font-medium text-azul underline">Descarga la extensión</a> y descomprime el .zip (clic derecho → Extraer todo).</li>
+          <li>
+            Abre la página de extensiones: escribe en la barra de direcciones{" "}
+            <code className="rounded bg-suave px-1">chrome://extensions</code> (Brave: <code className="rounded bg-suave px-1">brave://extensions</code>, Edge: <code className="rounded bg-suave px-1">edge://extensions</code>).
+          </li>
+          <li>Activa <strong>Modo de desarrollador</strong> (arriba a la derecha).</li>
+          <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que has descomprimido.</li>
+          <li>Recarga esta página: el botón <strong>Actualizar desde la FCBQ</strong> ya funcionará.</li>
+        </ol>
+        <p className="mt-3 text-xs text-tinta/50">
+          Al pulsarlo se abre una pestaña de basquetcatala.cat; si sale la verificación, resuélvela y la extensión sigue sola. Lee el calendario del club de toda la temporada,
+          los resultados y las clasificaciones de cada equipo, lo guarda aquí y cierra la pestaña.
+        </p>
+      </section>
+
+      <details className="mt-6 max-w-3xl">
+        <summary className="cursor-pointer text-sm font-medium text-tinta/60">Importación manual (sin extensión: móvil, otro navegador…)</summary>
+        <div className="mt-3">
+          <Importador equipos={equipos ?? []} existentes={existentes ?? []} temporada={temporada?.nombre ?? null} />
+        </div>
+      </details>
     </div>
   );
 }

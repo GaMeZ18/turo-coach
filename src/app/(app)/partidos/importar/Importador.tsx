@@ -97,7 +97,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
       .map(([nombre, equipoId]) => ({ nombre, equipoId, fcbqEquipoId: idFCBQ(nombre) }));
     start(async () => {
       try {
-        setResultado(await importarFCBQ(partidos, asignaciones, ligaLista ? liga : null));
+        setResultado(await importarFCBQ(partidos, asignaciones, ligaLista && liga ? [liga] : []));
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se ha podido importar.");
       }
@@ -246,7 +246,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
             <div className="tarjeta flex max-w-3xl items-start gap-3 border-green-200 bg-green-50 p-4 text-sm">
               <CheckCircle2 className="mt-0.5 shrink-0 text-green-700" size={20} />
               <div>
-                <p className="font-semibold text-green-800">Importación hecha: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados, {resultado.iguales} sin cambios{resultado.liga ? " · liga y clasificación guardadas" : ""}.</p>
+                <p className="font-semibold text-green-800">Importación hecha: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados, {resultado.iguales} sin cambios{resultado.ligas ? " · liga y clasificación guardadas" : ""}.</p>
                 {resultado.errores.length > 0 && (
                   <ul className="mt-2 list-inside list-disc text-red-700">{resultado.errores.map((x, i) => <li key={i}>{x}</li>)}</ul>
                 )}

@@ -7,6 +7,7 @@ import Enviar from "@/components/Enviar";
 import { crearPartido } from "./actions";
 import { Resultado, type Partido } from "./comun";
 import Liga, { type LigaGuardada } from "./Liga";
+import ActualizarFCBQ from "./importar/ActualizarFCBQ";
 
 export default async function PartidosPage() {
   const { supabase } = await requireUser();
@@ -20,7 +21,7 @@ export default async function PartidosPage() {
     );
   }
 
-  const [{ data }, { data: liga }] = await Promise.all([
+  const [{ data }, { data: liga }, { data: equiposClub }] = await Promise.all([
     supabase
       .from("partidos")
       .select("id, fecha, rival, local, lugar, competicion, jornada, puntos_favor, puntos_contra, estado")
@@ -28,6 +29,7 @@ export default async function PartidosPage() {
       .order("fecha", { ascending: true }),
     // Si aún no se ha ejecutado 0004_liga_fcbq.sql, la consulta falla y simplemente no hay liga
     supabase.from("ligas_fcbq").select("nombre, url, resultados, clasificacion, updated_at").eq("equipo_id", equipo.id).maybeSingle(),
+    supabase.from("equipos").select("id, nombre, fcbq_nombre").eq("temporada_id", equipo.temporada_id).order("nombre"),
   ]);
   const lista = (data ?? []) as Partido[];
   const ahora = Date.now() - 3 * 3600 * 1000;
@@ -66,7 +68,6 @@ export default async function PartidosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Partidos</h1>
           <p className="text-sm text-tinta/60">{equipo.nombre}</p>
-          <Link href="/partidos/importar" className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-azul hover:underline">⇣ Importar de la FCBQ</Link>
         </div>
         {jugados.length > 0 && (
           <div className="flex gap-4 text-center">
@@ -75,6 +76,10 @@ export default async function PartidosPage() {
             <div><div className="text-2xl font-bold text-azul">{(pc / jugados.length).toFixed(1)}</div><div className="text-[11px] uppercase text-tinta/50">PC/partido</div></div>
           </div>
         )}
+      </div>
+
+      <div className="mt-4">
+        <ActualizarFCBQ equipos={equiposClub ?? []} />
       </div>
 
       {!equipo.congelado && (
