@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
-import { calcularClasificacion, type ResultadoLiga } from "@/lib/fcbq";
+import { calcularClasificacion, type ResultadoLiga, type TablaFCBQ } from "@/lib/fcbq";
 import { media, mismoEquipo, pct, resumenEquipo, type StatsPartido } from "@/lib/stats-fcbq";
 import { esTuro, puedeVerScouting } from "@/lib/scouting";
 import { fechaCorta } from "@/lib/fechas";
@@ -24,7 +24,7 @@ export default async function ScoutingPage() {
   }
 
   const [{ data: liga }, { data: filas, error }, { data: fichas }, { data: proximo }, { data: eqFcbq }] = await Promise.all([
-    supabase.from("ligas_fcbq").select("nombre, resultados").eq("equipo_id", equipo.id).maybeSingle(),
+    supabase.from("ligas_fcbq").select("nombre, resultados, clasificacion").eq("equipo_id", equipo.id).maybeSingle(),
     supabase.from("fcbq_stats").select("datos").eq("equipo_id", equipo.id),
     supabase.from("scouting_rivales").select("nombre, notas, caracteristicas").eq("equipo_id", equipo.id),
     supabase.from("partidos").select("fecha, rival, local").eq("equipo_id", equipo.id).neq("estado", "jugado").gte("fecha", new Date(Date.now() - 3 * 3600e3).toISOString()).order("fecha").limit(1).maybeSingle(),
@@ -33,7 +33,13 @@ export default async function ScoutingPage() {
   const faltaSQL = error && /fcbq_stats|scouting/.test(error.message);
   const stats = ((filas ?? []) as { datos: StatsPartido }[]).map((f) => f.datos);
   const resultados = ((liga?.resultados ?? []) as ResultadoLiga[]);
-  const clasif = calcularClasificacion(resultados);
+  // Clasificación oficial de la FCBQ si la tenemos; si no, calculada con los resultados
+  const oficial = liga?.clasificacion as TablaFCBQ | null | undefined;
+  const col = (re: RegExp) => oficial?.cabeceras.findIndex((c) => re.test(c)) ?? -1;
+  const [iE, iJ, iG, iP, iPF, iPC, iPts] = [/^Equip/i, /^J$/i, /^G$/i, /^P$/i, /^PF$/i, /^PC$/i, /^Punts|^Pts/i].map(col);
+  const clasif = oficial && iE >= 0 && iJ >= 0 && iPts >= 0
+    ? oficial.filas.map((f) => ({ equipo: f[iE], pj: Number(f[iJ]) || 0, g: Number(f[iG]) || 0, p: Number(f[iP]) || 0, pf: Number(f[iPF]) || 0, pc: Number(f[iPC]) || 0, pts: Number(f[iPts]) || 0 }))
+    : calcularClasificacion(resultados);
 
   // Todos los equipos de la liga (de los resultados y de las estadísticas)
   const nombres = [...new Set([...clasif.map((c) => c.equipo), ...stats.flatMap((s) => [s.local.nombre, s.visitante.nombre])])];
@@ -87,13 +93,14 @@ export default async function ScoutingPage() {
                 <th className="hidden px-2 py-2 text-center sm:table-cell" title="Triples por partido">T3</th>
                 <th className="hidden px-2 py-2 text-center sm:table-cell" title="% de tiros libres">TL%</th>
                 <th className="hidden px-2 py-2 text-center sm:table-cell" title="Faltas por partido">Faltas</th>
+                <th className="px-2 py-2 text-center" title="Puntos de clasificación">Pts</th>
                 <th className="px-2 py-2" />
               </tr>
             </thead>
             <tbody>
-              {equiposLiga.map(({ nombre, c, r, ficha }) => (
+              {equiposLiga.map(({ nombre, c, r, ficha }, i) => (
                 <tr key={nombre} className={`border-t border-linea ${esTuro(nombre) ? "bg-azul/10 font-semibold text-azul" : ""}`}>
-                  <td className="px-2 py-1.5"><Link href={url(nombre)} className="hover:underline">{nombre}</Link></td>
+                  <td className="px-2 py-1.5"><span className="mr-1.5 text-xs text-tinta/40">{i + 1}</span><Link href={url(nombre)} className="hover:underline">{nombre}</Link></td>
                   <td className="px-2 py-1.5 text-center">{c?.pj ?? r.pj}</td>
                   <td className="px-2 py-1.5 text-center">{c ? `${c.g}-${c.p}` : `${r.g}-${r.p}`}</td>
                   <td className="px-2 py-1.5 text-center">{c ? media(c.pf, c.pj) : media(r.pf, r.pj)}</td>
@@ -101,6 +108,7 @@ export default async function ScoutingPage() {
                   <td className="hidden px-2 py-1.5 text-center sm:table-cell">{media(r.t3, r.pj)}</td>
                   <td className="hidden px-2 py-1.5 text-center sm:table-cell">{pct(r.tlm, r.tla)}</td>
                   <td className="hidden px-2 py-1.5 text-center sm:table-cell">{media(r.fc, r.pj)}</td>
+                  <td className="px-2 py-1.5 text-center font-bold">{c?.pts ?? ""}</td>
                   <td className="px-2 py-1.5 text-right">{ficha && <NotebookPen size={14} className="inline text-oro" aria-label="Tiene ficha" />}</td>
                 </tr>
               ))}

@@ -113,10 +113,48 @@ async function pedirStats(plantilla, idBase, ids) {
   return res;
 }
 
+// Se ejecuta DENTRO de la pestaña de basquetcatala.cat: pide un token a /jwt.php (como hace la web)
+// y descarga las estadísticas del servicio de la FCBQ
+async function apiStats(ids) {
+  const res = {};
+  const txt = await fetch("/jwt.php", { credentials: "include", cache: "no-store" }).then((r) => r.text()).catch(() => "");
+  const token = (txt.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/) || [])[0];
+  if (!token) return { error: "sin token" };
+  for (const id of ids) {
+    try {
+      const r = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/stats?currentSeason=true`, {
+        headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
+      });
+      if (!r.ok) { res[id] = { error: r.status }; continue; }
+      const j = await r.json();
+      delete j.playByPlay;
+      res[id] = j;
+    } catch (e) { res[id] = { error: String(e?.message || e) }; }
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  return res;
+}
+
 async function bajarEstadisticas(tabId, ids, avisar) {
   const stats = {};
+  // 1) Servicio de estadísticas de la FCBQ con el token de la web (lo más rápido)
+  for (let i = 0; i < ids.length; i += 20) {
+    avisar(`Estadísticas: ${Math.min(i + 20, ids.length)} de ${ids.length} partidos…`);
+    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20)] })
+      .then((x) => x[0]?.result || {}).catch(() => ({}));
+    if (r.error) break;
+    for (const [id, j] of Object.entries(r)) if (!j.error) stats[id] = j;
+    if (i === 0 && !Object.keys(stats).length) break;
+  }
+  if (ids.every((id) => stats[id])) return stats;
+
+  // 2) Si no, lo que carga la propia página de estadísticas
+  ids = ids.filter((id) => !stats[id]);
   const primero = await capturado(tabId, ids[0]);
-  if (!primero) throw new Error("No he podido leer las estadísticas de la FCBQ (la página no las ha cargado).");
+  if (!primero) {
+    if (Object.keys(stats).length) return stats;
+    throw new Error("No he podido leer las estadísticas de la FCBQ (la página no las ha cargado).");
+  }
   try { const j = JSON.parse(primero.texto); delete j.playByPlay; stats[ids[0]] = j; } catch {}
   const resto = ids.slice(1);
 
@@ -179,20 +217,30 @@ async function recolectar(club, base) {
       if (h) for (const e of enlaces(h, /\/competicions\/|classifica/i)) competiciones.add(e);
     }
 
-    // 3) Resultados de cada competición. "/resultats/<id>/0" suele traer todas las jornadas;
-    //    si solo trae una, recorremos las jornadas que enlace.
+    // 3) Resultados de cada grupo. "/resultats/<grupo>/0" es el resumen (última jornada y clasificación);
+    //    el desplegable trae "Jornada N (dd-mm-aaaa)" y cada jornada está en "/resultats/<grupo>/N".
     const ids = new Set();
     for (const e of competiciones) { const m = e.match(/\/competicions\/resultats\/(\d+)/); if (m) ids.add(m[1]); }
     const clasif = new Set([...competiciones].filter((e) => /classifica/i.test(e)));
+    const hoy = new Date();
     for (const id of ids) {
       const h = await leer(`/competicions/resultats/${id}/0`);
       if (!h) continue;
       for (const e of enlaces(h, /classifica/i)) clasif.add(e);
-      // Una sola jornada son pocos partidos; una temporada entera, muchos
-      const partidos = (h.match(/teamNameLink/g) || []).length / 2;
-      if (partidos < 12) {
-        const otras = enlaces(h, new RegExp(`/competicions/resultats/${id}/\\d+`)).slice(0, 40);
-        for (const e of otras) await leer(e);
+      const jornadas = [...h.matchAll(/Jornada\s+(\d+)\s*\((\d{2})-(\d{2})-(\d{4})\)/g)]
+        .map((m) => ({ n: Number(m[1]), fecha: new Date(`${m[4]}-${m[3]}-${m[2]}T00:00:00`) }));
+      const vistas = new Set();
+      let siguiente = false;
+      for (const j of jornadas.sort((x, y) => x.n - y.n)) {
+        if (vistas.has(j.n)) continue;
+        vistas.add(j.n);
+        // Las ya jugadas y la próxima (para tener su horario)
+        if (j.fecha > hoy) { if (siguiente) continue; siguiente = true; }
+        await leer(`/competicions/resultats/${id}/${j.n}`);
+      }
+      if (!jornadas.length) {
+        // Sin desplegable: probamos los enlaces de jornada que tenga
+        for (const e of enlaces(h, new RegExp(`/competicions/resultats/${id}/\\d+`)).slice(0, 40)) await leer(e);
       }
     }
     // 4) Clasificaciones

@@ -57,10 +57,11 @@ type PartidoLiga = ResultadoLiga & { idLocal: string | null; idVisit: string | n
  *  el marcador en un div "col-md-4 col-xs-4" ("78-65", o "-" si no se ha jugado), la fecha
  *  "dd-mm-aaaa hh:mm" y, si hay estadísticas, un enlace /estadistica/partit/<id>. */
 function partidosLiga(doc: Document): PartidoLiga[] {
-  const enlaces = Array.from(doc.querySelectorAll("a.teamNameLink"));
-
-  // Contenedor de cada partido: el ancestro más pequeño que tiene exactamente dos equipos
-  const contenedores: Element[] = [];
+  // Cada partido es un div.rowJornada con dos .teamNameLink (así es la web de la FCBQ).
+  // Si no los hay, buscamos el ancestro más pequeño que tenga exactamente dos equipos.
+  const filasJornada = Array.from(doc.querySelectorAll("div.rowJornada")).filter((el) => el.querySelectorAll(".teamNameLink").length === 2);
+  const enlaces = filasJornada.length ? [] : Array.from(doc.querySelectorAll("a.teamNameLink")).filter((a) => !a.closest(".nameTeamLegend2"));
+  const contenedores: Element[] = [...filasJornada];
   for (const a of enlaces) {
     let el: Element | null = a.parentElement;
     while (el && el.querySelectorAll("a.teamNameLink").length < 2) el = el.parentElement;
@@ -73,7 +74,10 @@ function partidosLiga(doc: Document): PartidoLiga[] {
   let jornada: number | null = null;
   let ultimaFecha: { dia: string; hora: string } | null = null;
   const RE_F = /(\d{2})[-/](\d{2})[-/](\d{4})(?:\s+(\d{1,2}:\d{2}))?/;
-  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  // (sin mirar el desplegable de jornadas ni los scripts)
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: (x) => (x.nodeType === Node.TEXT_NODE && x.parentElement?.closest("select, option, script, style, .nameTeamLegend2") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
   for (let n: Node | null = walker.currentNode; n; n = walker.nextNode()) {
     if (n.nodeType === Node.TEXT_NODE) {
       const t = n.textContent ?? "";
@@ -86,15 +90,25 @@ function partidosLiga(doc: Document): PartidoLiga[] {
     const el = n as Element;
     if (!set.has(el)) continue;
 
-    const [a1, a2] = Array.from(el.querySelectorAll("a.teamNameLink"));
-    const f = (el.textContent ?? "").match(RE_F);
+    const [a1, a2] = Array.from(el.querySelectorAll(".teamNameLink"));
+    const f = (el.querySelector("#time2")?.textContent ?? el.textContent ?? "").match(RE_F);
     const fecha: { dia: string; hora: string } | null = f ? { dia: `${f[3]}-${f[2]}-${f[1]}`, hora: f[4]?.padStart(5, "0") ?? "12:00" } : ultimaFecha;
     if (f) ultimaFecha = fecha;
     if (!fecha) continue;
 
-    // Marcador
+    // Marcador: en .fs-38, la primera y la tercera columna (local - visitante)
     let marcador: [number, number] | null = null;
-    for (const d of Array.from(el.querySelectorAll("div, span, td, strong"))) {
+    const fs = el.querySelector(".fs-38");
+    if (fs) {
+      const cols = Array.from(fs.children).filter((c) => /\bcol-/.test(c.getAttribute("class") ?? ""));
+      const a = limpio(cols[0]?.textContent), b = limpio(cols[2]?.textContent);
+      if (/^\d{1,3}$/.test(a) && /^\d{1,3}$/.test(b)) marcador = [Number(a), Number(b)];
+      else {
+        const m = limpio(fs.textContent).match(/^(\d{1,3})\s*-?\s*(\d{1,3})$/);
+        if (m) marcador = [Number(m[1]), Number(m[2])];
+      }
+    }
+    for (const d of marcador ? [] : Array.from(el.querySelectorAll("div, span, td, strong"))) {
       if (d.children.length > 1) continue;
       const m = limpio(d.textContent).match(/^(\d{1,3})\s*-\s*(\d{1,3})$/);
       if (m) { marcador = [Number(m[1]), Number(m[2])]; break; }
@@ -103,7 +117,7 @@ function partidosLiga(doc: Document): PartidoLiga[] {
 
     const stats = Array.from(el.querySelectorAll("a")).map((x) => x.getAttribute("href") ?? "")
       .map((h) => h.match(/estadistica\/partit\/([0-9a-fA-F-]{20,})/)?.[1]).find(Boolean) ?? null;
-    const idEquipo = (a: Element) => a.getAttribute("href")?.match(/equip\/(\d+)/)?.[1] ?? null;
+    const idEquipo = (a: Element) => a.getAttribute("href")?.match(/equip\/(\d+)/)?.[1] ?? a.getAttribute("href")?.match(/(\d+)\/?$/)?.[1] ?? null;
     res.push({
       jornada, dia: fecha.dia, hora: fecha.hora,
       local: limpio(a1.textContent), visitante: limpio(a2.textContent),
@@ -152,6 +166,27 @@ export interface LigaFCBQ {
 
 /** Tabla de clasificación: la que tiene una columna "Equip" y una fila del Turó */
 function tablaClasificacion(doc: Document): { tabla: TablaFCBQ; nuestro: string } | null {
+  // Web de la FCBQ: filas .nameTeamLegend2 con la posición (.numRanking) y los números (.textRanking):
+  // jugados, ganados, perdidos, no presentados, puntos a favor, en contra y puntos de clasificación
+  const filasRanking = Array.from(doc.querySelectorAll(".nameTeamLegend2")).map((el) => {
+    const fila = el.querySelector(".textRanking") ? el : el.closest(".row") ?? el.parentElement ?? el;
+    const pos = limpio((fila.querySelector(".numRanking") ?? el.querySelector(".numRanking"))?.textContent);
+    const nombre = limpio((el.querySelector("a") ?? el).textContent);
+    const nums = Array.from(fila.querySelectorAll(".textRanking")).map((x) => limpio(x.textContent)).filter((x) => /^-?\d+$/.test(x));
+    return { pos, nombre, nums };
+  }).filter((f) => f.nombre && f.nums.length >= 7);
+  if (filasRanking.length > 1) {
+    const nuestra = filasRanking.find((f) => esTuro(f.nombre));
+    if (nuestra) {
+      return {
+        nuestro: nuestra.nombre,
+        tabla: {
+          cabeceras: ["#", "Equip", "J", "G", "P", "NP", "PF", "PC", "Punts"],
+          filas: filasRanking.map((f, i) => [f.pos || String(i + 1), f.nombre, ...f.nums.slice(0, 7)]),
+        },
+      };
+    }
+  }
   for (const t of Array.from(doc.querySelectorAll("table"))) {
     const filas = Array.from(t.querySelectorAll("tr"));
     if (filas.length < 3) continue;
@@ -195,9 +230,14 @@ export function leerLigaFCBQ(html: string, url?: string | null): LigaFCBQ | null
 /** Une resultados nuevos con los guardados (por jornada + equipos) */
 export function unirResultados(antes: ResultadoLiga[], nuevos: ResultadoLiga[]) {
   const n = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
-  const clave = (r: ResultadoLiga) => `${n(r.local)}|${n(r.visitante)}|${r.jornada ?? r.dia}`;
+  // En una liga cada emparejamiento local-visitante se juega una sola vez
+  const clave = (r: ResultadoLiga) => `${n(r.local)}|${n(r.visitante)}`;
   const mapa = new Map(antes.map((r) => [clave(r), r]));
-  for (const r of nuevos) mapa.set(clave(r), r);
+  for (const r of nuevos) {
+    const ya = mapa.get(clave(r));
+    // No perder datos: si la página nueva no trae marcador, jornada o estadísticas y la guardada sí
+    mapa.set(clave(r), ya ? { ...r, jornada: r.jornada ?? ya.jornada, pl: r.pl ?? ya.pl, pv: r.pv ?? ya.pv, statsId: r.statsId ?? ya.statsId } : r);
+  }
   return [...mapa.values()].sort((a, b) => (a.jornada ?? 0) - (b.jornada ?? 0) || (a.dia + a.hora).localeCompare(b.dia + b.hora));
 }
 
