@@ -15,6 +15,18 @@ type Leido = { partidos: PartidoFCBQ[]; ligas: LigaFCBQ[]; nombres: string[]; id
 
 const CLUB = "3373";
 
+/** Trozo del HTML de una página de resultados (para diagnosticar si cambia la web) */
+function muestra(paginas: Pagina[]) {
+  const pg = paginas.find((p) => /\/competicions\/resultats\/\d+\/[1-9]/.test(p.url)) ?? paginas.find((p) => /resultats/.test(p.url));
+  if (!pg) return "—";
+  const doc = new DOMParser().parseFromString(pg.html, "text/html");
+  const corta = (el: Element | null | undefined, n = 1500) => (el ? el.outerHTML.replace(/\s+/g, " ").slice(0, n) : "—");
+  const ranking = doc.querySelector(".nameTeamLegend2");
+  let fila: Element | null | undefined = ranking;
+  for (let i = 0; i < 3 && fila?.parentElement; i++) fila = fila.parentElement;
+  return [pg.url, "PARTIDO: " + corta(doc.querySelector(".rowJornada")), "CLASIFICACION: " + corta(fila, 2500), "JORNADA: " + corta(doc.querySelector(".bg-2"), 400)].join("\n");
+}
+
 /** Convierte las páginas de la FCBQ en partidos (calendario + resultados) y ligas */
 function procesar(paginas: Pagina[]): Leido {
   const rango = (u: string) => (/calendari_club/.test(u) ? 0 : /\/competicions\/resultats/.test(u) ? 1 : 2);
@@ -161,6 +173,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
           `Equipos FCBQ: ${l.nombres.join(", ")}`,
           `Avisos: ${(d.avisos ?? []).join(" | ") || "—"}`,
           `Enlaces en páginas de equipo:\n${enlacesEquipo.join("\n") || "—"}`,
+          `Muestra de resultados:\n${muestra(d.paginas)}`,
         ].join("\n"));
         if (!l.partidos.length && !l.ligas.length) { setEstado("error"); setTexto("La FCBQ no ha devuelto partidos del Turó."); return; }
         const eqs = equiposRef.current;

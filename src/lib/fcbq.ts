@@ -169,7 +169,9 @@ function tablaClasificacion(doc: Document): { tabla: TablaFCBQ; nuestro: string 
   // Web de la FCBQ: filas .nameTeamLegend2 con la posición (.numRanking) y los números (.textRanking):
   // jugados, ganados, perdidos, no presentados, puntos a favor, en contra y puntos de clasificación
   const filasRanking = Array.from(doc.querySelectorAll(".nameTeamLegend2")).map((el) => {
-    const fila = el.querySelector(".textRanking") ? el : el.closest(".row") ?? el.parentElement ?? el;
+    // Fila del equipo: el ancestro más alto que solo contiene a este equipo
+    let fila: Element = el;
+    while (fila.parentElement && fila.parentElement.querySelectorAll(".nameTeamLegend2").length === 1 && fila.parentElement !== doc.body) fila = fila.parentElement;
     const pos = limpio((fila.querySelector(".numRanking") ?? el.querySelector(".numRanking"))?.textContent);
     const nombre = limpio((el.querySelector("a") ?? el).textContent);
     const nums = Array.from(fila.querySelectorAll(".textRanking")).map((x) => limpio(x.textContent)).filter((x) => /^-?\d+$/.test(x));
