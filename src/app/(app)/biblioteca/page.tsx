@@ -3,8 +3,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
 import MiniPizarra from "@/components/pizarra/Mini";
-import Enviar from "@/components/Enviar";
-import { cargarBibliotecaInicial } from "../ejercicios/actions";
+import CargarBiblioteca from "./CargarBiblioteca";
 import { SEMILLA } from "@/lib/biblioteca-semilla";
 import { Library, Plus, Users, Timer } from "lucide-react";
 
@@ -75,12 +74,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
           </form>
 
           {esCoord && !filtrando && (
-            <form action={cargarBibliotecaInicial} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-oro/15 p-3 text-sm">
-              <span className="flex-1">
-                {lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length}; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`}
-              </span>
-              <Enviar className="btn-primario !py-1.5">Cargar ejercicios iniciales</Enviar>
-            </form>
+            <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length}; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
           )}
 
           {/* Una sola rejilla de 3 columnas (ordenada por categoría) para que no queden huecos */}

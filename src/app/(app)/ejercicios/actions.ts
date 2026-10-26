@@ -111,28 +111,39 @@ export async function alternarBiblioteca(formData: FormData) {
 }
 
 /** Carga la biblioteca inicial del club (solo el coordinador). No duplica los que ya estén. */
-export async function cargarBibliotecaInicial() {
-  const { SEMILLA, montar } = await import("@/lib/biblioteca-semilla");
-  const supabase = await createClient();
-  const { data: ya, error } = await supabase.from("ejercicios").select("titulo").eq("en_biblioteca", true);
-  if (error) throw new Error(faltaSQL(error.message));
-  const titulos = new Set((ya ?? []).map((x) => x.titulo));
-  const nuevos = SEMILLA.filter((e) => !titulos.has(e.titulo)).map((e) => ({
-    tipo: e.tipo ?? "ejercicio",
-    titulo: e.titulo,
-    descripcion: e.descripcion,
-    correcciones: e.correcciones,
-    categoria: e.categoria,
-    etiquetas: e.etiquetas,
-    jugadores_min: e.jugadores,
-    duracion: e.duracion,
-    material: e.material ?? null,
-    edades: e.edades,
-    pizarra: montar(e.montaje),
-    visibilidad: "club",
-    en_biblioteca: true,
-  }));
-  if (nuevos.length) check(await supabase.from("ejercicios").insert(nuevos));
-  revalidatePath("/biblioteca");
-  revalidatePath("/ejercicios");
+export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error?: string }> {
+  try {
+    const { SEMILLA, montar } = await import("@/lib/biblioteca-semilla");
+    const supabase = await createClient();
+    const { data: ya, error } = await supabase.from("ejercicios").select("titulo").eq("en_biblioteca", true);
+    if (error) return { nuevos: 0, error: faltaSQL(error.message) };
+    const titulos = new Set((ya ?? []).map((x) => x.titulo));
+    const nuevos = SEMILLA.filter((e) => !titulos.has(e.titulo)).map((e) => ({
+      tipo: e.tipo ?? "ejercicio",
+      titulo: e.titulo,
+      descripcion: e.descripcion,
+      correcciones: e.correcciones,
+      categoria: e.categoria,
+      etiquetas: e.etiquetas,
+      jugadores_min: e.jugadores,
+      duracion: e.duracion,
+      material: e.material ?? null,
+      edades: e.edades,
+      pizarra: montar(e.montaje),
+      visibilidad: "club",
+      en_biblioteca: true,
+    }));
+    // Por tandas, para que un fallo no deje todo a medias
+    let n = 0;
+    for (let i = 0; i < nuevos.length; i += 10) {
+      const { error: e2 } = await supabase.from("ejercicios").insert(nuevos.slice(i, i + 10));
+      if (e2) return { nuevos: n, error: faltaSQL(e2.message) };
+      n += Math.min(10, nuevos.length - i);
+    }
+    revalidatePath("/biblioteca");
+    revalidatePath("/ejercicios");
+    return { nuevos: n };
+  } catch (e) {
+    return { nuevos: 0, error: e instanceof Error ? e.message : String(e) };
+  }
 }
