@@ -5,6 +5,7 @@ import { equipoActivo } from "@/lib/equipo-activo";
 import { guardarJugador, quitarDelEquipo } from "../actions";
 import Enviar from "@/components/Enviar";
 import EstadisticasJugador from "./EstadisticasJugador";
+import VideoJugador from "./VideoJugador";
 
 const ESTADOS: Record<string, string> = {
   presente: "Presente", ausente: "Ausente", justificado: "Justificado", lesionado: "Lesionado", tarde: "Tarde",
@@ -68,6 +69,8 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
       )}
 
       <EstadisticasJugador supabase={supabase} jugador={{ id: j.id, nombre: j.nombre, apellidos: j.apellidos }} />
+
+      <VideoJugador supabase={supabase} jugadorId={j.id} />
 
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Asistencia reciente</h2>

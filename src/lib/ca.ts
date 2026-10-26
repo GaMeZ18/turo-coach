@@ -317,6 +317,17 @@ export const CA: Record<string, string> = {
   "Ningún clip con esos filtros.": "Cap clip amb aquests filtres.",
   "Dale al play y pulsa las etiquetas para crear clips.": "Prem el play i les etiquetes per crear clips.",
   "Etiqueta acciones y revisa los clips": "Etiqueta accions i revisa els clips",
+  "Estadística": "Estadística",
+  "Anotada": "Anotada",
+  "Fallada": "Fallada",
+  "No sé / equipo": "No ho sé / equip",
+  "Saltar (Esc)": "Salta (Esc)",
+  "Sin jugador": "Sense jugador",
+  "Últimos clips": "Últims clips",
+  "Tiros de 2": "Tirs de 2",
+  "Pérdidas": "Pèrdues",
+  "Partido / vídeo": "Partit / vídeo",
+  "Tecla": "Tecla",
 };
 
 // Dies i mesos (per a les dates escrites)
