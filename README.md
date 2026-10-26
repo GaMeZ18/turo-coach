@@ -107,8 +107,14 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Avisos
+- Campana arriba con los avisos sin leer (`/notificaciones`). Al actualizar desde la FCBQ se avisa al cuerpo técnico de cada equipo (y al coordinador) de cambios de horario o de pista, aplazamientos y resultados nuevos.
+- Avisos push en el móvil/ordenador: botón «Activar avisos» en `/notificaciones` (en iPhone, con la app instalada). Necesita la variable de entorno `VAPID_PRIVATE_KEY` en Vercel (la pública está en `src/lib/notificar.ts`).
+
+> Requiere ejecutar `0010_notificaciones.sql`.
+
 ### Partidos (extra)
-- **Previa** (cuerpo técnico): ficha del rival del scouting, plan de partido y sistemas/ejercicios elegidos con su pizarra.
+- **Previa** (cuerpo técnico): informe automático del rival con los datos de la FCBQ (clasificación, racha, anotadores, tiradores, tiros libres, periodos, quinteto inicial…), ficha del rival del scouting, plan de partido y sistemas/ejercicios elegidos con su pizarra.
 - **Estadísticas de la FCBQ** en cada partido: parciales por periodo y box score de los dos equipos.
 - **Informe PDF** (`/imprimir/partido/<id>`): resultado, parciales, plan, sistemas, box score, convocatoria con periodos y notas.
 - **Aplazados**: al actualizar desde la FCBQ avisa de los partidos futuros que ya no están en su calendario y permite marcarlos como aplazados.

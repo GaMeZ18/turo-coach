@@ -6,6 +6,7 @@ import Enviar from "@/components/Enviar";
 import { anadirSistemaPartido, borrarPartido, editarPartido, guardarPrevia, guardarResultado, quitarSistemaPartido } from "../actions";
 import BoxScore, { Parciales } from "@/components/BoxScore";
 import MiniPizarra from "@/components/pizarra/Mini";
+import InformeRival from "@/components/InformeRival";
 import { Resultado, type Partido } from "../comun";
 import Convocatoria from "./Convocatoria";
 import Periodos from "./Periodos";
@@ -84,6 +85,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       {esStaff && (
         <section className="tarjeta mt-5 p-4">
           <h2 className="flex items-center gap-2 font-semibold"><ClipboardList size={18} className="text-azul" /> Previa del partido</h2>
+          <div className="mt-2"><InformeRival supabase={supabase} equipoId={p.equipo_id} nombre={p.rival} /></div>
           {(ficha && (Object.keys(caract).length > 0 || (ficha as { notas?: string | null }).notas)) ? (
             <div className="mt-2 rounded-lg bg-suave p-3 text-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-tinta/50">Ficha de {p.rival}</p>
@@ -95,7 +97,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
               {(ficha as { notas?: string | null }).notas && <p className="mt-1 whitespace-pre-line">{(ficha as { notas?: string | null }).notas}</p>}
             </div>
           ) : (
-            <p className="mt-1 text-xs text-tinta/50">Sin ficha del rival todavía (se rellena en Scouting).</p>
+            <p className="mt-1 text-xs text-tinta/50">Sin ficha manual del rival (se rellena en Scouting).</p>
           )}
           <form action={guardarPrevia} className="mt-3 space-y-2">
             <input type="hidden" name="id" value={p.id} />

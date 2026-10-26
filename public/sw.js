@@ -4,7 +4,7 @@
 // - Sin conexión muestra /offline.html en vez del error del navegador.
 // Los datos (Supabase) NO se cachean: siempre se piden en vivo.
 
-const VERSION = "turo-coach-v1";
+const VERSION = "turo-coach-v2";
 const PRECACHE = ["/offline.html", "/marca/escudo.png", "/marca/escudo-128.png", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -47,4 +47,26 @@ self.addEventListener("fetch", (event) => {
       )
     );
   }
+});
+
+// ---------- Avisos (push) ----------
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch { d = { titulo: event.data ? event.data.text() : "Turó Coach" }; }
+  event.waitUntil(self.registration.showNotification(d.titulo || "Turó Coach", {
+    body: d.cuerpo || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    data: { url: d.url || "/notificaciones" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil((async () => {
+    const ventanas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const v of ventanas) if (v.url.startsWith(self.location.origin)) { await v.focus(); return v.navigate(url); }
+    return self.clients.openWindow(url);
+  })());
 });

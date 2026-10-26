@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { notificarEquipo } from "@/lib/notificar";
 import { createClient } from "@/lib/supabase/server";
 import { buscarExistente, cambiosFCBQ, datosFCBQ, unirResultados, type LigaFCBQ, type PartidoFCBQ, type ResultadoLiga } from "@/lib/fcbq";
 
@@ -30,6 +31,10 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
     .in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
   if (e1) return { ...res, errores: [...res.errores, e1.message] };
   const lista = (existentes ?? []) as unknown as Existente[];
+  const { data: nombresEq } = await supabase.from("equipos").select("id, nombre").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nombreDe = new Map((nombresEq ?? []).map((e) => [e.id as string, e.nombre as string]));
+  const avisos: { equipoId: string; titulo: string; cuerpo: string; url: string }[] = [];
+  const cuando = (iso: string) => new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   for (const p of partidos) {
     const equipoId = equipoDe.get(p.nuestro);
@@ -40,8 +45,20 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
     if (ya) {
       const cambios = cambiosFCBQ(ya, p);
       if (!Object.keys(cambios).length) { res.iguales++; continue; }
+      const antes = { fecha: ya.fecha as string, lugar: (ya.lugar as string | null) ?? null, pf: ya.puntos_favor };
       const { error } = await supabase.from("partidos").update(cambios).eq("id", ya.id);
-      if (error) res.errores.push(`${etiqueta}: ${error.message}`); else { res.actualizados++; Object.assign(ya, cambios); }
+      if (error) { res.errores.push(`${etiqueta}: ${error.message}`); continue; }
+      res.actualizados++;
+      Object.assign(ya, cambios);
+      // Avisos: cambio de horario o de pista en partidos que aún no se han jugado, y resultados nuevos
+      const eqNombre = nombreDe.get(equipoId) ?? p.nuestro;
+      const vs = `${eqNombre} ${p.local ? "vs" : "@"} ${p.rival}`;
+      const futuro = new Date(ya.fecha as string).getTime() > Date.now() - 3600e3;
+      if (futuro && "fecha" in cambios) avisos.push({ equipoId, titulo: `Cambio de horario · ${vs}`, cuerpo: `Ahora: ${cuando(String(cambios.fecha))} (antes ${cuando(antes.fecha)})`, url: `/partidos/${ya.id}` });
+      else if (futuro && "lugar" in cambios && antes.lugar) avisos.push({ equipoId, titulo: `Cambio de pista · ${vs}`, cuerpo: `Ahora: ${cambios.lugar} (antes ${antes.lugar})`, url: `/partidos/${ya.id}` });
+      if ("puntos_favor" in cambios && antes.pf === null && p.pf !== null && p.pc !== null) {
+        avisos.push({ equipoId, titulo: `${p.pf > p.pc ? "Victoria" : p.pf < p.pc ? "Derrota" : "Empate"} · ${vs}`, cuerpo: `${p.local ? `${p.pf}-${p.pc}` : `${p.pc}-${p.pf}`}`, url: `/partidos/${ya.id}` });
+      }
       continue;
     }
 
@@ -57,6 +74,9 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
     const { data: plantilla } = await supabase.from("equipo_jugadores").select("jugador_id").eq("equipo_id", equipoId);
     if (plantilla?.length) await supabase.from("convocatorias").insert(plantilla.map((j) => ({ partido_id: (nuevo as unknown as Existente).id, jugador_id: j.jugador_id })));
   }
+
+  // Avisos al cuerpo técnico (en la app y, si lo han activado, en el móvil)
+  for (const a of avisos.slice(0, 40)) await notificarEquipo(supabase, a.equipoId, a.titulo, a.cuerpo, a.url);
 
   // 3) Ligas: resultados de todos los equipos y clasificación
   for (const liga of ligas) {

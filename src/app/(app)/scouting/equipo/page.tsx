@@ -9,6 +9,7 @@ import Enviar from "@/components/Enviar";
 import { guardarFichaJugador, guardarFichaRival } from "../actions";
 import { Lock, NotebookPen } from "lucide-react";
 import Sinergias from "./Sinergias";
+import InformeRival from "@/components/InformeRival";
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" });
 
@@ -76,6 +77,8 @@ export default async function ScoutingEquipo({ searchParams }: { searchParams: P
       <Link href="/scouting" className="text-sm text-tinta/60 hover:underline">← Scouting</Link>
       <h1 className="mt-1 text-2xl font-semibold">{buscado}</h1>
       <p className="text-sm text-tinta/60">{nuestro ? "Nuestro equipo" : `Rival de ${equipo.nombre}`} · {jugados.length} partidos jugados · {r.pj} con estadísticas</p>
+
+      <div className="mt-4"><InformeRival supabase={supabase} equipoId={equipo.id} nombre={buscado} /></div>
 
       {/* Números del equipo */}
       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">

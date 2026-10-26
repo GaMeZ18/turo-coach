@@ -5,14 +5,18 @@ import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
 import RegistrarSW from "@/components/RegistrarSW";
 import { salir } from "@/app/login/actions";
-import { LogOut, UserRound } from "lucide-react";
+import { Bell, LogOut, UserRound } from "lucide-react";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { supabase, perfil } = await requireUser();
+  const { supabase, perfil, user } = await requireUser();
   const [{ equipos }, activo] = await Promise.all([
     equiposDeTemporada(supabase),
     equipoActivo(supabase),
   ]);
+
+  // Avisos sin leer (si aún no existe la tabla, 0)
+  const { count: sinLeerRaw } = await supabase.from("notificaciones").select("id", { count: "exact", head: true }).eq("perfil_id", user.id).eq("leida", false);
+  const sinLeer = sinLeerRaw ?? 0;
 
   return (
     <div className="min-h-dvh">
@@ -27,6 +31,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <SelectorEquipo equipos={equipos} activoId={activo?.id ?? null} />
+            <Link href="/notificaciones" className="relative rounded-lg p-1.5 hover:bg-white/10" title="Avisos">
+              <Bell size={20} />
+              {sinLeer > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rojo px-1 text-[10px] font-bold">{sinLeer > 9 ? "9+" : sinLeer}</span>}
+            </Link>
             <Link href="/cuenta" className="rounded-lg p-1.5 hover:bg-white/10" title={perfil.nombre ?? "Cuenta"}>
               <UserRound size={20} />
             </Link>

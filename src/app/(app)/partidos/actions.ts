@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
 import { aISO } from "@/lib/fechas";
+import { notificarEquipo } from "@/lib/notificar";
 
 const txt = (fd: FormData, k: string) => {
   const v = String(fd.get(k) ?? "").trim();
@@ -137,6 +138,11 @@ export async function quitarSistemaPartido(formData: FormData) {
 export async function marcarAplazados(ids: string[]) {
   const supabase = await createClient();
   if (ids.length) check(await supabase.from("partidos").update({ estado: "aplazado" }).in("id", ids));
+  const { data: ps } = ids.length ? await supabase.from("partidos").select("id, equipo_id, rival, fecha, local, equipos(nombre)").in("id", ids) : { data: [] };
+  for (const p of (ps ?? []) as unknown as { id: string; equipo_id: string; rival: string; fecha: string; local: boolean; equipos: { nombre: string } | null }[]) {
+    await notificarEquipo(supabase, p.equipo_id, `Aplazado · ${p.equipos?.nombre ?? ""} ${p.local ? "vs" : "@"} ${p.rival}`,
+      `El partido del ${new Date(p.fecha).toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" })} ya no está en el calendario de la FCBQ.`, `/partidos/${p.id}`);
+  }
   revalidatePath("/partidos");
   revalidatePath("/calendario");
 }
