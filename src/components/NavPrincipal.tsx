@@ -13,6 +13,7 @@ const NAV = [
   { href: "/partidos", label: "Partidos" },
   { href: "/pistas", label: "Pistas" },
   { href: "/scouting", label: "Scouting" },
+  { href: "/video", label: "Vídeo" },
   { href: "/ejercicios", label: "Ejercicios" },
   { href: "/biblioteca", label: "Biblioteca" },
   { href: "/pizarra", label: "Pizarra" },

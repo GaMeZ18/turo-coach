@@ -17,7 +17,7 @@ const MODULOS = [
   { href: "/pistas", titulo: "Pistas", texto: "Quién entrena en cada pista y a qué hora", icono: MapPin },
   { href: "/planificaciones", titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
   { href: "/scouting", titulo: "Scouting", texto: "Liga, rivales, estadísticas y fichas", icono: Binoculars },
-  { titulo: "Vídeo", texto: "Etiqueta acciones por categorías", icono: Video },
+  { href: "/video", titulo: "Vídeo", texto: "Etiqueta acciones y revisa los clips", icono: Video },
   { href: "/biblioteca", titulo: "Biblioteca", texto: "Ejercicios del club listos para usar", icono: BookOpen },
 ];
 

@@ -11,7 +11,7 @@ import { Resultado, type Partido } from "../comun";
 import Convocatoria from "./Convocatoria";
 import Periodos from "./Periodos";
 import type { StatsPartido } from "@/lib/stats-fcbq";
-import { Binoculars, ClipboardList, FileText, MapPin, Pencil, Trash2, X } from "lucide-react";
+import { Binoculars, Clapperboard, ClipboardList, FileText, MapPin, Pencil, Trash2, X } from "lucide-react";
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +31,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       : Promise.resolve({ data: null }),
   ]);
   const esStaff = perfil.rol === "coordinador" || !!staff;
+  const { data: videoPartido } = esStaff ? await supabase.from("videos").select("id").eq("partido_id", p.id).order("created_at").limit(1).maybeSingle() : { data: null };
   // Previa: ficha del rival (scouting), sistemas elegidos y lista de ejercicios para añadir
   const [{ data: ficha }, { data: sistemas }, { data: ejercicios }] = esStaff
     ? await Promise.all([
@@ -79,6 +80,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       <div className="mt-3 flex flex-wrap gap-2">
         <Link href={`/imprimir/partido/${p.id}`} className="btn-secundario"><FileText size={16} /> Informe PDF</Link>
         {esStaff && <Link href={`/scouting/equipo?nombre=${encodeURIComponent(p.rival)}`} className="btn-secundario"><Binoculars size={16} /> Scouting del rival</Link>}
+        {esStaff && <Link href={videoPartido ? `/video/${videoPartido.id}` : `/video?partido=${p.id}`} className="btn-secundario"><Clapperboard size={16} /> {videoPartido ? "Vídeo del partido" : "Añadir vídeo"}</Link>}
       </div>
 
       {/* Previa del partido (solo cuerpo técnico) */}

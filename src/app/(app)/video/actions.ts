@@ -1,0 +1,86 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { check } from "@/lib/db";
+import { youtubeId, type Clip } from "@/lib/video";
+
+export async function crearVideo(fd: FormData) {
+  const supabase = await createClient();
+  const url = String(fd.get("url") ?? "").trim();
+  const yt = youtubeId(url);
+  if (!yt) throw new Error("Pega un enlace de YouTube (youtube.com/watch?v=… o youtu.be/…).");
+  const partido = String(fd.get("partido_id") ?? "") || null;
+  let titulo = String(fd.get("titulo") ?? "").trim();
+  let rival: string | null = null;
+  if (partido) {
+    const { data: p } = await supabase.from("partidos").select("rival, fecha, local").eq("id", partido).maybeSingle();
+    if (p) {
+      rival = p.rival;
+      if (!titulo) titulo = `${p.local ? "vs" : "@"} ${p.rival} · ${new Date(p.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })}`;
+    }
+  }
+  const { data, error } = await supabase.from("videos").insert({
+    equipo_id: String(fd.get("equipo_id")), partido_id: partido, url, youtube_id: yt, titulo: titulo || "Vídeo", rival,
+  }).select("id").single();
+  if (error) throw new Error(/videos/.test(error.message) ? "Falta preparar la base de datos (0016_video.sql)." : error.message);
+  revalidatePath("/video");
+  redirect(`/video/${data.id}`);
+}
+
+export async function borrarVideo(fd: FormData) {
+  const supabase = await createClient();
+  check(await supabase.from("videos").delete().eq("id", String(fd.get("id"))));
+  revalidatePath("/video");
+  redirect("/video");
+}
+
+export async function renombrarVideo(id: string, titulo: string) {
+  const supabase = await createClient();
+  check(await supabase.from("videos").update({ titulo: titulo.trim() || "Vídeo" }).eq("id", id));
+  revalidatePath(`/video/${id}`);
+}
+
+// ---------- Clips ----------
+export async function crearClip(c: { video_id: string; categoria_id: string | null; inicio: number; fin: number; periodo: number | null }): Promise<Clip> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("video_clips").insert({
+    video_id: c.video_id, categoria_id: c.categoria_id, inicio: Math.max(0, Math.round(c.inicio * 10) / 10), fin: Math.round(c.fin * 10) / 10, periodo: c.periodo,
+  }).select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota").single();
+  if (error) throw new Error(error.message);
+  return { ...data, inicio: Number(data.inicio), fin: Number(data.fin) } as Clip;
+}
+
+export async function actualizarClip(id: string, campos: Partial<Pick<Clip, "categoria_id" | "inicio" | "fin" | "jugador_id" | "resultado" | "periodo" | "nota">>) {
+  const supabase = await createClient();
+  check(await supabase.from("video_clips").update(campos).eq("id", id));
+}
+
+export async function borrarClip(id: string) {
+  const supabase = await createClient();
+  check(await supabase.from("video_clips").delete().eq("id", id));
+}
+
+// ---------- Botonera (categorías) ----------
+export async function guardarCategoria(fd: FormData) {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "") || null;
+  const fila = {
+    nombre: String(fd.get("nombre") ?? "").trim().slice(0, 40),
+    color: String(fd.get("color") ?? "#002b8e"),
+    antes: Math.min(60, Math.max(0, Number(fd.get("antes") || 8))),
+    despues: Math.min(60, Math.max(0, Number(fd.get("despues") || 4))),
+    orden: Number(fd.get("orden") || 0),
+  };
+  if (!fila.nombre) throw new Error("Ponle nombre a la etiqueta.");
+  if (id) check(await supabase.from("video_categorias").update(fila).eq("id", id));
+  else check(await supabase.from("video_categorias").insert({ ...fila, equipo_id: String(fd.get("equipo_id") ?? "") || null }));
+  revalidatePath("/video");
+}
+
+export async function borrarCategoria(fd: FormData) {
+  const supabase = await createClient();
+  check(await supabase.from("video_categorias").delete().eq("id", String(fd.get("id"))));
+  revalidatePath("/video");
+}
