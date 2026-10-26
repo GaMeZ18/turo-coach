@@ -59,7 +59,10 @@ type PartidoLiga = ResultadoLiga & { idLocal: string | null; idVisit: string | n
 function partidosLiga(doc: Document): PartidoLiga[] {
   // Cada partido es un div.rowJornada con dos .teamNameLink (así es la web de la FCBQ).
   // Si no los hay, buscamos el ancestro más pequeño que tenga exactamente dos equipos.
-  const filasJornada = Array.from(doc.querySelectorAll("div.rowJornada")).filter((el) => el.querySelectorAll(".teamNameLink").length === 2);
+  // (la web anida varios .rowJornada: nos quedamos con el de fuera, que tiene equipos y marcador)
+  const filasJornada = Array.from(doc.querySelectorAll("div.rowJornada"))
+    .filter((el) => el.querySelectorAll(".teamNameLink").length === 2)
+    .filter((el) => !el.parentElement?.closest("div.rowJornada"));
   const enlaces = filasJornada.length ? [] : Array.from(doc.querySelectorAll("a.teamNameLink")).filter((a) => !a.closest(".nameTeamLegend2"));
   const contenedores: Element[] = [...filasJornada];
   for (const a of enlaces) {
