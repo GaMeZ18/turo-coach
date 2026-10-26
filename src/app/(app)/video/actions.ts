@@ -72,6 +72,8 @@ export async function guardarCategoria(fd: FormData) {
     antes: Math.min(60, Math.max(0, Number(fd.get("antes") || 8))),
     despues: Math.min(60, Math.max(0, Number(fd.get("despues") || 4))),
     orden: Number(fd.get("orden") || 0),
+    tecla: (String(fd.get("tecla") ?? "").trim().slice(0, 1).toUpperCase() || null),
+    estadistica: (String(fd.get("estadistica") ?? "") || null),
   };
   if (!fila.nombre) throw new Error("Ponle nombre a la etiqueta.");
   if (id) check(await supabase.from("video_categorias").update(fila).eq("id", id));

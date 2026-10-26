@@ -2,8 +2,8 @@
 
 // Analizador de vídeo: reproductor de YouTube + botonera de etiquetas + clips filtrables.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
-import { mmss, type Categoria, type Clip } from "@/lib/video";
+import { BarChart3, ListVideo, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { NOMBRE_ESTADISTICA, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, type Categoria, type Clip, type StatVideo } from "@/lib/video";
 import { actualizarClip, borrarClip, crearClip } from "../actions";
 
 type Jugador = { id: string; nombre: string; apellidos: string | null; dorsal: number | null };
@@ -30,8 +30,10 @@ function cargarAPI(): Promise<void> {
 const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
-export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores }: {
-  videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[];
+type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean };
+
+export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial }: {
+  videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
 }) {
   const contenedor = useRef<HTMLDivElement>(null);
   const player = useRef<any>(null);
@@ -49,6 +51,14 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   const [fJug, setFJug] = useState("");
   const [fRes, setFRes] = useState<"" | "bien" | "mal" | "sin">("");
   const [error, setError] = useState<string | null>(null);
+  const [pregunta, setPregunta] = useState<Pregunta | null>(null);
+  const [dorsalTecleado, setDorsalTecleado] = useState("");
+  const [pestana, setPestana] = useState<"clips" | "stats">("clips");
+  const teclas = useMemo(() => teclasDe(categorias), [categorias]);
+  const teclaDe = useCallback((c: Categoria) => [...teclas.entries()].find(([, x]) => x.id === c.id)?.[0] ?? null, [teclas]);
+  // Clips recién creados: id provisional → id real, y cambios hechos antes de tener el id real
+  const idReal = useRef(new Map<string, string>());
+  const pendientes = useRef(new Map<string, Partial<Clip>>());
 
   const cat = useCallback((id: string | null) => categorias.find((c) => c.id === id) ?? null, [categorias]);
   const jug = useCallback((id: string | null) => jugadores.find((j) => j.id === id) ?? null, [jugadores]);
@@ -121,21 +131,46 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     setClips((l) => [...l, tmp]);
     setSel(tmp.id);
     setDestello(c.id); setTimeout(() => setDestello(null), 350);
+    if (c.estadistica) {
+      const sonando = player.current?.getPlayerState?.() === 1;
+      if (sonando) player.current?.pauseVideo?.();
+      setDorsalTecleado("");
+      setPregunta({ id: tmp.id, cat: c, reanudar: sonando });
+    }
     try {
       const real = await crearClip({ video_id: videoId, categoria_id: c.id, inicio: tmp.inicio, fin: tmp.fin, periodo });
-      setClips((l) => l.map((x) => (x.id === tmp.id ? real : x)));
+      idReal.current.set(tmp.id, real.id);
+      const pend = pendientes.current.get(tmp.id);
+      pendientes.current.delete(tmp.id);
+      if (pend) actualizarClip(real.id, pend).catch(() => setError("No se ha podido guardar el cambio."));
+      setClips((l) => l.map((x) => (x.id === tmp.id ? { ...real, ...pend } : x)));
       setSel((s) => (s === tmp.id ? real.id : s));
+      setPregunta((q) => (q && q.id === tmp.id ? { ...q, id: real.id } : q));
     } catch {
       setClips((l) => l.filter((x) => x.id !== tmp.id));
       setError("No se ha podido guardar el clip. Revisa la conexión.");
     }
   }, [videoId, periodo]);
 
-  const cambiar = (id: string, campos: Partial<Clip>) => {
-    if (id.startsWith("tmp-")) return;
+  const cambiar = (idPedido: string, campos: Partial<Clip>) => {
+    const id = idReal.current.get(idPedido) ?? idPedido;
     setClips((l) => l.map((x) => (x.id === id ? { ...x, ...campos } : x)));
+    if (id.startsWith("tmp-")) { pendientes.current.set(id, { ...pendientes.current.get(id), ...campos }); return; }
     actualizarClip(id, campos).catch(() => setError("No se ha podido guardar el cambio."));
   };
+
+  // --- Pregunta tras etiquetar un tiro o una pérdida: jugador (y si entra) ---
+  const responder = useCallback((q: Pregunta, r: Partial<Pick<Pregunta, "jugador" | "resultado">>) => {
+    const nueva = { ...q, ...r };
+    const tiro = esTiro(q.cat.estadistica);
+    const completa = nueva.jugador !== undefined && (!tiro || nueva.resultado !== undefined);
+    if (!completa) { setPregunta(nueva); return; }
+    cambiar(q.id, { jugador_id: nueva.jugador ?? null, resultado: tiro ? nueva.resultado ?? null : "mal" });
+    setPregunta(null); setDorsalTecleado("");
+    if (q.reanudar) player.current?.playVideo?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const cerrarPregunta = () => { if (pregunta?.reanudar) player.current?.playVideo?.(); setPregunta(null); setDorsalTecleado(""); };
   const quitar = (id: string) => {
     if (id.startsWith("tmp-")) return;
     setClips((l) => l.filter((x) => x.id !== id));
@@ -148,10 +183,26 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     const fn = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (/^[0-9]$/.test(e.key)) {
-        const c = categorias[e.key === "0" ? 9 : Number(e.key) - 1];
-        if (c) { e.preventDefault(); etiquetar(c); }
-      } else if (e.key === " ") {
+      const k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      const q = refsP.current.pregunta;
+      if (q) {
+        // Con la pregunta abierta: dorsal con los números, M = la mete, F/X = la falla, Enter = vale, Esc = saltar
+        e.preventDefault();
+        if (/^[0-9]$/.test(k)) {
+          let buf = (refsP.current.dorsal + k).slice(-2);
+          let j = jugadores.find((x) => x.dorsal === Number(buf));
+          if (!j) { buf = k; j = jugadores.find((x) => x.dorsal === Number(k)); }
+          setDorsalTecleado(buf);
+          if (j) setPregunta({ ...q, jugador: j.id });
+        } else if (k === "M" && esTiro(q.cat.estadistica)) responder(q, { resultado: "bien", jugador: q.jugador === undefined ? null : q.jugador });
+        else if ((k === "F" || k === "X") && esTiro(q.cat.estadistica)) responder(q, { resultado: "mal", jugador: q.jugador === undefined ? null : q.jugador });
+        else if (k === "Enter" && (!esTiro(q.cat.estadistica) || q.resultado !== undefined)) responder(q, { jugador: q.jugador === undefined ? null : q.jugador });
+        else if (k === "Escape") cerrarPregunta();
+        return;
+      }
+      const c = teclas.get(k);
+      if (c) { e.preventDefault(); etiquetar(c); }
+      else if (e.key === " ") {
         e.preventDefault();
         if (player.current?.getPlayerState?.() === 1) player.current.pauseVideo(); else player.current?.playVideo?.();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -160,7 +211,36 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, [categorias, etiquetar]);
+  }, [teclas, etiquetar, jugadores, responder]);
+
+  const refsP = useRef({ pregunta, dorsal: dorsalTecleado });
+  refsP.current = { pregunta, dorsal: dorsalTecleado };
+
+  // Abrir un clip concreto (desde la ficha del jugador)
+  const abierto = useRef(false);
+  useEffect(() => {
+    if (!listo || abierto.current || !clipInicial) return;
+    const c = clips.find((x) => x.id === clipInicial);
+    if (c) { abierto.current = true; verClip(c); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listo, clipInicial]);
+
+  // --- Estadística que sale de las etiquetas ---
+  const stats = useMemo(() => {
+    const porJug = new Map<string, StatVideo>();
+    const total = statVacia();
+    let hay = false;
+    for (const c of clips) {
+      const e = cat(c.categoria_id)?.estadistica;
+      if (!e || c.id.startsWith("tmp-")) continue;
+      hay = true;
+      sumarStat(total, e, c.resultado);
+      const k = c.jugador_id ?? "";
+      sumarStat(porJug.get(k) ?? (porJug.set(k, statVacia()), porJug.get(k)!), e, c.resultado);
+    }
+    const filas = [...porJug.entries()].map(([id, st]) => ({ id, j: jug(id || null), st })).sort((a, b) => b.st.pts - a.st.pts || (a.j?.dorsal ?? 999) - (b.j?.dorsal ?? 999));
+    return { hay, total, filas };
+  }, [clips, cat, jug]);
 
   // --- Contadores ---
   const contadores = useMemo(() => categorias.map((c) => {
@@ -191,18 +271,48 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
           </div>
         </div>
 
+        {/* Pregunta: jugador y si la mete */}
+        {pregunta && (
+          <div className="mt-3 rounded-xl border-2 p-3" style={{ borderColor: pregunta.cat.color }}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-bold" style={{ color: pregunta.cat.color }}>{pregunta.cat.nombre}: ¿quién{esTiro(pregunta.cat.estadistica) ? " tira" : ""}?</p>
+              <button onClick={cerrarPregunta} className="text-xs text-tinta/50 hover:text-tinta">Saltar (Esc)</button>
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
+              {jugadores.map((j) => (
+                <button key={j.id} onClick={() => responder(pregunta, { jugador: j.id })}
+                  className={`rounded-lg px-1 py-2 text-center ${pregunta.jugador === j.id ? "bg-azul text-white ring-2 ring-oro" : "bg-suave hover:bg-linea"}`}>
+                  <span className="block text-lg font-bold leading-none">{j.dorsal ?? "–"}</span>
+                  <span className="block truncate text-[10px]">{j.nombre}</span>
+                </button>
+              ))}
+              <button onClick={() => responder(pregunta, { jugador: null })} className={`rounded-lg px-1 py-2 text-xs ${pregunta.jugador === null ? "bg-azul text-white" : "bg-suave"}`}>No sé / equipo</button>
+            </div>
+            {esTiro(pregunta.cat.estadistica) && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button onClick={() => responder(pregunta, { resultado: "bien" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "bien" ? "ring-4 ring-oro" : ""} bg-green-600`}>✓ Anotada <span className="text-xs font-normal opacity-80">(M)</span></button>
+                <button onClick={() => responder(pregunta, { resultado: "mal" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "mal" ? "ring-4 ring-oro" : ""} bg-red-600`}>✗ Fallada <span className="text-xs font-normal opacity-80">(F)</span></button>
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-tinta/50">
+              Teclado: escribe el dorsal{dorsalTecleado && <strong> ({dorsalTecleado})</strong>}{esTiro(pregunta.cat.estadistica) ? " y pulsa M si la mete o F si la falla." : " y pulsa Enter."} El vídeo sigue al responder.
+            </p>
+          </div>
+        )}
+
         {/* Botonera */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-          {categorias.map((c, i) => (
+        <div className={`mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 ${pregunta ? "hidden" : ""}`}>
+          {categorias.map((c) => (
             <button key={c.id} onClick={() => etiquetar(c)} disabled={!listo}
               className={`relative rounded-xl px-3 py-3 text-left text-sm font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-50 ${destello === c.id ? "scale-95 ring-4 ring-oro" : ""}`}
               style={{ background: c.color }}>
               {c.nombre}
-              {i < 10 && <span className="absolute right-2 top-1.5 hidden rounded bg-white/25 px-1 text-[10px] font-semibold sm:block">{i === 9 ? 0 : i + 1}</span>}
+              {teclaDe(c) && <span className="absolute right-2 top-1.5 hidden rounded bg-white/25 px-1 text-[10px] font-semibold sm:block">{teclaDe(c)}</span>}
+              {c.estadistica && <span className="block text-[10px] font-medium opacity-80">{esTiro(c.estadistica) ? "Jugador · mete/falla" : "Jugador"}</span>}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-tinta/50">Pulsa la etiqueta justo cuando acabe la acción: el clip coge unos segundos antes y después. En el ordenador: teclas 1-9 y 0 para etiquetar, espacio para pausar y flechas para ±5 s.</p>
+        <p className="mt-2 text-[11px] text-tinta/50">Pulsa la etiqueta justo cuando acabe la acción: el clip coge unos segundos antes y después. En el ordenador: la tecla de cada botón (arriba a la derecha), espacio para pausar y flechas para ±5 s. Tiros y pérdidas te preguntan el jugador y van a su estadística.</p>
       </div>
 
       {/* Derecha: clip seleccionado + lista */}
@@ -230,8 +340,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => cambiar(seleccionado.id, { resultado: seleccionado.resultado === "bien" ? null : "bien" })} className={`btn-secundario !py-1 text-sm ${seleccionado.resultado === "bien" ? "!border-green-600 !bg-green-600 !text-white" : ""}`}><ThumbsUp size={15} /> Bien</button>
-                  <button onClick={() => cambiar(seleccionado.id, { resultado: seleccionado.resultado === "mal" ? null : "mal" })} className={`btn-secundario !py-1 text-sm ${seleccionado.resultado === "mal" ? "!border-red-600 !bg-red-600 !text-white" : ""}`}><ThumbsDown size={15} /> Mal</button>
+                  <button onClick={() => cambiar(seleccionado.id, { resultado: seleccionado.resultado === "bien" ? null : "bien" })} className={`btn-secundario !py-1 text-sm ${seleccionado.resultado === "bien" ? "!border-green-600 !bg-green-600 !text-white" : ""}`}><ThumbsUp size={15} /> {esTiro(cat(seleccionado.categoria_id)?.estadistica) ? "Anotada" : "Bien"}</button>
+                  <button onClick={() => cambiar(seleccionado.id, { resultado: seleccionado.resultado === "mal" ? null : "mal" })} className={`btn-secundario !py-1 text-sm ${seleccionado.resultado === "mal" ? "!border-red-600 !bg-red-600 !text-white" : ""}`}><ThumbsDown size={15} /> {esTiro(cat(seleccionado.categoria_id)?.estadistica) ? "Fallada" : "Mal"}</button>
                   <div className="ml-auto flex gap-0.5">
                     {PERIODOS.map((p) => (
                       <button key={p} onClick={() => cambiar(seleccionado.id, { periodo: p })} className={`h-7 min-w-7 rounded px-1 text-[11px] font-semibold ${seleccionado.periodo === p ? "bg-azul text-white" : "bg-suave text-tinta/60"}`}>{nombrePeriodo(p)}</button>
@@ -261,6 +371,44 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
           </div>
         )}
 
+        <div className="flex rounded-lg border border-linea bg-white p-0.5 text-sm">
+          <button onClick={() => setPestana("clips")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 ${pestana === "clips" ? "bg-azul text-white" : "text-tinta/70"}`}><ListVideo size={15} /> Clips ({clips.length})</button>
+          <button onClick={() => setPestana("stats")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 ${pestana === "stats" ? "bg-azul text-white" : "text-tinta/70"}`}><BarChart3 size={15} /> Estadística</button>
+        </div>
+
+        {pestana === "stats" ? (
+          <div className="tarjeta overflow-x-auto">
+            {!stats.hay ? <p className="p-4 text-sm text-tinta/50">Etiqueta tiros ({["t2", "t3", "tl"].map((e) => NOMBRE_ESTADISTICA[e as "t2"]).join(", ")}) o pérdidas y la estadística se hace sola.</p> : (
+              <table className="w-full text-sm">
+                <thead className="bg-suave text-[11px] uppercase text-tinta/60">
+                  <tr><th className="p-2 text-left">Jugador</th><th className="p-1">Pts</th><th className="p-1">T2</th><th className="p-1">T3</th><th className="p-1">TL</th><th className="p-1">Pérd.</th></tr>
+                </thead>
+                <tbody>
+                  {stats.filas.map(({ id, j, st }) => (
+                    <tr key={id} onClick={() => { setFJug(id); setPestana("clips"); }} className="cursor-pointer border-t border-linea hover:bg-suave">
+                      <td className="p-2">{j ? <><strong className="text-azul">{j.dorsal ?? ""}</strong> {j.nombre}</> : <span className="text-tinta/50">Sin jugador</span>}</td>
+                      <td className="p-1 text-center font-bold">{st.pts}</td>
+                      <td className="p-1 text-center text-xs">{st.t2m}/{st.t2a}<span className="block text-tinta/50">{pctTiro(st.t2m, st.t2a)}</span></td>
+                      <td className="p-1 text-center text-xs">{st.t3m}/{st.t3a}<span className="block text-tinta/50">{pctTiro(st.t3m, st.t3a)}</span></td>
+                      <td className="p-1 text-center text-xs">{st.tlm}/{st.tla}<span className="block text-tinta/50">{pctTiro(st.tlm, st.tla)}</span></td>
+                      <td className="p-1 text-center">{st.perdidas || "–"}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-tinta/30 bg-suave font-semibold">
+                    <td className="p-2">Equipo</td>
+                    <td className="p-1 text-center">{stats.total.pts}</td>
+                    <td className="p-1 text-center text-xs">{stats.total.t2m}/{stats.total.t2a}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.t2m, stats.total.t2a)}</span></td>
+                    <td className="p-1 text-center text-xs">{stats.total.t3m}/{stats.total.t3a}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.t3m, stats.total.t3a)}</span></td>
+                    <td className="p-1 text-center text-xs">{stats.total.tlm}/{stats.total.tla}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.tlm, stats.total.tla)}</span></td>
+                    <td className="p-1 text-center">{stats.total.perdidas || "–"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+            {stats.hay && <p className="px-2 pb-2 pt-1 text-[11px] text-tinta/50">Toca un jugador para ver sus clips. Se guarda también en su ficha.</p>}
+          </div>
+        ) : (
+          <>
         {/* Contadores */}
         {contadores.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -325,6 +473,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
           })}
           {filtrados.length === 0 && <li className="p-4 text-center text-sm text-tinta/50">{clips.length ? "Ningún clip con esos filtros." : "Dale al play y pulsa las etiquetas para crear clips."}</li>}
         </ul>
+          </>
+        )}
       </div>
     </div>
   );

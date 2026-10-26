@@ -20,7 +20,7 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
   const [{ data: vids, error }, { data: partidos }, { data: cats }] = await Promise.all([
     supabase.from("videos").select("id, titulo, youtube_id, created_at, partido_id, partidos(fecha), video_clips(count)").eq("equipo_id", equipo.id).order("created_at", { ascending: false }),
     supabase.from("partidos").select("id, fecha, rival, local").eq("equipo_id", equipo.id).lte("fecha", new Date(Date.now() + 86400000).toISOString()).order("fecha", { ascending: false }).limit(40),
-    supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden").or(`equipo_id.is.null,equipo_id.eq.${equipo.id}`).order("orden"),
+    supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${equipo.id}`).order("orden"),
   ]);
   const videos = (vids ?? []) as unknown as V[];
   const categorias = (cats ?? []) as Categoria[];
@@ -35,6 +35,16 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
         <label className="text-xs text-tinta/60">Antes<input name="antes" type="number" min={0} max={60} defaultValue={c?.antes ?? 8} className="campo !w-16" /></label>
         <label className="text-xs text-tinta/60">Después<input name="despues" type="number" min={0} max={60} defaultValue={c?.despues ?? 4} className="campo !w-16" /></label>
         <label className="text-xs text-tinta/60">Orden<input name="orden" type="number" defaultValue={c?.orden ?? 50} className="campo !w-16" /></label>
+        <label className="text-xs text-tinta/60">Tecla<input name="tecla" maxLength={1} defaultValue={c?.tecla ?? ""} placeholder="auto" className="campo !w-14 text-center uppercase" /></label>
+        <label className="text-xs text-tinta/60">Estadística
+          <select name="estadistica" defaultValue={c?.estadistica ?? ""} className="campo !w-32">
+            <option value="">No</option>
+            <option value="t2">Tiro de 2</option>
+            <option value="t3">Tiro de 3</option>
+            <option value="tl">Tiro libre</option>
+            <option value="perdida">Pérdida</option>
+          </select>
+        </label>
         <Enviar className="btn-secundario">{c ? "Guardar" : <><Plus size={15} /> Añadir</>}</Enviar>
       </form>
       {c && (
@@ -91,7 +101,7 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
           <details className="mt-8">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm text-azul hover:underline [&::-webkit-details-marker]:hidden"><Settings2 size={14} /> Botonera de etiquetas</summary>
             <div className="mt-2 space-y-4">
-              <p className="text-xs text-tinta/60">«Antes» y «Después»: segundos que coge el clip alrededor del momento en que pulsas el botón (en el partido, la acción ya ha pasado cuando la ves).</p>
+              <p className="text-xs text-tinta/60">«Antes» y «Después»: segundos que coge el clip alrededor del momento en que pulsas el botón (en el partido, la acción ya ha pasado cuando la ves). «Tecla»: atajo en el ordenador (si no pones ninguna, se le da un número). «Estadística»: al pulsarla te pregunta el jugador (y si la mete o la falla) y cuenta para su estadística.</p>
               <section>
                 <h3 className="mb-1 flex items-center gap-1 text-sm font-semibold"><Tags size={14} /> De {equipo.nombre}</h3>
                 <div className="space-y-2">
@@ -104,7 +114,7 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
                 {esCoord ? (
                   <div className="space-y-2">{categorias.filter((c) => !c.equipo_id).map((c) => <FilaCategoria key={c.id} c={c} />)}</div>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">{categorias.filter((c) => !c.equipo_id).map((c) => <span key={c.id} className="rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: c.color }}>{c.nombre}</span>)}</div>
+                  <div className="flex flex-wrap gap-1.5">{categorias.filter((c) => !c.equipo_id).map((c) => <span key={c.id} className="rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: c.color }}>{c.nombre}{c.tecla ? ` · ${c.tecla}` : ""}</span>)}</div>
                 )}
               </section>
             </div>

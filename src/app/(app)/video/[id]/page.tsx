@@ -8,13 +8,14 @@ import { borrarVideo } from "../actions";
 import Analizador from "./Analizador";
 import { ExternalLink, Trash2 } from "lucide-react";
 
-export default async function VerVideo({ params }: { params: Promise<{ id: string }> }) {
+export default async function VerVideo({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ clip?: string }> }) {
   const { id } = await params;
+  const { clip: clipInicial } = await searchParams;
   const { supabase } = await requireUser();
   const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, partidos(id, fecha, rival, local), equipos(nombre)").eq("id", id).maybeSingle();
   if (!v) notFound();
   const [{ data: cats }, { data: clips }, { data: plantilla }] = await Promise.all([
-    supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
+    supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
     supabase.from("video_clips").select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota").eq("video_id", id).order("inicio"),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", v.equipo_id),
   ]);
@@ -49,6 +50,7 @@ export default async function VerVideo({ params }: { params: Promise<{ id: strin
           categorias={(cats ?? []) as Categoria[]}
           clipsIniciales={((clips ?? []) as Clip[]).map((c) => ({ ...c, inicio: Number(c.inicio), fin: Number(c.fin) }))}
           jugadores={jugadores}
+          clipInicial={clipInicial ?? null}
         />
       ) : <p className="tarjeta mt-4 p-4 text-sm">El enlace no es de YouTube.</p>}
     </div>
