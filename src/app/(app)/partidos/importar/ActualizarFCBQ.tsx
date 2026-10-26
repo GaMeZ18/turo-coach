@@ -129,14 +129,23 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     setTexto("Guardando estadísticas…");
     try {
       const porEquipo = new Map<string, StatsPartido[]>();
+      const muestra = (crudos as Record<string, unknown>).__muestra;
+      delete (crudos as Record<string, unknown>).__muestra;
+      let conJugada = 0;
       for (const [id, j] of Object.entries(crudos)) {
         const s = compactarStats(id, j);
+        if (s && (s.marcador?.length ?? 0) > 1) conJugada++;
         const eq = equipoDeStats.current.get(id);
         if (s && eq) porEquipo.set(eq, [...(porEquipo.get(eq) ?? []), s]);
       }
       let n = 0;
       for (const [eq, lista] of porEquipo) for (let i = 0; i < lista.length; i += 25) n += await guardarStatsFCBQ(eq, lista.slice(i, i + 25));
       setNumStats(n);
+      // Si no ha llegado la jugada a jugada, lo explicamos en el detalle (para poder arreglarlo)
+      if (n && !conJugada) {
+        setAvisos((a) => [...a, "No ha llegado la jugada a jugada (sin sinergias). Abre «Detalle de lo leído» y pásale el informe a quien mantiene la app."]);
+        setInforme((t) => `${t}\nJugada a jugada: ${JSON.stringify(muestra ?? "sin muestra").slice(0, 1500)}`);
+      }
       if (pendientesFCBQ > 0) setAvisos((a) => [...a, `Quedan ${pendientesFCBQ} partidos por descargar: vuelve a pulsar Actualizar.`]);
     } catch (e) {
       setAvisos((a) => [...a, e instanceof Error ? e.message : "No se han podido guardar las estadísticas."]);

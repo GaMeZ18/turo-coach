@@ -179,12 +179,24 @@ async function apiStats(ids) {
         });
         if (q.ok) {
           const pj = await q.json();
-          const ev = Array.isArray(pj) ? pj : pj.playByPlay || pj.events || [];
-          // Nombres de la FCBQ: eventTypeCode, period, minute, second, localScore, visitorScore
-          j.pbp = ev.map((e) => ({
-            c: e.c ?? e.eventTypeCode, p: e.p ?? e.period ?? e.periodNumber,
-            m: e.m ?? e.minute, s: e.s ?? e.second, l: e.l ?? e.localScore, v: e.v ?? e.visitorScore,
-          }));
+          const ev = Array.isArray(pj) ? pj : pj.playByPlay || pj.events || pj.data || pj.moves || [];
+          const num = (...xs) => { for (const x of xs) { if (x !== undefined && x !== null && x !== "" && !isNaN(Number(x))) return Number(x); } return undefined; };
+          // Nombres de la FCBQ: eventTypeCode, period, minute, second, localScore, visitorScore (con alternativas)
+          j.pbp = ev.map((e) => {
+            const reloj = typeof (e.time ?? e.clock) === "string" ? String(e.time ?? e.clock).split(":") : null;
+            return {
+              c: e.c ?? e.eventTypeCode ?? e.type ?? e.code,
+              p: num(e.p, e.period, e.periodNumber, e.quarter, e.per),
+              m: num(e.m, e.minute, e.min, reloj?.[0]),
+              s: num(e.s, e.second, e.sec, reloj?.[1]),
+              l: num(e.l, e.localScore, e.scoreLocal, e.homeScore, e.score?.local),
+              v: num(e.v, e.visitorScore, e.scoreVisitor, e.awayScore, e.score?.visitor),
+            };
+          });
+          // Muestra para diagnosticar si la FCBQ cambia el formato
+          if (!res.__muestra) res.__muestra = { estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length, primeros: ev.slice(0, 3) };
+        } else if (!res.__muestra) {
+          res.__muestra = { estado: q.status };
         }
       } catch {}
       res[id] = j;
