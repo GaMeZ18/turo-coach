@@ -22,6 +22,7 @@ export type DatosEjercicio = {
   en_biblioteca?: boolean;
   edades?: string[];
   material?: string;
+  objetivos?: string;
 };
 
 const vacioANull = (s: string) => (s.trim() === "" ? null : s.trim());
@@ -47,17 +48,23 @@ export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
     en_biblioteca: !!d.en_biblioteca,
     edades: d.edades ?? [],
     material: vacioANull(d.material ?? ""),
+    objetivos: vacioANull(d.objetivos ?? ""),
   };
   // En la biblioteca, siempre visible para el club
   if (fila.en_biblioteca) fila.visibilidad = "club";
 
+  // Si aún no se ha ejecutado 0012 (columna objetivos), se guarda sin ella
+  const sinObjetivos = (m: string) => /objetivos/.test(m);
+  const { objetivos: _o, ...filaSinObj } = fila;
   let id = d.id;
   if (id) {
-    const { error } = await supabase.from("ejercicios").update(fila).eq("id", id);
+    let { error } = await supabase.from("ejercicios").update(fila).eq("id", id);
+    if (error && sinObjetivos(error.message)) ({ error } = await supabase.from("ejercicios").update(filaSinObj).eq("id", id));
     if (error) return { error: faltaSQL(error.message) };
   } else {
-    const { data, error } = await supabase.from("ejercicios").insert(fila).select("id").single();
-    if (error) return { error: faltaSQL(error.message) };
+    let { data, error } = await supabase.from("ejercicios").insert(fila).select("id").single();
+    if (error && sinObjetivos(error.message)) ({ data, error } = await supabase.from("ejercicios").insert(filaSinObj).select("id").single());
+    if (error || !data) return { error: faltaSQL(error?.message ?? "No se ha podido guardar") };
     id = data.id;
   }
   revalidatePath("/ejercicios");
@@ -128,6 +135,7 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error
       jugadores_min: e.jugadores,
       duracion: e.duracion,
       material: e.material ?? null,
+      objetivos: e.objetivos ?? null,
       edades: e.edades,
       pizarra: montar(e.montaje),
       visibilidad: "club",
@@ -135,10 +143,22 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error
     }));
     // Por tandas, para que un fallo no deje todo a medias
     let n = 0;
+    let conObjetivos = true;
     for (let i = 0; i < nuevos.length; i += 10) {
-      const { error: e2 } = await supabase.from("ejercicios").insert(nuevos.slice(i, i + 10));
+      const tanda = nuevos.slice(i, i + 10);
+      let { error: e2 } = await supabase.from("ejercicios").insert(conObjetivos ? tanda : tanda.map(({ objetivos: _o, ...r }) => r));
+      if (e2 && /objetivos/.test(e2.message)) { conObjetivos = false; ({ error: e2 } = await supabase.from("ejercicios").insert(tanda.map(({ objetivos: _o, ...r }) => r))); }
       if (e2) return { nuevos: n, error: faltaSQL(e2.message) };
       n += Math.min(10, nuevos.length - i);
+    }
+    // Completar los objetivos de los que ya estaban cargados sin ellos
+    if (conObjetivos) {
+      const { data: sinObj } = await supabase.from("ejercicios").select("id, titulo").eq("en_biblioteca", true).is("objetivos", null);
+      const porTitulo = new Map(SEMILLA.filter((e) => e.objetivos).map((e) => [e.titulo, e.objetivos!]));
+      for (const x of sinObj ?? []) {
+        const o = porTitulo.get(x.titulo);
+        if (o) await supabase.from("ejercicios").update({ objetivos: o }).eq("id", x.id);
+      }
     }
     revalidatePath("/biblioteca");
     revalidatePath("/ejercicios");

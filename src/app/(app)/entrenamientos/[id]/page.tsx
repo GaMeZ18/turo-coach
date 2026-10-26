@@ -10,13 +10,24 @@ import type { Objetivo } from "@/lib/objetivos";
 import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
 
+/** Edad de la biblioteca que corresponde al equipo ("U18 A" → Junior, "Sènior" → Sénior…) */
+function edadDe(t: string): string | null {
+  const s = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/senior|sots|absolut|u2[0-5]/.test(s)) return "Sénior";
+  if (/junior|u1[789]/.test(s)) return "Junior";
+  if (/cadet|u1[56]/.test(s)) return "Cadete";
+  if (/infantil|u1[34]/.test(s)) return "Infantil";
+  if (/mini|premini|u1[012]|u[89]\b|escola/.test(s)) return "Mini";
+  return null;
+}
+
 export default async function EntrenoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, perfil } = await requireUser();
+  const { supabase, perfil, user } = await requireUser();
 
   const { data: e } = await supabase
     .from("entrenamientos")
-    .select("*, equipos(nombre)")
+    .select("*, equipos(nombre, categoria)")
     .eq("id", id)
     .maybeSingle();
   if (!e) notFound();
@@ -27,7 +38,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       .select("id, orden, tipo, titulo, duracion, notas, ejercicio_id, ejercicios(titulo, preview, descripcion)")
       .eq("entrenamiento_id", id)
       .order("orden"),
-    supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion").order("titulo"),
+    supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id").order("titulo"),
     supabase
       .from("equipo_jugadores")
       .select("dorsal, jugadores(id, nombre, apellidos)")
@@ -113,6 +124,8 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           prevista={e.duracion_prevista}
           actividades={(actividades ?? []) as never}
           ejercicios={ejercicios ?? []}
+          yo={user.id}
+          edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
         />
         <Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} />
       </div>

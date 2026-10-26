@@ -243,6 +243,20 @@ export const CA: Record<string, string> = {
   "No se puede: hay otros datos que dependen de este.": "No es pot: hi ha altres dades que en depenen.", "No hay conexión con la base de datos. Inténtalo de nuevo.": "No hi ha connexió amb la base de dades. Torna-ho a provar.",
   "No se ha podido guardar.": "No s'ha pogut desar.", "No se ha podido importar.": "No s'ha pogut importar.",
   "No se ha podido cargar. Recarga la página (Ctrl+Shift+R) y vuelve a probar.": "No s'ha pogut carregar. Recarrega la pàgina (Ctrl+Shift+R) i torna-ho a provar.",
+  "Elegir ejercicio de la biblioteca": "Tria exercici de la biblioteca",
+  "Elegir ejercicios": "Tria exercicis",
+  "Míos": "Meus",
+  "Volver a la lista": "Torna a la llista",
+  "Añadir al entreno": "Afegeix a l'entrenament",
+  "Añadir otra vez": "Afegeix-lo un altre cop",
+  "Toca un ejercicio para ver su pizarra, objetivos, descripción y correcciones.": "Toca un exercici per veure'n la pissarra, els objectius, la descripció i les correccions.",
+  "Otra actividad (calentamiento, agua, nota…)": "Una altra activitat (escalfament, aigua, nota…)",
+  "Trabaja": "Treballa",
+  "Ver la pizarra animada": "Mira la pissarra animada",
+  "Cargando ejercicio…": "Carregant l'exercici…",
+  "Resto presentes": "La resta presents",
+  "Márcala aquí: se guarda en el entreno y sale en el PDF. Las casillas vacías se pueden rellenar a mano.": "Marca-la aquí: es desa a l'entrenament i surt al PDF. Les caselles buides es poden omplir a mà.",
+  "Estado / motivo": "Estat / motiu",
 };
 
 // Dies i mesos (per a les dates escrites)

@@ -3,6 +3,7 @@
 import type { AccionBalon, Elemento, Fotograma, Movimiento, Pizarra, TipoTrazo, Vista } from "@/components/pizarra/modelo";
 import { AROS, COLOR_DEFECTO } from "@/components/pizarra/modelo";
 import { EDADES } from "./edades";
+import { SEMILLA_2 } from "./biblioteca-semilla-2";
 
 type P = [number, number];
 type Paso = {
@@ -83,6 +84,7 @@ export type EjercicioSemilla = {
   duracion: number;
   jugadores: number;
   material?: string;
+  objetivos?: string;
   descripcion: string;
   correcciones: string;
   etiquetas: string[];
@@ -98,7 +100,7 @@ const TODAS = EDADES;
 const FORMACION = ["Mini", "Infantil", "Cadete"];
 const MAYORES = ["Cadete", "Junior", "Sénior"];
 
-export const SEMILLA: EjercicioSemilla[] = [
+const SEMILLA_1: EjercicioSemilla[] = [
   // ---------- Calentamiento ----------
   {
     titulo: "Rueda de entradas por ambos lados", categoria: "Calentamiento", edades: TODAS, duracion: 8, jugadores: 8, material: "2 balones",
@@ -659,3 +661,6 @@ export const SEMILLA: EjercicioSemilla[] = [
     montaje: { entrenador: [25, 9], at: { "1": [20.4, 11.4] }, balon: "1", pasos: [{ m: [["1", "botar", [23.4, 9.6], [25.6, 8.4]]] }, { tiro: "1" }] },
   },
 ];
+
+/** Todos los ejercicios iniciales de la biblioteca (63 + 100 de la ampliación) */
+export const SEMILLA: EjercicioSemilla[] = [...SEMILLA_1, ...SEMILLA_2];

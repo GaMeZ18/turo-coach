@@ -36,6 +36,7 @@ export default function FormEjercicio({
     en_biblioteca: inicial?.en_biblioteca ?? false,
     edades: inicial?.edades ?? [],
     material: inicial?.material ?? "",
+    objetivos: inicial?.objetivos ?? "",
   });
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +131,10 @@ export default function FormEjercicio({
         <div>
           <label className="etiqueta">Material</label>
           <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="1 balón por jugador, 6 conos…" />
+        </div>
+        <div>
+          <label className="etiqueta">Objetivos</label>
+          <textarea value={d.objetivos ?? ""} onChange={(e) => set("objetivos", e.target.value)} rows={2} className="campo" placeholder="Qué se trabaja: p. ej. Tiro tras bloqueo indirecto · Lectura de la ayuda" />
         </div>
         <div>
           <label className="etiqueta">Descripción</label>

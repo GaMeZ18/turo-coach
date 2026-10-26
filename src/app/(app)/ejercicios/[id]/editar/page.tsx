@@ -20,7 +20,7 @@ export default async function EditarEjercicio({ params }: { params: Promise<{ id
           correcciones: e.correcciones ?? "", categoria: e.categoria ?? "", etiquetas: e.etiquetas ?? [],
           jugadores_min: e.jugadores_min, duracion: e.duracion, video_url: e.video_url ?? "",
           visibilidad: e.visibilidad, pizarra: e.pizarra, preview: e.preview,
-          en_biblioteca: e.en_biblioteca ?? false, edades: e.edades ?? [], material: e.material ?? "",
+          en_biblioteca: e.en_biblioteca ?? false, edades: e.edades ?? [], material: e.material ?? "", objetivos: e.objetivos ?? "",
         }}
       />
     </div>

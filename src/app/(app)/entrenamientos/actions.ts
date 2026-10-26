@@ -250,3 +250,15 @@ export async function programarEntrenos(formData: FormData) {
   revalidatePath("/entrenamientos");
   revalidatePath("/calendario");
 }
+
+// ---------- Ficha de un ejercicio (para elegirlo desde el entreno) ----------
+export type FichaEjercicio = {
+  id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null; jugadores_min: number | null;
+  descripcion: string | null; correcciones: string | null; objetivos?: string | null; material?: string | null;
+  edades?: string[]; etiquetas: string[]; pizarra: unknown; preview: string | null; video_url: string | null;
+};
+export async function fichaEjercicio(id: string): Promise<FichaEjercicio | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("ejercicios").select("*").eq("id", id).maybeSingle();
+  return (data as FichaEjercicio | null) ?? null;
+}

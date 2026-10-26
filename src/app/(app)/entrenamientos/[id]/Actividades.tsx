@@ -7,13 +7,14 @@ import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,
 } from "../actions";
 import Enviar from "@/components/Enviar";
+import FichaEjercicio from "@/components/FichaEjercicio";
+import SelectorEjercicios, { type EjercicioLista } from "./SelectorEjercicios";
 
 type Actividad = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
   ejercicio_id: string | null;
   ejercicios: { titulo: string; preview: string | null; descripcion: string | null } | null;
 };
-type EjercicioLite = { id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null };
 
 const TIPOS: Record<string, { label: string; color: string }> = {
   ejercicio: { label: "Ejercicio", color: "bg-club/10 text-club" },
@@ -28,9 +29,9 @@ const TZ = "Europe/Madrid";
 const hhmm = (d: Date) => d.toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 
 export default function Actividades({
-  entrenoId, inicio, prevista, actividades, ejercicios,
+  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo,
 }: {
-  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLite[];
+  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null;
 }) {
   const [lista, setLista] = useState(actividades);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
@@ -107,18 +108,13 @@ export default function Actividades({
 
               {abierta === a.id && (
                 <div className="mt-3 space-y-2 border-t border-linea pt-3">
-                  {a.ejercicios?.preview && (
-                    <img src={a.ejercicios.preview} alt="" className="max-h-64 rounded-lg border border-linea" />
-                  )}
-                  {a.ejercicios?.descripcion && <p className="whitespace-pre-line text-sm text-tinta/80">{a.ejercicios.descripcion}</p>}
+                  {a.ejercicio_id && <FichaEjercicio id={a.ejercicio_id} compacta />}
                   <textarea
                     defaultValue={a.notas ?? ""} rows={2} placeholder="Notas para este entreno…" className="campo"
                     onBlur={(e) => start(() => actualizarActividad(entrenoId, a.id, { notas: e.target.value }))}
                   />
                   <div className="flex justify-between">
-                    {a.ejercicio_id ? (
-                      <Link href={`/ejercicios/${a.ejercicio_id}`} className="text-sm text-club hover:underline">Abrir ejercicio</Link>
-                    ) : <span />}
+                    <span />
                     <button
                       onClick={() => { setLista((l) => l.filter((x) => x.id !== a.id)); start(() => borrarActividad(entrenoId, a.id)); }}
                       className="btn-peligro !px-2 !py-1"
@@ -134,36 +130,25 @@ export default function Actividades({
         {lista.length === 0 && <li className="text-sm text-tinta/50">Añade ejercicios o actividades abajo.</li>}
       </ol>
 
+      <div className="mt-3">
+        <SelectorEjercicios entrenoId={entrenoId} ejercicios={ejercicios} yo={yo} edadEquipo={edadEquipo} />
+      </div>
       <form
         ref={formAlta}
         action={async (fd) => { await anadirActividad(fd); formAlta.current?.reset(); }}
-        className="tarjeta mt-3 space-y-2 p-3"
+        className="tarjeta mt-2 space-y-2 p-3"
       >
         <input type="hidden" name="entrenamiento_id" value={entrenoId} />
-        <div className="flex gap-2">
-          <select name="ejercicio_id" className="campo">
-            <option value="">Actividad genérica (elige tipo) →</option>
-            <optgroup label="Ejercicios">
-              {ejercicios.filter((e) => e.tipo === "ejercicio").map((e) => (
-                <option key={e.id} value={e.id}>{e.titulo}{e.categoria ? ` · ${e.categoria}` : ""}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Sistemas">
-              {ejercicios.filter((e) => e.tipo === "sistema").map((e) => (
-                <option key={e.id} value={e.id}>{e.titulo}</option>
-              ))}
-            </optgroup>
-          </select>
+        <p className="text-xs font-medium text-tinta/60">Otra actividad (calentamiento, agua, nota…)</p>
+        <div className="flex flex-wrap gap-2">
           <select name="tipo" className="campo !w-auto">
             {Object.entries(TIPOS).filter(([k]) => k !== "ejercicio").map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-        </div>
-        <div className="flex gap-2">
-          <input name="titulo" placeholder="Título (opcional)" className="campo" />
+          <input name="titulo" placeholder="Título (opcional)" className="campo min-w-32 flex-1" />
           <input name="duracion" type="number" min={0} placeholder="Min" className="campo !w-20" />
-          <Enviar className="btn-primario shrink-0">Añadir</Enviar>
+          <Enviar className="btn-secundario shrink-0">Añadir</Enviar>
         </div>
       </form>
       <Link

@@ -3,10 +3,11 @@ import { requireUser } from "@/lib/supabase/server";
 import { fechaLarga, hora } from "@/lib/fechas";
 import MiniPizarra from "@/components/pizarra/Mini";
 import BotonImprimir from "./Imprimir";
+import AsistenciaHoja from "./AsistenciaHoja";
 
 type Act = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
-  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; material: string | null; pizarra: unknown; preview: string | null } | null;
+  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null } | null;
 };
 
 export const metadata = { title: "Entreno · Coach Manager CBTuró" };
@@ -16,15 +17,17 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
   const { supabase } = await requireUser();
   const { data: e } = await supabase.from("entrenamientos").select("*, equipos(nombre)").eq("id", id).maybeSingle();
   if (!e) notFound();
-  const [{ data: acts }, { data: plantilla }, { data: objs }] = await Promise.all([
-    supabase.from("entreno_actividades").select("id, orden, tipo, titulo, duracion, notas, ejercicios(titulo, descripcion, correcciones, material, pizarra, preview)").eq("entrenamiento_id", id).order("orden"),
-    supabase.from("equipo_jugadores").select("dorsal, jugadores(nombre, apellidos)").eq("equipo_id", e.equipo_id),
+  const [{ data: acts }, { data: plantilla }, { data: objs }, { data: asistencias }] = await Promise.all([
+    supabase.from("entreno_actividades").select("id, orden, tipo, titulo, duracion, notas, ejercicios(*)").eq("entrenamiento_id", id).order("orden"),
+    supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", e.equipo_id),
     supabase.from("entreno_objetivos").select("objetivos(nombre, color)").eq("entrenamiento_id", id),
+    supabase.from("asistencias").select("jugador_id, estado, motivo").eq("entrenamiento_id", id),
   ]);
   const lista = (acts ?? []) as unknown as Act[];
   const total = lista.reduce((s, a) => s + (a.duracion || 0), 0);
-  const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { nombre: string; apellidos: string | null } }[])
-    .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
+  const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
+    .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999))
+    .map((j) => ({ id: j.jugadores.id, dorsal: j.dorsal, nombre: `${j.jugadores.nombre} ${j.jugadores.apellidos ?? ""}`.trim() }));
   const objetivos = ((objs ?? []) as unknown as { objetivos: { nombre: string; color: string | null } | null }[]).map((o) => o.objetivos).filter(Boolean) as { nombre: string; color: string | null }[];
   const t0 = new Date(e.fecha).getTime();
   let acumulado = 0;
@@ -68,11 +71,12 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
               {ej && (
                 <div className="mt-2 flex gap-3">
                   {(ej.preview || ej.pizarra) ? (
-                    <div className="w-40 shrink-0 overflow-hidden rounded border border-linea">
+                    <div className="w-48 shrink-0 overflow-hidden rounded border border-linea">
                       {ej.preview ? <img src={ej.preview} alt="" className="w-full" /> : <MiniPizarra pizarra={ej.pizarra} className="w-full" />}
                     </div>
                   ) : null}
                   <div className="min-w-0 flex-1 space-y-1 text-xs leading-snug">
+                    {ej.objetivos && <p className="whitespace-pre-line"><strong>Objetivos:</strong> {ej.objetivos}</p>}
                     {ej.descripcion && <p className="whitespace-pre-line">{ej.descripcion}</p>}
                     {ej.correcciones && <p className="whitespace-pre-line"><strong>Claves:</strong> {ej.correcciones}</p>}
                     {ej.material && <p><strong>Material:</strong> {ej.material}</p>}
@@ -86,18 +90,7 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
       </ol>
 
       {jugadores.length > 0 && (
-        <section className="mt-5 break-inside-avoid">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-tinta/60">Asistencia</h2>
-          <div className="mt-1 grid grid-cols-2 gap-x-6 text-sm sm:grid-cols-3">
-            {jugadores.map((j, i) => (
-              <div key={i} className="flex items-center gap-2 border-b border-linea py-1">
-                <span className="inline-block h-3.5 w-3.5 rounded-sm border border-tinta/50" />
-                <span className="w-5 text-xs text-tinta/50">{j.dorsal ?? ""}</span>
-                <span className="truncate">{j.jugadores.nombre} {j.jugadores.apellidos ?? ""}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        <AsistenciaHoja entrenoId={id} jugadores={jugadores} registros={asistencias ?? []} />
       )}
     </main>
   );

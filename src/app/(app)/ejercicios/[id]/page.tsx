@@ -78,6 +78,12 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
               <p className="text-sm">{e.material}</p>
             </section>
           )}
+          {e.objetivos && (
+            <section className="rounded-lg bg-azul/5 p-3">
+              <h2 className="etiqueta">Objetivos</h2>
+              <p className="whitespace-pre-line text-sm">{e.objetivos}</p>
+            </section>
+          )}
           {e.descripcion && (
             <section>
               <h2 className="etiqueta">Descripción</h2>
