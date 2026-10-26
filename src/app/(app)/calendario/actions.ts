@@ -26,3 +26,20 @@ export async function borrarEvento(formData: FormData) {
   check(await supabase.from("eventos").delete().eq("id", String(formData.get("id"))));
   revalidatePath("/calendario");
 }
+
+// ---------- Suscripción al calendario desde el móvil ----------
+export async function crearEnlaceCalendario(formData: FormData) {
+  const supabase = await createClient();
+  const alcance = String(formData.get("alcance") ?? "mios");
+  const equipo = String(formData.get("equipo_id") ?? "") || null;
+  if (!["mios", "equipo", "club"].includes(alcance)) throw new Error("Calendario no válido.");
+  if (alcance === "equipo" && !equipo) throw new Error("Elige el equipo.");
+  check(await supabase.from("calendario_enlaces").insert({ alcance, equipo_id: alcance === "equipo" ? equipo : null }));
+  revalidatePath("/calendario/movil");
+}
+
+export async function borrarEnlaceCalendario(formData: FormData) {
+  const supabase = await createClient();
+  check(await supabase.from("calendario_enlaces").delete().eq("token", String(formData.get("token"))));
+  revalidatePath("/calendario/movil");
+}

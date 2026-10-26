@@ -6,7 +6,7 @@ import { colorEquipo } from "@/lib/colores";
 import { TZ, diaInput, hora, hoyLocal } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
 import { borrarEvento, crearEvento } from "./actions";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Smartphone, Trash2 } from "lucide-react";
 
 type Item = {
   id: string;
@@ -137,7 +137,8 @@ export default async function CalendarioPage({
           <h1 className="text-2xl font-semibold">Calendario</h1>
           <p className="text-sm text-tinta/60">{verTodo ? (filtro ? delClub.find((e) => e.id === filtro)?.nombre : "Todo el club · partidos de todos los equipos") : equipo?.nombre}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/calendario/movil" className="btn-secundario !py-1.5 text-sm"><Smartphone size={16} /> En mi móvil</Link>
           {equipo && (
             <div className="flex overflow-hidden rounded-lg border border-linea text-xs font-semibold uppercase">
               <Link href={`/calendario?mes=${mes}`} className={`px-3 py-1.5 ${!verTodo ? "bg-azul text-white" : "bg-white hover:bg-suave"}`}>{equipo.nombre}</Link>

@@ -67,7 +67,7 @@ export default async function PartidosPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Partidos</h1>
-          <p className="text-sm text-tinta/60">{equipo.nombre}</p>
+          <p className="text-sm text-tinta/60">{equipo.nombre} · <Link href="/imprimir/temporada" className="text-azul hover:underline">Informe de temporada</Link></p>
         </div>
         {jugados.length > 0 && (
           <div className="flex gap-4 text-center">
