@@ -22,7 +22,7 @@ export default function PlantillaFCBQ({ equipoId, candidatos, cambios }: { equip
   const importar = () => start(async () => {
     try {
       const r = await importarPlantillaFCBQ(equipoId, lista.filter((x) => x.marcado).map(({ nombre, apellidos, dorsal }) => ({ nombre, apellidos, dorsal })), conDorsales ? cambios.map((c) => ({ jugadorId: c.jugadorId, dorsal: c.dorsal })) : []);
-      setMsg(`Hecho: ${r.altas} jugadores añadidos${r.dorsales ? ` y ${r.dorsales} dorsales actualizados` : ""}.`);
+      setMsg([r.altas ? `${r.altas} jugadores añadidos` : "", r.dorsales ? `${r.dorsales} dorsales actualizados` : ""].filter(Boolean).join(" y ") || "No había nada que cambiar.");
       setAbierto(false);
       router.refresh();
     } catch (e) { setMsg(e instanceof Error ? e.message : "No se ha podido importar."); }
@@ -67,7 +67,7 @@ export default function PlantillaFCBQ({ equipoId, candidatos, cambios }: { equip
             </label>
           )}
           <div className="flex gap-2">
-            <button type="button" className="btn-primario" onClick={importar} disabled={pendiente}>{pendiente && <Loader2 size={16} className="animate-spin" />} Importar {lista.filter((x) => x.marcado).length} jugadores</button>
+            <button type="button" className="btn-primario" onClick={importar} disabled={pendiente}>{pendiente && <Loader2 size={16} className="animate-spin" />} {lista.some((x) => x.marcado) ? `Importar ${lista.filter((x) => x.marcado).length} jugadores` : "Actualizar dorsales"}</button>
             <button type="button" className="btn-secundario" onClick={() => setAbierto(false)}>Cancelar</button>
           </div>
         </div>
