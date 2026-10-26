@@ -8,6 +8,7 @@ import SinEquipo from "@/components/SinEquipo";
 import Enviar from "@/components/Enviar";
 import { guardarFichaJugador, guardarFichaRival } from "../actions";
 import { Lock, NotebookPen } from "lucide-react";
+import Sinergias from "./Sinergias";
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" });
 
@@ -203,6 +204,8 @@ export default async function ScoutingEquipo({ searchParams }: { searchParams: P
               <p className="mt-1 text-xs text-tinta/50">Sale del control de periodos de cada partido.</p>
             </section>
           )}
+
+          {stats.length > 0 && <Sinergias nombre={buscado} stats={stats} />}
 
           {/* Resultados */}
           <section>

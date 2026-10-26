@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
-import type { StatsPartido } from "@/lib/stats-fcbq";
+import { VERSION_STATS, type StatsPartido } from "@/lib/stats-fcbq";
 
 /** De los partidos de cada equipo, cuáles aún no tienen estadísticas guardadas */
 export async function statsPendientes(pares: { equipoId: string; ids: string[] }[]): Promise<{ pendientes: { equipoId: string; id: string }[]; error?: string }> {
@@ -11,9 +11,10 @@ export async function statsPendientes(pares: { equipoId: string; ids: string[] }
   const pendientes: { equipoId: string; id: string }[] = [];
   for (const { equipoId, ids } of pares) {
     if (!ids.length) continue;
-    const { data, error } = await supabase.from("fcbq_stats").select("stats_id").eq("equipo_id", equipoId).in("stats_id", ids);
+    const { data, error } = await supabase.from("fcbq_stats").select("stats_id, v:datos->v").eq("equipo_id", equipoId).in("stats_id", ids);
     if (error) return { pendientes: [], error: /fcbq_stats/.test(error.message) ? "Para guardar estadísticas, ejecuta antes 0006_scouting.sql en Supabase." : error.message };
-    const ya = new Set((data ?? []).map((d) => d.stats_id as string));
+    // Los guardados con una versión antigua (sin jugada a jugada) se vuelven a descargar
+    const ya = new Set((data ?? []).filter((d) => Number((d as { v?: unknown }).v) >= VERSION_STATS).map((d) => d.stats_id as string));
     for (const id of ids) if (!ya.has(id)) pendientes.push({ equipoId, id });
   }
   return { pendientes };

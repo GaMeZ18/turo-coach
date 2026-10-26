@@ -172,6 +172,17 @@ async function apiStats(ids) {
       if (!r.ok) { res[id] = { error: r.status }; continue; }
       const j = await r.json();
       delete j.playByPlay;
+      // Jugada a jugada (marcador en cada momento): para quintetos, parejas y on/off
+      try {
+        const q = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/pbp?currentSeason=true`, {
+          headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
+        });
+        if (q.ok) {
+          const pj = await q.json();
+          const ev = Array.isArray(pj) ? pj : pj.playByPlay || pj.events || [];
+          j.pbp = ev.map((e) => ({ c: e.c, p: e.p, m: e.m, s: e.s, l: e.l, v: e.v }));
+        }
+      } catch {}
       res[id] = j;
     } catch (e) { res[id] = { error: String(e?.message || e) }; }
     await new Promise((r) => setTimeout(r, 120));
