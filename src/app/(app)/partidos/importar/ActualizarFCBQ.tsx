@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { leerCalendarioFCBQ, leerLigaFCBQ, sugerirEquipo, unirResultados, type LigaFCBQ, type PartidoFCBQ } from "@/lib/fcbq";
 import { importarFCBQ, type ResultadoImportacion } from "./actions";
+import { marcarAplazados } from "../actions";
 import { guardarStatsFCBQ, statsPendientes } from "../../scouting/actions";
 import { compactarStats, type StatsPartido } from "@/lib/stats-fcbq";
 
@@ -264,6 +265,19 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
               {resultado.ligas ? `, ${resultado.ligas} ligas con clasificación` : ""}
               {numStats ? `, estadísticas de ${numStats} partidos` : ""}.
             </p>
+            {resultado.desaparecidos?.length > 0 && (
+              <div className="mt-2 rounded border border-oro bg-oro/15 p-2 text-tinta">
+                <p className="font-semibold">{resultado.desaparecidos.length} partidos ya no aparecen en el calendario de la FCBQ (aplazados o anulados):</p>
+                <ul className="mt-1 list-inside list-disc text-xs">
+                  {resultado.desaparecidos.map((d) => (
+                    <li key={d.id}><Link href={`/partidos/${d.id}`} className="underline">{new Date(d.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })} · {d.equipo} – {d.rival}</Link></li>
+                  ))}
+                </ul>
+                <button type="button" className="btn-secundario mt-2 !py-1 text-xs" onClick={async () => { await marcarAplazados(resultado.desaparecidos.map((d) => d.id)); setResultado({ ...resultado, desaparecidos: [] }); router.refresh(); }}>
+                  Marcarlos como aplazados
+                </button>
+              </div>
+            )}
             {[...resultado.errores, ...avisos].length > 0 && (
               <ul className="mt-1 list-inside list-disc text-xs text-red-700">{[...resultado.errores, ...avisos].slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}</ul>
             )}

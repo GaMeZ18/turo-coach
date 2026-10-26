@@ -3,19 +3,21 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
-import { borrarPartido, editarPartido, guardarResultado } from "../actions";
+import { anadirSistemaPartido, borrarPartido, editarPartido, guardarPrevia, guardarResultado, quitarSistemaPartido } from "../actions";
+import BoxScore, { Parciales } from "@/components/BoxScore";
+import MiniPizarra from "@/components/pizarra/Mini";
 import { Resultado, type Partido } from "../comun";
 import Convocatoria from "./Convocatoria";
 import Periodos from "./Periodos";
 import type { StatsPartido } from "@/lib/stats-fcbq";
-import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { Binoculars, ClipboardList, FileText, MapPin, Pencil, Trash2, X } from "lucide-react";
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, user, perfil } = await requireUser();
   const { data } = await supabase.from("partidos").select("*, equipos(nombre)").eq("id", id).maybeSingle();
   if (!data) notFound();
-  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string } | null; fcbq_stats_id?: string | null; num_periodos?: number | null };
+  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string } | null; fcbq_stats_id?: string | null; num_periodos?: number | null; previa?: string | null };
   const equipo = p.equipos?.nombre ?? "Equipo";
 
   const [{ data: plantilla }, { data: conv }, { data: staff }, { data: periodos }, { data: stats }] = await Promise.all([
@@ -28,6 +30,16 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       : Promise.resolve({ data: null }),
   ]);
   const esStaff = perfil.rol === "coordinador" || !!staff;
+  // Previa: ficha del rival (scouting), sistemas elegidos y lista de ejercicios para añadir
+  const [{ data: ficha }, { data: sistemas }, { data: ejercicios }] = esStaff
+    ? await Promise.all([
+        supabase.from("scouting_rivales").select("notas, caracteristicas").eq("equipo_id", p.equipo_id).ilike("nombre", p.rival).maybeSingle(),
+        supabase.from("partido_ejercicios").select("ejercicio_id, orden, ejercicios(titulo, tipo, pizarra, preview)").eq("partido_id", id).order("orden"),
+        supabase.from("ejercicios").select("id, titulo, tipo, categoria").order("tipo", { ascending: false }).order("titulo").limit(400),
+      ])
+    : [{ data: null }, { data: null }, { data: null }];
+  const listaSistemas = (sistemas ?? []) as unknown as { ejercicio_id: string; ejercicios: { titulo: string; tipo: string; pizarra: unknown; preview: string | null } | null }[];
+  const caract = ((ficha as { caracteristicas?: Record<string, unknown> } | null)?.caracteristicas ?? {}) as Record<string, string | string[]>;
   const st = (stats as { datos: StatsPartido } | null)?.datos ?? null;
   const nuestroLado = st ? (/TUR[OÓ]/i.test(st.local.nombre) ? st.local : st.visitante) : null;
   const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
@@ -62,6 +74,75 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           <Resultado p={p} />
         </div>
       </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href={`/imprimir/partido/${p.id}`} className="btn-secundario"><FileText size={16} /> Informe PDF</Link>
+        {esStaff && <Link href={`/scouting/equipo?nombre=${encodeURIComponent(p.rival)}`} className="btn-secundario"><Binoculars size={16} /> Scouting del rival</Link>}
+      </div>
+
+      {/* Previa del partido (solo cuerpo técnico) */}
+      {esStaff && (
+        <section className="tarjeta mt-5 p-4">
+          <h2 className="flex items-center gap-2 font-semibold"><ClipboardList size={18} className="text-azul" /> Previa del partido</h2>
+          {(ficha && (Object.keys(caract).length > 0 || (ficha as { notas?: string | null }).notas)) ? (
+            <div className="mt-2 rounded-lg bg-suave p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-tinta/50">Ficha de {p.rival}</p>
+              <dl className="mt-1 grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                {Object.entries(caract).map(([k, v]) => (
+                  <div key={k} className="flex gap-1"><dt className="capitalize text-tinta/60">{k}:</dt><dd className="font-medium">{Array.isArray(v) ? v.join(", ") : v}</dd></div>
+                ))}
+              </dl>
+              {(ficha as { notas?: string | null }).notas && <p className="mt-1 whitespace-pre-line">{(ficha as { notas?: string | null }).notas}</p>}
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-tinta/50">Sin ficha del rival todavía (se rellena en Scouting).</p>
+          )}
+          <form action={guardarPrevia} className="mt-3 space-y-2">
+            <input type="hidden" name="id" value={p.id} />
+            <label className="etiqueta">Plan de partido</label>
+            <textarea name="previa" rows={4} defaultValue={p.previa ?? ""} className="campo" placeholder="Defensa, emparejamientos, ritmo, claves en ataque, a quién no dejar tirar…" />
+            <Enviar>Guardar plan</Enviar>
+          </form>
+          <div className="mt-4">
+            <p className="etiqueta">Sistemas y ejercicios para el partido</p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {listaSistemas.map((x) => (
+                <div key={x.ejercicio_id} className="relative overflow-hidden rounded-lg border border-linea">
+                  <Link href={`/ejercicios/${x.ejercicio_id}`} className="block">
+                    <div className="aspect-[15/14] bg-suave">{x.ejercicios?.preview ? <img src={x.ejercicios.preview} alt="" className="h-full w-full object-contain" /> : x.ejercicios?.pizarra ? <MiniPizarra pizarra={x.ejercicios.pizarra} className="h-full w-full" /> : null}</div>
+                    <p className="truncate px-1.5 py-1 text-xs font-medium">{x.ejercicios?.titulo}</p>
+                  </Link>
+                  <form action={quitarSistemaPartido} className="absolute right-1 top-1">
+                    <input type="hidden" name="id" value={p.id} /><input type="hidden" name="ejercicio_id" value={x.ejercicio_id} />
+                    <Enviar className="rounded-full bg-white/90 p-0.5 text-tinta/60 shadow hover:text-rojo" title="Quitar"><X size={14} /></Enviar>
+                  </form>
+                </div>
+              ))}
+            </div>
+            <form action={anadirSistemaPartido} className="mt-2 flex gap-2">
+              <input type="hidden" name="id" value={p.id} />
+              <select name="ejercicio_id" className="campo" defaultValue="">
+                <option value="" disabled>Añadir sistema o ejercicio…</option>
+                {(ejercicios ?? []).map((e) => <option key={e.id} value={e.id}>{e.tipo === "sistema" ? "Sistema · " : ""}{e.titulo}</option>)}
+              </select>
+              <Enviar className="btn-secundario">Añadir</Enviar>
+            </form>
+          </div>
+        </section>
+      )}
+
+      {/* Estadísticas de la FCBQ */}
+      {st && (
+        <section className="tarjeta mt-5 space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Estadísticas (FCBQ)</h2>
+            <Parciales local={st.local} visitante={st.visitante} />
+          </div>
+          <BoxScore eq={st.local} destacar={/TUR[OÓ]/i.test(st.local.nombre)} />
+          <BoxScore eq={st.visitante} destacar={/TUR[OÓ]/i.test(st.visitante.nombre)} />
+          <p className="text-[11px] text-tinta/50">* titular · T2 y T3: canastas anotadas · TL: anotados/intentados</p>
+        </section>
+      )}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">

@@ -8,11 +8,12 @@ const COLUMNAS = "id, equipo_id, fecha, rival, local, lugar, competicion, jornad
 type Existente = { id: string; equipo_id: string; fecha: string; rival: string; fcbq_id: string | null } & Record<string, unknown>;
 
 export type Asignacion = { nombre: string; equipoId: string; fcbqEquipoId: string | null };
-export type ResultadoImportacion = { nuevos: number; actualizados: number; iguales: number; ligas: number; errores: string[] };
+export type Desaparecido = { id: string; fecha: string; rival: string; equipo: string };
+export type ResultadoImportacion = { nuevos: number; actualizados: number; iguales: number; ligas: number; errores: string[]; desaparecidos: Desaparecido[] };
 
 export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asignacion[], ligas: LigaFCBQ[] = []): Promise<ResultadoImportacion> {
   const supabase = await createClient();
-  const res: ResultadoImportacion = { nuevos: 0, actualizados: 0, iguales: 0, ligas: 0, errores: [] };
+  const res: ResultadoImportacion = { nuevos: 0, actualizados: 0, iguales: 0, ligas: 0, errores: [], desaparecidos: [] };
   const equipoDe = new Map(asignaciones.map((a) => [a.nombre, a.equipoId]));
 
   // 1) Recordar cómo se llama cada equipo en la FCBQ (para la próxima vez)
@@ -75,6 +76,19 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
       updated_at: new Date().toISOString(),
     });
     if (error) res.errores.push(`Liga de ${liga.nuestro}: ${error.message}`); else res.ligas++;
+  }
+
+  // 4) Partidos futuros que venían de la FCBQ y ya no están en su calendario (aplazados o anulados)
+  const idsLeidos = new Set(partidos.map((p) => p.fcbqId).filter(Boolean));
+  // (solo si se ha leído el calendario de varios meses, como hace el botón de actualizar)
+  const meses = new Set(partidos.filter((p) => p.fcbqId).map((p) => p.dia.slice(0, 7)));
+  if (idsLeidos.size && meses.size >= 3) {
+    const ahora = new Date().toISOString();
+    const nombreEq = new Map(asignaciones.map((a) => [a.equipoId, a.nombre]));
+    for (const x of lista) {
+      if (!x.fcbq_id || idsLeidos.has(x.fcbq_id) || x.fecha < ahora || x.estado === "aplazado" || x.estado === "jugado") continue;
+      res.desaparecidos.push({ id: x.id, fecha: x.fecha, rival: x.rival, equipo: nombreEq.get(x.equipo_id) ?? "" });
+    }
   }
 
   revalidatePath("/partidos");

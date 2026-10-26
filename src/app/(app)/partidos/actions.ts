@@ -103,3 +103,40 @@ export async function guardarPeriodos(partidoId: string, numPeriodos: number, fi
   }
   revalidatePath(`/partidos/${partidoId}`);
 }
+
+// ---------- Previa del partido ----------
+const sinPrevia = (m: string) => (/previa|partido_ejercicios/.test(m) ? "Ejecuta antes 0009_partidos_previa.sql en Supabase." : m);
+
+export async function guardarPrevia(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const { error } = await supabase.from("partidos").update({ previa: txt(formData, "previa") }).eq("id", id);
+  if (error) throw new Error(sinPrevia(error.message));
+  revalidatePath(`/partidos/${id}`);
+}
+
+export async function anadirSistemaPartido(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const ej = String(formData.get("ejercicio_id") ?? "");
+  if (!ej) return;
+  const { count } = await supabase.from("partido_ejercicios").select("ejercicio_id", { count: "exact", head: true }).eq("partido_id", id);
+  const { error } = await supabase.from("partido_ejercicios").upsert({ partido_id: id, ejercicio_id: ej, orden: count ?? 0 });
+  if (error) throw new Error(sinPrevia(error.message));
+  revalidatePath(`/partidos/${id}`);
+}
+
+export async function quitarSistemaPartido(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  check(await supabase.from("partido_ejercicios").delete().eq("partido_id", id).eq("ejercicio_id", String(formData.get("ejercicio_id"))));
+  revalidatePath(`/partidos/${id}`);
+}
+
+/** Marca como aplazados los partidos que ya no aparecen en la FCBQ */
+export async function marcarAplazados(ids: string[]) {
+  const supabase = await createClient();
+  if (ids.length) check(await supabase.from("partidos").update({ estado: "aplazado" }).in("id", ids));
+  revalidatePath("/partidos");
+  revalidatePath("/calendario");
+}

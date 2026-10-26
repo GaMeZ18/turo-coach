@@ -107,6 +107,14 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Partidos (extra)
+- **Previa** (cuerpo técnico): ficha del rival del scouting, plan de partido y sistemas/ejercicios elegidos con su pizarra.
+- **Estadísticas de la FCBQ** en cada partido: parciales por periodo y box score de los dos equipos.
+- **Informe PDF** (`/imprimir/partido/<id>`): resultado, parciales, plan, sistemas, box score, convocatoria con periodos y notas.
+- **Aplazados**: al actualizar desde la FCBQ avisa de los partidos futuros que ya no están en su calendario y permite marcarlos como aplazados.
+
+> Requiere ejecutar `0009_partidos_previa.sql`.
+
 ### Entrenamientos (extra)
 - **Plantillas**: «Guardar como plantilla» en cualquier entreno; se usan al crear un entreno o al programar varios. Las del club (coordinador) las ven todos los equipos.
 - **Programar varios**: días de la semana, hora y fechas → crea todos los entrenos (con o sin plantilla) sin duplicar días.
