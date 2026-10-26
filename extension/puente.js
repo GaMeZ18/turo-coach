@@ -1,4 +1,4 @@
-// Puente entre la página de Turó Coach y la extensión.
+// Puente entre la página de Coach Manager CBTuró y la extensión.
 // La página pide "actualizar" con window.postMessage; la extensión abre la FCBQ y devuelve las páginas.
 window.addEventListener("message", (e) => {
   if (e.source !== window || !e.data) return;

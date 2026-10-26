@@ -64,7 +64,7 @@ export default function Liga({ liga }: { liga: LigaGuardada | null }) {
       <section className="tarjeta mt-8 p-4 text-sm text-tinta/70">
         <h2 className="font-semibold text-tinta">Liga y clasificación</h2>
         <p className="mt-1">
-          Abre en basquetcatala.cat la página de <strong>Resultats</strong> (o la <strong>Classificació</strong>) de la competición de este equipo y pulsa el marcador «Enviar a Turó Coach».{" "}
+          Abre en basquetcatala.cat la página de <strong>Resultats</strong> (o la <strong>Classificació</strong>) de la competición de este equipo y pulsa el marcador «Enviar a Coach Manager CBTuró».{" "}
           <Link href="/partidos/importar" className="font-medium text-azul underline">Cómo se hace</Link>
         </p>
       </section>

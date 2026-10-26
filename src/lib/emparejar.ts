@@ -1,4 +1,4 @@
-// Emparejar un jugador de Turó Coach con su nombre en las actas de la FCBQ (nombre + dorsal)
+// Emparejar un jugador de Coach Manager CBTuró con su nombre en las actas de la FCBQ (nombre + dorsal)
 export const tokens = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().split(/[^A-Z]+/).filter((t) => t.length > 1);
 
 /** Puntos de parecido: palabras del nombre en común (+2 si coincide el dorsal). 2 o más = es el mismo jugador */

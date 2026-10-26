@@ -20,8 +20,8 @@ export default async function LoginPage({
       <div className="relative flex flex-1 items-start justify-center px-4 pb-10 lg:max-w-lg lg:items-center lg:px-10">
         <div className="-mt-16 w-full max-w-sm lg:mt-0">
           <div className="mb-6 flex flex-col items-center text-center">
-            <img src="/marca/escudo.png" alt="Escudo CB Turó" className="h-28 w-auto drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
-            <h1 className="mt-4 !font-[family-name:var(--font-escudo)] text-3xl !normal-case !text-white">Turó Coach</h1>
+            <img src="/marca/logo-10.png" alt="CB Turó · 10 anys" className="h-32 w-auto drop-shadow-[0_6px_18px_rgba(0,0,0,0.5)]" />
+            <h1 className="mt-4 !font-[family-name:var(--font-escudo)] text-3xl !normal-case !text-white">Coach Manager CBTuró</h1>
             <p className="mt-1 text-sm text-white/60">Àrea d&apos;entrenadors · CB Turó de la Peira</p>
           </div>
 

@@ -10,9 +10,9 @@ const barlowCondensed = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "
 const graduate = Graduate({ subsets: ["latin"], weight: "400", variable: "--font-graduate" });
 
 export const metadata: Metadata = {
-  title: "Turó Coach · CB Turó de la Peira",
+  title: "Coach Manager CBTuró",
   description: "Herramientas para los entrenadores del CB Turó de la Peira",
-  appleWebApp: { capable: true, title: "Turó Coach", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Coach Manager CBTuró", statusBarStyle: "black-translucent" },
   icons: { apple: "/icons/apple-touch-icon.png" },
 };
 

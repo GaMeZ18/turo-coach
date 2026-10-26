@@ -22,7 +22,7 @@ export default async function ImportarPage() {
       <Link href="/partidos" className="text-sm text-tinta/60 hover:underline">← Partidos</Link>
       <h1 className="mt-1 text-2xl font-semibold">Importar de la FCBQ</h1>
       <p className="mt-1 max-w-3xl text-sm text-tinta/70">
-        Trae a Turó Coach los partidos y los <strong>resultados</strong> de basquetcatala.cat. Puedes repetirlo cuando quieras:
+        Trae a Coach Manager CBTuró los partidos y los <strong>resultados</strong> de basquetcatala.cat. Puedes repetirlo cuando quieras:
         lo que ya esté se actualiza (hora, pista, marcador…) y no se duplica.
       </p>
       <div className="mt-5">
@@ -47,7 +47,7 @@ export default async function ImportarPage() {
         </ol>
         <p className="mt-3 rounded-lg bg-oro/15 p-2 text-xs text-tinta/70">
           <strong>Automático:</strong> desde la versión 1.3, la extensión actualiza sola <strong>cada lunes a las 6:00</strong> si el ordenador está encendido con el navegador abierto
-          y la sesión de Turó Coach iniciada. Si a esa hora estaba apagado, lo hace al abrir el navegador. Si la FCBQ pide verificación, la pestaña se queda esperando a que la resuelvas.
+          y la sesión de Coach Manager CBTuró iniciada. Si a esa hora estaba apagado, lo hace al abrir el navegador. Si la FCBQ pide verificación, la pestaña se queda esperando a que la resuelvas.
         </p>
         <p className="mt-3 text-xs text-tinta/50">
           Al pulsarlo se abre una pestaña de basquetcatala.cat; si sale la verificación, resuélvela y la extensión sigue sola. Lee el calendario del club de toda la temporada,

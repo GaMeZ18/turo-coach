@@ -119,7 +119,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
     <div className="space-y-5">
       {/* Marcador */}
       <div className="tarjeta max-w-3xl space-y-3 p-4">
-        <h2 className="flex items-center gap-2 font-semibold"><Bookmark size={18} className="text-azul" /> Botón «Enviar a Turó Coach»</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Bookmark size={18} className="text-azul" /> Botón «Enviar a Coach Manager CBTuró»</h2>
         <ol className="list-inside list-decimal space-y-1 text-sm text-tinta/80">
           <li>
             <strong>Una sola vez:</strong> arrastra este botón a la barra de marcadores del navegador
@@ -127,7 +127,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
             <div className="my-2 flex flex-wrap items-center gap-2">
               {/* href lo pone el useEffect */}
               <a ref={enlace} onClick={(e) => e.preventDefault()} className="btn-primario cursor-grab" title="Arrástralo a la barra de marcadores">
-                ⇪ Enviar a Turó Coach
+                ⇪ Enviar a Coach Manager CBTuró
               </a>
               <button type="button" className="btn-secundario !py-1.5 text-xs" onClick={async () => { try { await navigator.clipboard.writeText(marcador); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch {} }}>
                 <Copy size={14} /> {copiado ? "Copiado" : "Copiar código"}
@@ -146,7 +146,7 @@ export default function Importador({ equipos, existentes, temporada }: { equipos
             </ul>
           </li>
           <li>
-            Pulsa el marcador <strong>Enviar a Turó Coach</strong>: se abre esta pantalla con los partidos leídos. Si la FCBQ te pide verificar que no eres un robot, hazlo primero.
+            Pulsa el marcador <strong>Enviar a Coach Manager CBTuró</strong>: se abre esta pantalla con los partidos leídos. Si la FCBQ te pide verificar que no eres un robot, hazlo primero.
             <span className="block text-xs text-tinta/50">Si no llegan, la página también queda copiada: ábrela en «Otras formas» y pégala con Ctrl+V.</span>
           </li>
         </ol>

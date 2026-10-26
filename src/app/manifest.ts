@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Turó Coach · CB Turó de la Peira",
-    short_name: "Turó Coach",
+    name: "Coach Manager CBTuró",
+    short_name: "Coach Manager",
     description: "Ejercicios, pizarra y entrenamientos del CB Turó de la Peira",
     id: "/",
     start_url: "/",

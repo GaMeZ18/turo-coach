@@ -6,7 +6,7 @@ import BoxScore, { Parciales } from "@/components/BoxScore";
 import MiniPizarra from "@/components/pizarra/Mini";
 import BotonImprimir from "../../entreno/[id]/Imprimir";
 
-export const metadata = { title: "Informe de partido · Turó Coach" };
+export const metadata = { title: "Informe de partido · Coach Manager CBTuró" };
 
 export default async function InformePartido({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

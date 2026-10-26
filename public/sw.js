@@ -4,7 +4,7 @@
 // - Sin conexión muestra /offline.html en vez del error del navegador.
 // Los datos (Supabase) NO se cachean: siempre se piden en vivo.
 
-const VERSION = "turo-coach-v2";
+const VERSION = "turo-coach-v3";
 const PRECACHE = ["/offline.html", "/marca/escudo.png", "/marca/escudo-128.png", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {

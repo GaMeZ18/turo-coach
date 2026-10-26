@@ -1,5 +1,5 @@
 // Abre basquetcatala.cat en una pestaña (si sale la verificación de seguridad, la resuelve el usuario)
-// y lee lo que pide Turó Coach:
+// y lee lo que pide Coach Manager CBTuró:
 //  - { club }   → calendario del club, páginas de cada equipo, resultados y clasificaciones
 //  - { stats }  → estadísticas (box score) de una lista de partidos
 // Todo ocurre en el navegador del usuario, como si navegara él.
@@ -9,7 +9,7 @@ const APP_POR_DEFECTO = "https://coach.cbturo.com";
 const app = async () => (await chrome.storage.local.get("app")).app || APP_POR_DEFECTO;
 
 // ---------- Actualización automática: cada lunes a las 6:00 ----------
-// El ordenador tiene que estar encendido con el navegador abierto (y la sesión de Turó Coach iniciada).
+// El ordenador tiene que estar encendido con el navegador abierto (y la sesión de Coach Manager CBTuró iniciada).
 // Si a esa hora estaba apagado, se hace en cuanto se abra el navegador.
 function proximoLunes6() {
   const d = new Date();

@@ -24,9 +24,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-20 bg-azul text-white shadow-md shadow-azul/20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2">
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <img src="/marca/escudo-128.png" alt="CB Turó" className="h-10 w-auto drop-shadow" />
+            <img src="/icons/icon-192.png" alt="CB Turó 10 anys" className="h-10 w-10 rounded-lg shadow ring-1 ring-white/15" />
             <span className="hidden leading-none sm:block">
-              <span className="block font-[family-name:var(--font-escudo)] text-lg tracking-wide">Turó Coach</span>
+              <span className="block font-[family-name:var(--font-escudo)] text-lg tracking-wide">Coach Manager CBTuró</span>
               <span className="block text-[11px] uppercase tracking-[0.18em] text-oro">CB Turó de la Peira</span>
             </span>
           </Link>

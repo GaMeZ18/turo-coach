@@ -19,7 +19,7 @@ export function Credenciales({ r }: { r: NonNullable<ResultadoPersona> }) {
   useEffect(() => setWeb(location.origin), []);
   if (r.error) return <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{r.error}</p>;
   if (r.invitado) return <p className="rounded-lg bg-green-50 p-2 text-sm text-green-800">Invitación enviada a {r.email}. Le llegará un correo para entrar y ponerse contraseña.</p>;
-  const texto = `Hola ${r.nombre?.split(" ")[0] ?? ""}! Ya tienes acceso a Turó Coach, la app de entrenadores del CB Turó de la Peira.\n\n👉 ${web}\n📧 Usuario: ${r.email}\n🔑 Contraseña provisional: ${r.password}\n\nAl entrar, cámbiala en «Mi cuenta». Puedes instalarla en el móvil como una app.`;
+  const texto = `Hola ${r.nombre?.split(" ")[0] ?? ""}! Ya tienes acceso a Coach Manager CBTuró, la app de entrenadores del CB Turó de la Peira.\n\n👉 ${web}\n📧 Usuario: ${r.email}\n🔑 Contraseña provisional: ${r.password}\n\nAl entrar, cámbiala en «Mi cuenta». Puedes instalarla en el móvil como una app.`;
   return (
     <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
       <p className="flex items-center gap-1.5 font-semibold text-green-800"><Check size={16} /> Listo. Datos de acceso (solo se muestran ahora):</p>

@@ -84,7 +84,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
 
   const importar = async (l: Leido, asig: Record<string, string>) => {
     setEstado("trabajando");
-    setTexto("Guardando en Turó Coach…");
+    setTexto("Guardando en Coach Manager CBTuró…");
     try {
       const asignaciones = Object.entries(asig).filter(([, id]) => id).map(([nombre, equipoId]) => ({ nombre, equipoId, fcbqEquipoId: l.ids[nombre] ?? l.ligas.find((x) => x.nuestro === nombre)?.nuestroId ?? null }));
       const r = await importarFCBQ(l.partidos, asignaciones, l.ligas);
@@ -193,7 +193,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         const enlacesEquipo = d.paginas.filter((pg) => tipo(pg.url) === "equipo").slice(0, 2)
           .map((pg) => `${pg.url}\n  ` + [...new Set([...pg.html.matchAll(/href="([^"#]+)"/g)].map((m) => m[1]).filter((h) => /competici|resultat|classific|calendari|partit/i.test(h)))].slice(0, 25).join("\n  "));
         setInforme([
-          `Turó Coach · informe FCBQ ${new Date().toLocaleString("es-ES")}`,
+          `Coach Manager CBTuró · informe FCBQ ${new Date().toLocaleString("es-ES")}`,
           `Páginas: ${Object.entries(cuenta).map(([k, v]) => `${k} ${v}`).join(", ")}`,
           `Partidos del Turó leídos: ${l.partidos.length} · con marcador: ${l.partidos.filter((x) => x.pf !== null).length}`,
           `Ligas: ${l.ligas.map((x) => `${x.nuestro} (${x.resultados.length} partidos, ${x.resultados.filter((r) => r.statsId).length} con stats, clasif. ${x.clasificacion ? "sí" : "no"})`).join("; ") || "ninguna"}`,
@@ -256,7 +256,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
 
       {estado === "asignar" && leido && (
         <div className="tarjeta max-w-xl space-y-3 p-4">
-          <p className="text-sm font-semibold">¿Qué equipo de Turó Coach es cada uno? <span className="font-normal text-tinta/60">Solo la primera vez.</span></p>
+          <p className="text-sm font-semibold">¿Qué equipo de Coach Manager CBTuró es cada uno? <span className="font-normal text-tinta/60">Solo la primera vez.</span></p>
           {leido.nombres.map((n) => (
             <label key={n} className="flex items-center gap-2 text-sm">
               <span className="w-40 shrink-0 truncate font-medium" title={n}>{n}</span>

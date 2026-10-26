@@ -1,4 +1,4 @@
-// Estadísticas de partido de la FCBQ (JSON de su servicio de estadísticas) → formato compacto de Turó Coach.
+// Estadísticas de partido de la FCBQ (JSON de su servicio de estadísticas) → formato compacto de Coach Manager CBTuró.
 // La FCBQ da: puntos, canastas de 2 y de 3 anotadas, tiros libres anotados/intentados, faltas,
 // minutos, +/- en pista y, por periodo, quién ha jugado.
 

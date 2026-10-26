@@ -1,7 +1,7 @@
 // Lectura de páginas de basquetcatala.cat:
 //  - "Calendari Mensual Club" (partidos de todos los equipos, sin resultados)
 //  - "Resultats" de una competición (/competicions/resultats/<id>/<jornada>), con marcadores
-// Acepta el HTML (guardado con Ctrl+S o enviado con el botón «Enviar a Turó Coach») o el texto copiado.
+// Acepta el HTML (guardado con Ctrl+S o enviado con el botón «Enviar a Coach Manager CBTuró») o el texto copiado.
 // Se ejecuta en el navegador.
 
 import { aISO } from "./fechas";
@@ -342,7 +342,7 @@ export function leerCalendarioFCBQ(entrada: string): PartidoFCBQ[] {
   return lista.filter((p) => (vistos.has(p.clave) ? false : (vistos.add(p.clave), true)));
 }
 
-/** Propuesta de equipo de Turó Coach para un nombre FCBQ (p. ej. "CB TURÓ U18 A" → "U18 A") */
+/** Propuesta de equipo de Coach Manager CBTuró para un nombre FCBQ (p. ej. "CB TURÓ U18 A" → "U18 A") */
 export function sugerirEquipo(nombreFCBQ: string, equipos: { id: string; nombre: string; fcbq_nombre: string | null }[]) {
   const n = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
   const exacto = equipos.find((e) => e.fcbq_nombre && n(e.fcbq_nombre) === n(nombreFCBQ));

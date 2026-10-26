@@ -9,7 +9,7 @@ type Act = {
   ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; material: string | null; pizarra: unknown; preview: string | null } | null;
 };
 
-export const metadata = { title: "Entreno · Turó Coach" };
+export const metadata = { title: "Entreno · Coach Manager CBTuró" };
 
 export default async function ImprimirEntreno({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

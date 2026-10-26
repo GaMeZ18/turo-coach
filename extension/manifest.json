@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Turó Coach · FCBQ",
-  "version": "1.5.0",
-  "description": "Botón «Actualizar desde la FCBQ» de Turó Coach: trae partidos, resultados y clasificaciones de basquetcatala.cat.",
+  "name": "Coach Manager CBTuró · FCBQ",
+  "version": "1.5.1",
+  "description": "Botón «Actualizar desde la FCBQ» de Coach Manager CBTuró: trae partidos, resultados y clasificaciones de basquetcatala.cat.",
   "permissions": [
     "scripting",
     "tabs",

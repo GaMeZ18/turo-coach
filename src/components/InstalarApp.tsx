@@ -59,7 +59,7 @@ export default function InstalarApp({ variante = "aviso" }: { variante?: "aviso"
     ) : plataforma === "mac-safari" ? (
       <>En Safari: menú <strong>Archivo → Añadir al Dock</strong>.</>
     ) : plataforma === "chromium" ? (
-      <>En Chrome o Edge: icono de instalar en la barra de direcciones, o menú ⋮ → <strong>Instalar Turó Coach</strong>.</>
+      <>En Chrome o Edge: icono de instalar en la barra de direcciones, o menú ⋮ → <strong>Instalar Coach Manager CBTuró</strong>.</>
     ) : (
       <>Abre esta web en Chrome, Edge o Safari para instalarla.</>
     );
@@ -68,7 +68,7 @@ export default function InstalarApp({ variante = "aviso" }: { variante?: "aviso"
     return (
       <div className="space-y-2 text-sm">
         {evento ? (
-          <button onClick={instalar} className="btn-primario"><Download size={16} /> Instalar Turó Coach</button>
+          <button onClick={instalar} className="btn-primario"><Download size={16} /> Instalar Coach Manager CBTuró</button>
         ) : (
           <p className="text-tinta/70">{instrucciones}</p>
         )}
@@ -83,7 +83,7 @@ export default function InstalarApp({ variante = "aviso" }: { variante?: "aviso"
     <div className="tarjeta mb-4 flex items-center gap-3 border-l-4 !border-l-oro p-3">
       <img src="/icons/icon-192.png" alt="" className="h-10 w-10 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1 text-sm">
-        <p className="font-semibold text-azul">Instala Turó Coach</p>
+        <p className="font-semibold text-azul">Instala Coach Manager CBTuró</p>
         <p className="text-tinta/70">{evento ? "Tenla a mano como una app más, con su icono." : instrucciones}</p>
       </div>
       {evento && <button onClick={instalar} className="btn-primario shrink-0 !py-1.5"><Download size={16} /> Instalar</button>}
