@@ -143,7 +143,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
       setNumStats(n);
       // Si no ha llegado la jugada a jugada, lo explicamos en el detalle (para poder arreglarlo)
       if (n && !conJugada) {
-        setAvisos((a) => [...a, "No ha llegado la jugada a jugada (sin sinergias). Abre «Detalle de lo leído» y pásale el informe a quien mantiene la app."]);
+        setAvisos((a) => [...a, "La FCBQ no ha publicado la jugada a jugada de estos partidos: las sinergias se estiman con los minutos y el +/- oficial."]);
         setInforme((t) => `${t}\nJugada a jugada: ${JSON.stringify(muestra ?? "sin muestra").slice(0, 1500)}`);
       }
       if (pendientesFCBQ > 0) setAvisos((a) => [...a, `Quedan ${pendientesFCBQ} partidos por descargar: vuelve a pulsar Actualizar.`]);

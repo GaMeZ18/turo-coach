@@ -174,12 +174,18 @@ async function apiStats(ids) {
       delete j.playByPlay;
       // Jugada a jugada (marcador en cada momento): para quintetos, parejas y on/off
       try {
-        const q = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/pbp?currentSeason=true`, {
-          headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
-        });
-        if (q.ok) {
-          const pj = await q.json();
-          const ev = Array.isArray(pj) ? pj : pj.playByPlay || pj.events || pj.data || pj.moves || [];
+        // La jugada a jugada puede estar en /pbp o en /moves (y a veces viene vacía)
+        let q = null, pj = null, ev = [];
+        for (const ruta of ["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"]) {
+          q = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/${ruta}`, {
+            headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
+          }).catch(() => null);
+          if (!q || !q.ok) continue;
+          pj = await q.json().catch(() => null);
+          ev = !pj ? [] : Array.isArray(pj) ? pj : pj.playByPlay || pj.events || pj.data || pj.moves || [];
+          if (ev.length) break;
+        }
+        if (q && q.ok && pj) {
           const num = (...xs) => { for (const x of xs) { if (x !== undefined && x !== null && x !== "" && !isNaN(Number(x))) return Number(x); } return undefined; };
           // Nombres de la FCBQ: eventTypeCode, period, minute, second, localScore, visitorScore (con alternativas)
           j.pbp = ev.map((e) => {
