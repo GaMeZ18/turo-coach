@@ -238,12 +238,14 @@ export async function programarEntrenos(formData: FormData) {
     const semana = ((d.getUTCDay() + 6) % 7) + 1;
     if (!dias.includes(semana) || ocupados.has(dia)) continue;
     filas.push({ equipo_id: equipo, fecha: aISO(dia, hora), titulo, duracion_prevista: dur, lugar });
-    if (filas.length >= 120) break;
+    if (filas.length >= 400) break;
   }
   if (filas.length) {
-    const { data: creados, error } = await supabase.from("entrenamientos").insert(filas).select("id");
-    if (error) throw new Error(error.message);
-    if (plantilla) for (const c of creados ?? []) await copiarPlantilla(supabase, plantilla, c.id);
+    for (let i = 0; i < filas.length; i += 100) {
+      const { data: creados, error } = await supabase.from("entrenamientos").insert(filas.slice(i, i + 100)).select("id");
+      if (error) throw new Error(error.message);
+      if (plantilla) for (const c of creados ?? []) await copiarPlantilla(supabase, plantilla, c.id);
+    }
   }
   revalidatePath("/entrenamientos");
   revalidatePath("/calendario");

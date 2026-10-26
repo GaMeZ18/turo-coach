@@ -18,17 +18,21 @@ export default async function EntrenamientosPage() {
   if (!equipo) return <SinEquipo que="sus entrenamientos" />;
 
   const { data: plantillas } = await supabase.from("plantillas_entreno").select("id, nombre, equipo_id, duracion_prevista").order("nombre");
-  const { data } = await supabase
-    .from("entrenamientos")
-    .select("id, fecha, titulo, duracion_prevista, lugar, entreno_actividades(duracion)")
-    .eq("equipo_id", equipo.id)
-    .order("fecha", { ascending: false })
-    .limit(60);
-
-  const ahora = Date.now() - 3 * 3600 * 1000; // un entreno de hoy sigue en "próximos" un rato
-  const lista = (data ?? []) as Entreno[];
-  const proximos = lista.filter((e) => new Date(e.fecha).getTime() >= ahora).reverse();
-  const pasados = lista.filter((e) => new Date(e.fecha).getTime() < ahora);
+  // Próximos en orden y pasados recientes (por separado, para que no se coman unos a otros)
+  const ahoraIso = new Date(Date.now() - 3 * 3600 * 1000).toISOString(); // un entreno de hoy sigue en "próximos" un rato
+  const columnas = "id, fecha, titulo, duracion_prevista, lugar, entreno_actividades(duracion)";
+  const [{ data: futuros }, { data: anteriores }] = await Promise.all([
+    supabase.from("entrenamientos").select(columnas).eq("equipo_id", equipo.id).gte("fecha", ahoraIso).order("fecha").limit(300),
+    supabase.from("entrenamientos").select(columnas).eq("equipo_id", equipo.id).lt("fecha", ahoraIso).order("fecha", { ascending: false }).limit(60),
+  ]);
+  const proximos = (futuros ?? []) as Entreno[];
+  const pasados = (anteriores ?? []) as Entreno[];
+  // Los próximos, agrupados por mes
+  const porMes = new Map<string, Entreno[]>();
+  for (const e of proximos) {
+    const k = new Date(e.fecha).toLocaleDateString("es-ES", { month: "long", year: "numeric", timeZone: "Europe/Madrid" });
+    porMes.set(k, [...(porMes.get(k) ?? []), e]);
+  }
 
   const Tarjeta = ({ e }: { e: Entreno }) => {
     const total = e.entreno_actividades.reduce((s, a) => s + a.duracion, 0);
@@ -114,7 +118,12 @@ export default async function EntrenamientosPage() {
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-tinta/60">Próximos</h2>
       <div className="mt-2 space-y-2">
-        {proximos.map((e) => <Tarjeta key={e.id} e={e} />)}
+        {[...porMes.entries()].map(([mes, es], i) => (
+          <details key={mes} open={i < 2} className="space-y-2">
+            <summary className="cursor-pointer text-xs font-semibold capitalize text-tinta/50">{mes} · {es.length} entrenos</summary>
+            <div className="space-y-2">{es.map((e) => <Tarjeta key={e.id} e={e} />)}</div>
+          </details>
+        ))}
         {proximos.length === 0 && <p className="text-sm text-tinta/50">No hay entrenos programados.</p>}
       </div>
 
