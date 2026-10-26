@@ -18,7 +18,7 @@ export interface JugadorStats {
   fc: number;
   mm: number;          // +/- con el jugador en pista
   periodos: number[];  // periodos en los que ha jugado
-  tramos?: [number, number][]; // segundos de partido en pista [inicio, fin]
+  tramos?: number[][];          // en pista: [inicio, fin, +/- en ese tramo] (segundos de partido)
 }
 export interface EquipoStats {
   nombre: string;
@@ -43,12 +43,12 @@ export interface StatsPartido {
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 3;
+export const VERSION_STATS = 4;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };
 type EqFCBQ = { name?: string; accumulated?: Acum; players?: JugFCBQ[] };
-type Stint = { startSeconds?: number; endSeconds?: number };
+type Stint = { startSeconds?: number; endSeconds?: number; computed?: { onCourtPlusMinus?: number } };
 type FCBQ = {
   stints?: { local?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[]; visitor?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[] };
   pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null }[];
@@ -82,7 +82,7 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
         mm: n(p.computed?.onCourtPlusMinus), periodos: jugados,
         tramos: (d.stints?.[lado] ?? [])
           .find((x) => (p.uuid && x.uuid === p.uuid) || (x.actorName === p.name && String(x.dorsal) === String(p.dorsal)))
-          ?.stints?.map((t) => [n(t.startSeconds), n(t.endSeconds)] as [number, number]).filter(([a, b]) => b > a),
+          ?.stints?.map((t) => [n(t.startSeconds), n(t.endSeconds), n(t.computed?.onCourtPlusMinus)]).filter(([a, b]) => b > a),
       };
     });
     const nombre = String((lado === "local" ? d.header?.localTeam?.name : d.header?.visitorTeam?.name) ?? eq.name ?? "").trim();
@@ -105,8 +105,9 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
     visitante: equipo("visitor"),
     ...(() => {
       const m = d.pbp?.length ? lineaMarcador(d.pbp) : [];
-      // Solo vale si el marcador avanza (si no, se volverá a descargar)
-      return m.length > 1 ? { v: VERSION_STATS, marcador: m } : { v: 1 };
+      // Con marcador (jugada a jugada) o, si no lo hay, con los tramos en pista y su +/- (sinergias estimadas)
+      const conTramos = (d.stints?.local?.length ?? 0) > 0;
+      return m.length > 1 ? { v: VERSION_STATS, marcador: m } : { v: conTramos ? VERSION_STATS : 1 };
     })(),
   };
 }
@@ -135,27 +136,41 @@ export interface OnOff { nombre: string; dorsal: string; segOn: number; pfOn: nu
 /** Para un equipo: minutos y puntos a favor y en contra de cada quinteto, cada pareja y cada jugador en pista / en el banquillo */
 export function sinergias(nombre: string, partidos: StatsPartido[]) {
   const quintetos = new Map<string, Unidad>(), parejas = new Map<string, Unidad>(), onoff = new Map<string, OnOff>();
-  let conDatos = 0;
+  let conDatos = 0, estimado = false;
   for (const s of partidos) {
     const lado = mismoEquipo(s.local.nombre, nombre) ? "local" : mismoEquipo(s.visitante.nombre, nombre) ? "visitante" : null;
-    if (!lado || (s.marcador?.length ?? 0) < 2) continue;
+    if (!lado) continue;
+    const otro = lado === "local" ? "visitante" : "local";
     const jug = s[lado].jugadores.filter((j) => j.tramos?.length);
     if (!jug.length) continue;
+    const exacto = (s.marcador?.length ?? 0) > 1;
+    const conMas = jug.some((j) => j.tramos!.some((t) => t.length > 2));
+    if (!exacto && !conMas) continue;
     conDatos++;
-    const linea = s.marcador!;
-    const marcadorEn = (t: number) => { let r = linea[0]; for (const x of linea) { if (x[0] <= t) r = x; else break; } return r; };
-    const nuestros = (x: [number, number, number]) => (lado === "local" ? [x[1], x[2]] : [x[2], x[1]]);
-    // Cortes: cada cambio de jugadores
-    const cortes = [...new Set(jug.flatMap((j) => j.tramos!.flat()))].sort((a, b) => a - b);
-    const total = { seg: 0, pf: 0, pc: 0 };
-    const enPistaSeg = new Map<string, { seg: number; pf: number; pc: number }>();
-    for (let i = 0; i + 1 < cortes.length; i++) {
-      const t0 = cortes[i], t1 = cortes[i + 1];
-      const pista = jug.filter((j) => j.tramos!.some(([a, b]) => a <= t0 && b >= t1));
-      if (!pista.length) continue;
-      const [f0, c0] = nuestros(marcadorEn(t0)), [f1, c1] = nuestros(marcadorEn(t1));
-      const seg = t1 - t0, pf = f1 - f0, pc = c1 - c0;
-      total.seg += seg; total.pf += pf; total.pc += pc;
+    if (!exacto) estimado = true;
+
+    const fin = Math.max(...s.local.jugadores.concat(s.visitante.jugadores).flatMap((j) => (j.tramos ?? []).map((t) => t[1])));
+    const nP = Math.max(1, s.numPeriodos || s.local.porPeriodo.length || 4);
+    const limites = Array.from({ length: nP + 1 }, (_, i) => Math.round((fin * i) / nP));
+    const cortes = [...new Set([...limites, ...s.local.jugadores.concat(s.visitante.jugadores).flatMap((j) => (j.tramos ?? []).flatMap((t) => [t[0], t[1]]))])].sort((a, b) => a - b);
+    const tramosSeg = cortes.slice(0, -1).map((t0, i) => [t0, cortes[i + 1]] as const);
+
+    // Diferencia de marcador (a nuestro favor) en cada tramo: exacta con la jugada a jugada o estimada
+    let difs: { pf: number; pc: number }[];
+    if (exacto) {
+      const linea = s.marcador!;
+      const marcadorEn = (t: number) => { let r = linea[0]; for (const x of linea) { if (x[0] <= t) r = x; else break; } return r; };
+      const nuestros = (x: [number, number, number]) => (lado === "local" ? [x[1], x[2]] : [x[2], x[1]]);
+      difs = tramosSeg.map(([t0, t1]) => { const [f0, c0] = nuestros(marcadorEn(t0)), [f1, c1] = nuestros(marcadorEn(t1)); return { pf: f1 - f0, pc: c1 - c0 }; });
+    } else {
+      difs = estimarDiferencias(s, lado, otro, tramosSeg, limites).map((d) => ({ pf: d, pc: 0 }));
+    }
+
+    const enPista = (j: JugadorStats, t0: number, t1: number) => j.tramos!.some((t) => t[0] <= t0 && t[1] >= t1);
+    tramosSeg.forEach(([t0, t1], i) => {
+      const pista = jug.filter((j) => enPista(j, t0, t1));
+      if (!pista.length) return;
+      const seg = t1 - t0, { pf, pc } = difs[i];
       const nombres = pista.map((j) => j.nombre).sort();
       const sumar = (m: Map<string, Unidad>, js: string[]) => {
         const k = js.join("|");
@@ -164,21 +179,53 @@ export function sinergias(nombre: string, partidos: StatsPartido[]) {
       };
       if (nombres.length === 5) sumar(quintetos, nombres);
       for (let a = 0; a < nombres.length; a++) for (let b = a + 1; b < nombres.length; b++) sumar(parejas, [nombres[a], nombres[b]]);
-      for (const j of pista) {
-        const e = enPistaSeg.get(j.nombre) ?? { seg: 0, pf: 0, pc: 0 };
-        e.seg += seg; e.pf += pf; e.pc += pc; enPistaSeg.set(j.nombre, e);
-      }
-    }
+    });
+
+    // On/off: con el +/- y los minutos oficiales de cada jugador (exacto aunque no haya jugada a jugada)
+    const difTotal = s[lado].pts - s[otro].pts;
     for (const j of jug) {
-      const e = enPistaSeg.get(j.nombre) ?? { seg: 0, pf: 0, pc: 0 };
+      const segOn = j.tramos!.reduce((t, x) => t + (x[1] - x[0]), 0);
       const o = onoff.get(j.nombre) ?? { nombre: j.nombre, dorsal: j.dorsal, segOn: 0, pfOn: 0, pcOn: 0, segOff: 0, pfOff: 0, pcOff: 0 };
-      o.segOn += e.seg; o.pfOn += e.pf; o.pcOn += e.pc;
-      o.segOff += total.seg - e.seg; o.pfOff += total.pf - e.pf; o.pcOff += total.pc - e.pc;
+      o.segOn += segOn; o.pfOn += j.mm;
+      o.segOff += Math.max(0, fin - segOn); o.pfOff += difTotal - j.mm;
       onoff.set(j.nombre, o);
     }
   }
   const orden = (m: Map<string, Unidad>) => [...m.values()].sort((a, b) => b.seg - a.seg);
-  return { quintetos: orden(quintetos), parejas: orden(parejas), onoff: [...onoff.values()].sort((a, b) => b.segOn - a.segOn), partidos: conDatos };
+  return { quintetos: orden(quintetos), parejas: orden(parejas), onoff: [...onoff.values()].sort((a, b) => b.segOn - a.segOn), partidos: conDatos, estimado };
+}
+
+/** Sin jugada a jugada: estima la diferencia de marcador de cada tramo con mínimos cuadrados,
+ *  a partir del +/- oficial de cada tramo en pista de los jugadores de los dos equipos y del parcial de cada periodo. */
+function estimarDiferencias(s: StatsPartido, lado: "local" | "visitante", otro: "local" | "visitante", seg: readonly (readonly [number, number])[], limites: number[]) {
+  const n = seg.length;
+  const filas: { c: number[]; b: number; w: number }[] = [];
+  const dentro = (a: number, b: number) => seg.map(([t0, t1]) => (t0 >= a && t1 <= b ? 1 : 0));
+  for (const j of s[lado].jugadores) for (const t of j.tramos ?? []) if (t.length > 2) filas.push({ c: dentro(t[0], t[1]), b: t[2], w: 1 });
+  for (const j of s[otro].jugadores) for (const t of j.tramos ?? []) if (t.length > 2) filas.push({ c: dentro(t[0], t[1]), b: -t[2], w: 1 });
+  const pf = s[lado].porPeriodo, pc = s[otro].porPeriodo;
+  for (let i = 0; i + 1 < limites.length && i < pf.length; i++) filas.push({ c: dentro(limites[i], limites[i + 1]), b: pf[i] - (pc[i] ?? 0), w: 3 });
+  filas.push({ c: seg.map(() => 1), b: s[lado].pts - s[otro].pts, w: 4 });
+  // (AᵀWA + λI) x = AᵀWb
+  const M = Array.from({ length: n }, () => new Array(n + 1).fill(0));
+  for (const f of filas) for (let a = 0; a < n; a++) {
+    if (!f.c[a]) continue;
+    for (let b = 0; b < n; b++) if (f.c[b]) M[a][b] += f.w;
+    M[a][n] += f.w * f.b;
+  }
+  for (let a = 0; a < n; a++) M[a][a] += 0.05;
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    const d = M[col][col] || 1e-9;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const k = M[r][col] / d;
+      if (k) for (let c = col; c <= n; c++) M[r][c] -= k * M[col][c];
+    }
+  }
+  return M.map((fila, i) => fila[n] / (M[i][i] || 1e-9));
 }
 
 /** +/- cada 10 minutos */

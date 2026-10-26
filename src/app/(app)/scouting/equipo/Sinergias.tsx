@@ -9,7 +9,7 @@ const min = (seg: number) => `${Math.floor(seg / 60)}:${String(Math.round(seg % 
 const signo = (x: number | null, dec = 1) => (x === null ? "–" : `${x > 0 ? "+" : ""}${x.toFixed(dec)}`);
 const color = (x: number | null) => (x === null ? "" : x > 0 ? "text-green-700" : x < 0 ? "text-rojo" : "");
 
-function TablaUnidades({ titulo, ayuda, unidades }: { titulo: string; ayuda: string; unidades: Unidad[] }) {
+function TablaUnidades({ titulo, ayuda, unidades, estimado }: { titulo: string; ayuda: string; unidades: Unidad[]; estimado: boolean }) {
   return (
     <div className="tarjeta overflow-x-auto">
       <div className="px-3 pt-3">
@@ -31,8 +31,8 @@ function TablaUnidades({ titulo, ayuda, unidades }: { titulo: string; ayuda: str
               <tr key={u.jugadores.join("|")} className="border-t border-linea">
                 <td className="px-2 py-1.5">{u.jugadores.map(corto).join(" · ")}</td>
                 <td className="px-2 py-1.5 text-center">{min(u.seg)}</td>
-                <td className="px-2 py-1.5 text-center">{u.pf}-{u.pc}</td>
-                <td className={`px-2 py-1.5 text-center font-semibold ${color(u.pf - u.pc)}`}>{signo(u.pf - u.pc, 0)}</td>
+                <td className="px-2 py-1.5 text-center">{estimado ? "–" : `${u.pf}-${u.pc}`}</td>
+                <td className={`px-2 py-1.5 text-center font-semibold ${color(u.pf - u.pc)}`}>{estimado ? "≈" : ""}{signo(u.pf - u.pc, 0)}</td>
                 <td className={`px-2 py-1.5 text-center ${color(p)}`}>{signo(p)}</td>
               </tr>
             );
@@ -62,7 +62,9 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
     <section>
       <h2 className="text-sm font-semibold uppercase tracking-wide text-tinta/60">Sinergias</h2>
       <p className="text-xs text-tinta/50">
-        Calculado con la jugada a jugada de la FCBQ ({s.partidos} de {pj} partidos). La FCBQ no publica los tiros fallados, así que se mide con puntos y +/-, no con posesiones.
+        {s.estimado
+          ? <>On/off exacto con el +/- oficial. Quintetos y parejas <strong>estimados</strong> (≈) a partir de los minutos en pista y el +/- de cada tramo, porque la FCBQ no publica la jugada a jugada de estos partidos ({s.partidos} de {pj}).</>
+          : <>Calculado con la jugada a jugada de la FCBQ ({s.partidos} de {pj} partidos). La FCBQ no publica los tiros fallados, así que se mide con puntos y +/-, no con posesiones.</>}
       </p>
 
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -112,8 +114,8 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
               </tbody>
             </table>
           </div>
-          <TablaUnidades titulo="Quintetos" ayuda="Los más utilizados (más de 2 minutos juntos)." unidades={s.quintetos.filter((q) => q.seg >= 120).slice(0, 12)} />
-          <TablaUnidades titulo="Parejas" ayuda="Las parejas que más minutos comparten en pista." unidades={s.parejas.slice(0, 15)} />
+          <TablaUnidades titulo="Quintetos" ayuda="Los más utilizados (más de 2 minutos juntos)." unidades={s.quintetos.filter((q) => q.seg >= 120).slice(0, 12)} estimado={s.estimado} />
+          <TablaUnidades titulo="Parejas" ayuda="Las parejas que más minutos comparten en pista." unidades={s.parejas.slice(0, 15)} estimado={s.estimado} />
         </div>
       )}
     </section>
