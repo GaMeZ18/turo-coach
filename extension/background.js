@@ -5,7 +5,8 @@
 // Todo ocurre en el navegador del usuario, como si navegara él.
 
 const FCBQ = "https://www.basquetcatala.cat";
-const APP = "https://turo-coach1.vercel.app";
+const APP_POR_DEFECTO = "https://coach.cbturo.com";
+const app = async () => (await chrome.storage.local.get("app")).app || APP_POR_DEFECTO;
 
 // ---------- Actualización automática: cada lunes a las 6:00 ----------
 // El ordenador tiene que estar encendido con el navegador abierto (y la sesión de Turó Coach iniciada).
@@ -24,7 +25,7 @@ async function programar() {
 }
 async function lanzarAuto() {
   await chrome.storage.local.set({ ultimaAuto: Date.now() });
-  const tab = await chrome.tabs.create({ url: `${APP}/partidos/importar?auto=1`, active: false });
+  const tab = await chrome.tabs.create({ url: `${await app()}/partidos/importar?auto=1`, active: false });
   await chrome.storage.local.set({ pestanaAuto: tab.id });
 }
 async function revisarPendiente() {
@@ -42,6 +43,7 @@ chrome.alarms.onAlarm.addListener(async (a) => {
 });
 // La página avisa cuando ha terminado: cerramos la pestaña que abrimos nosotros
 chrome.runtime.onMessage.addListener(async (m, sender) => {
+  if (m?.tipo === "origen" && typeof m.url === "string" && /^https:\/\//.test(m.url)) { await chrome.storage.local.set({ app: m.url }); return; }
   if (m?.tipo !== "terminado" || !sender.tab?.id) return;
   const { pestanaAuto } = await chrome.storage.local.get("pestanaAuto");
   if (pestanaAuto === sender.tab.id) {
