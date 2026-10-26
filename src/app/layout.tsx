@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed, Graduate } from "next/font/google";
 import "./globals.css";
+import { cookies } from "next/headers";
+import Traductor from "@/components/Traductor";
 
 const barlow = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-barlow" });
 const barlowCondensed = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-barlow-condensed" });
@@ -21,10 +23,18 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const idioma = (await cookies()).get("idioma")?.value === "ca" ? "ca" : "es";
   return (
-    <html lang="es" className={`${barlow.variable} ${barlowCondensed.variable} ${graduate.variable}`}>
-      <body className="min-h-dvh font-sans antialiased">{children}</body>
+    <html lang={idioma} data-idioma={idioma} suppressHydrationWarning className={`${barlow.variable} ${barlowCondensed.variable} ${graduate.variable}`}>
+      <body className="min-h-dvh font-sans antialiased">
+        {idioma === "ca" && (
+          // Mientras se traduce, no se ve la página en castellano (como mucho 1,5 s)
+          <script dangerouslySetInnerHTML={{ __html: "setTimeout(function(){document.documentElement.setAttribute('data-traducido','1')},1500)" }} />
+        )}
+        {children}
+        <Traductor idioma={idioma} />
+      </body>
     </html>
   );
 }

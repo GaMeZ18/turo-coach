@@ -107,6 +107,9 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Idioma (castellano / catalán)
+- Botones **ES / CA** en la cabecera, en *Mi cuenta* y en el acceso (se guarda en una cookie). En catalán, `<Traductor/>` traduce la interfaz con el diccionario `src/lib/ca.ts` (coincidencia exacta de cada texto, también fechas); lo que escribe cada usuario no se toca. Para traducir un texto nuevo, añádelo al diccionario.
+
 ### Avisos
 - Campana arriba con los avisos sin leer (`/notificaciones`). Al actualizar desde la FCBQ se avisa al cuerpo técnico de cada equipo (y al coordinador) de cambios de horario o de pista, aplazamientos y resultados nuevos.
 - Avisos push en el móvil/ordenador: botón «Activar avisos» en `/notificaciones` (en iPhone, con la app instalada). Necesita la variable de entorno `VAPID_PRIVATE_KEY` en Vercel (la pública está en `src/lib/notificar.ts`).
@@ -139,4 +142,3 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 ## Próximas fases
 - Partidos y scouting (rivales, notas, control de periodos de minibásquet, informe PDF)
 - Vídeo (etiquetado por categorías y descriptores)
-- Catalán como segundo idioma

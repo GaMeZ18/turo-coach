@@ -80,3 +80,6 @@ h1 {
 .tarjeta {
   @apply rounded-xl border border-linea bg-white;
 }
+
+/* Catalán: ocultar la página hasta que esté traducida (lo hace <Traductor/>) */
+html[data-idioma="ca"]:not([data-traducido]) body { visibility: hidden; }

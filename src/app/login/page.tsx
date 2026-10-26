@@ -1,6 +1,7 @@
 import { entrar, enviarEnlace } from "./actions";
 import SesionDesdeEnlace from "./SesionDesdeEnlace";
 import Enviar from "@/components/Enviar";
+import SelectorIdioma from "@/components/SelectorIdioma";
 
 export default async function LoginPage({
   searchParams,
@@ -52,6 +53,7 @@ export default async function LoginPage({
           <p className="mt-4 text-center text-xs text-white/40">
             Acceso solo por invitación del coordinador del club.
           </p>
+          <div className="mt-3 flex justify-center"><SelectorIdioma oscuro /></div>
         </div>
       </div>
     </main>

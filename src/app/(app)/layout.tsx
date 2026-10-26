@@ -4,6 +4,7 @@ import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
 import RegistrarSW from "@/components/RegistrarSW";
+import SelectorIdioma from "@/components/SelectorIdioma";
 import { salir } from "@/app/login/actions";
 import { Bell, LogOut, UserRound } from "lucide-react";
 
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <SelectorEquipo equipos={equipos} activoId={activo?.id ?? null} />
+            <div className="hidden sm:block"><SelectorIdioma oscuro /></div>
             <Link href="/notificaciones" className="relative rounded-lg p-1.5 hover:bg-white/10" title="Avisos">
               <Bell size={20} />
               {sinLeer > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rojo px-1 text-[10px] font-bold">{sinLeer > 9 ? "9+" : sinLeer}</span>}
