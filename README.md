@@ -110,7 +110,7 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 ### Biblioteca
 - Ejercicios y sistemas del club, por categorías, con filtro por edad (Mini, Infantil, Cadete, Junior, Sénior), tipo y texto, y la pizarra dibujada en cada tarjeta.
 - Cada entrenador decide al crear o editar un ejercicio si lo publica («Publicar en la Biblioteca del club»), y puede quitarlo después.
-- El coordinador carga los 38 ejercicios iniciales (`src/lib/biblioteca-semilla.ts`, con su pizarra) con un botón.
+- El coordinador carga los ejercicios iniciales (incluye sistemas habituales en ACB y ejercicios avanzados) (`src/lib/biblioteca-semilla.ts`, con su pizarra) con un botón.
 
 > Requiere ejecutar `0007_biblioteca.sql`.
 
