@@ -60,7 +60,7 @@ export default async function EjerciciosPage({
         <button className="btn-secundario">Filtrar</button>
       </form>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
         {lista.map((e) => (
           <Link key={e.id} href={`/ejercicios/${e.id}`} className="tarjeta overflow-hidden transition hover:shadow-md">
             <div className="flex aspect-[15/14] items-center justify-center bg-suave">

@@ -36,9 +36,6 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
   const lista = (data ?? []) as unknown as Ej[];
   const filtrando = !!(q || cat || edad || tipo);
 
-  // Agrupado por categoría
-  const grupos = new Map<string, Ej[]>();
-  for (const e of lista) grupos.set(e.categoria ?? "Otros", [...(grupos.get(e.categoria ?? "Otros") ?? []), e]);
 
   return (
     <div>
@@ -85,35 +82,31 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
             </form>
           )}
 
-          {[...grupos.entries()].map(([nombre, ejs]) => (
-            <section key={nombre} className="mt-7">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-tinta/60">{nombre} <span className="font-normal text-tinta/40">· {ejs.length}</span></h2>
-              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {ejs.map((e) => (
-                  <Link key={e.id} href={`/ejercicios/${e.id}`} className="tarjeta group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
-                    <div className="flex aspect-[15/14] items-center justify-center bg-suave">
-                      {e.preview ? <img src={e.preview} alt="" className="h-full w-full object-contain" loading="lazy" />
-                        : e.pizarra ? <MiniPizarra pizarra={e.pizarra} className="h-full w-full" />
-                        : <span className="text-xs text-tinta/40">Sin pizarra</span>}
+          {/* Una sola rejilla de 3 columnas (ordenada por categoría) para que no queden huecos */}
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+            {lista.map((e) => (
+              <Link key={e.id} href={`/ejercicios/${e.id}`} className="tarjeta group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
+                <div className="flex aspect-[15/14] items-center justify-center bg-suave">
+                  {e.preview ? <img src={e.preview} alt="" className="h-full w-full object-contain" loading="lazy" />
+                    : e.pizarra ? <MiniPizarra pizarra={e.pizarra} className="h-full w-full" />
+                    : <span className="text-xs text-tinta/40">Sin pizarra</span>}
+                </div>
+                <div className="p-2 sm:p-3">
+                  <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-rojo sm:text-[11px]">{e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}</p>
+                  <h3 className="line-clamp-2 text-xs font-semibold group-hover:text-azul sm:text-sm">{e.titulo}</h3>
+                  <p className="mt-1 hidden flex-wrap items-center gap-x-2 text-xs text-tinta/60 sm:flex">
+                    {e.duracion ? <span className="inline-flex items-center gap-0.5"><Timer size={11} /> {e.duracion}′</span> : null}
+                    {e.jugadores_min ? <span className="inline-flex items-center gap-0.5"><Users size={11} /> {e.jugadores_min}</span> : null}
+                  </p>
+                  {e.edades?.length > 0 && (
+                    <div className="mt-1.5 hidden flex-wrap gap-1 sm:flex">
+                      {e.edades.map((x) => <span key={x} className="rounded-full bg-azul/10 px-1.5 py-0.5 text-[10px] font-medium text-azul">{x}</span>)}
                     </div>
-                    <div className="p-3">
-                      <h3 className="line-clamp-2 text-sm font-semibold group-hover:text-azul">{e.titulo}</h3>
-                      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-tinta/60">
-                        {e.duracion ? <span className="inline-flex items-center gap-0.5"><Timer size={11} /> {e.duracion}′</span> : null}
-                        {e.jugadores_min ? <span className="inline-flex items-center gap-0.5"><Users size={11} /> {e.jugadores_min}</span> : null}
-                        {e.tipo === "sistema" && <span className="font-semibold text-rojo">Sistema</span>}
-                      </p>
-                      {e.edades?.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {e.edades.map((x) => <span key={x} className="rounded-full bg-azul/10 px-1.5 py-0.5 text-[10px] font-medium text-azul">{x}</span>)}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))}
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
           {lista.length === 0 && (
             <p className="mt-8 text-center text-sm text-tinta/50">
               {filtrando ? "No hay ejercicios con esos filtros." : "Todavía no hay ejercicios en la biblioteca."}
