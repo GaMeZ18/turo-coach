@@ -45,6 +45,10 @@ export default async function ImportarPage() {
           <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que has descomprimido.</li>
           <li>Recarga esta página: el botón <strong>Actualizar desde la FCBQ</strong> ya funcionará.</li>
         </ol>
+        <p className="mt-3 rounded-lg bg-oro/15 p-2 text-xs text-tinta/70">
+          <strong>Automático:</strong> desde la versión 1.3, la extensión actualiza sola <strong>cada lunes a las 6:00</strong> si el ordenador está encendido con el navegador abierto
+          y la sesión de Turó Coach iniciada. Si a esa hora estaba apagado, lo hace al abrir el navegador. Si la FCBQ pide verificación, la pestaña se queda esperando a que la resuelvas.
+        </p>
         <p className="mt-3 text-xs text-tinta/50">
           Al pulsarlo se abre una pestaña de basquetcatala.cat; si sale la verificación, resuélvela y la extensión sigue sola. Lee el calendario del club de toda la temporada,
           los resultados y las clasificaciones de cada equipo, lo guarda aquí y cierra la pestaña.

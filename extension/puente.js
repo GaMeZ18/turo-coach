@@ -6,6 +6,7 @@ window.addEventListener("message", (e) => {
     window.postMessage({ tipo: "turo-fcbq-pong", version: chrome.runtime.getManifest().version }, location.origin);
     return;
   }
+  if (e.data.tipo === "turo-fcbq-terminado") { chrome.runtime.sendMessage({ tipo: "terminado", ok: !!e.data.ok }); return; }
   if (e.data.tipo !== "turo-fcbq-pedir" && e.data.tipo !== "turo-fcbq-pedir-stats") return;
   const puerto = chrome.runtime.connect({ name: "fcbq" });
   puerto.onMessage.addListener((m) => window.postMessage({ ...m, tipo: "turo-fcbq-" + m.tipo }, location.origin));

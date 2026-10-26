@@ -144,7 +144,10 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
       if (e.source !== window || !e.data || typeof e.data.tipo !== "string" || !e.data.tipo.startsWith("turo-fcbq-")) return;
       const d = e.data as { tipo: string; texto?: string; paginas?: Pagina[]; avisos?: string[]; stats?: Record<string, unknown>; pendientes?: number };
       if (d.tipo === "turo-fcbq-stats") { recibido = true; guardarStatsRef.current(d.stats ?? {}, d.pendientes ?? 0); }
-      if (d.tipo === "turo-fcbq-pong") { respondio = true; setInstalada(true); }
+      if (d.tipo === "turo-fcbq-pong") {
+        if (!respondio && /[?&]auto=1/.test(location.search) && !autoLanzado.current) { autoLanzado.current = true; setTimeout(() => actualizarRef.current(), 300); }
+        respondio = true; setInstalada(true);
+      }
       if (d.tipo === "turo-fcbq-progreso") setTexto(d.texto ?? "");
       if (d.tipo === "turo-fcbq-error") {
         // Si falla solo la parte de estadísticas, lo demás ya está guardado
@@ -189,6 +192,13 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     return () => { clearTimeout(t); clearTimeout(t1); window.removeEventListener("message", alRecibir); };
   }, []);
 
+  // Modo automático (?auto=1): lo abre la extensión los lunes a las 6:00; al acabar se cierra sola
+  const autoLanzado = useRef(false);
+  useEffect(() => {
+    if (!autoLanzado.current || (estado !== "hecho" && estado !== "error")) return;
+    window.postMessage({ tipo: "turo-fcbq-terminado", ok: estado === "hecho" }, location.origin);
+  }, [estado]);
+
   const actualizar = () => {
     setEstado("trabajando");
     setResultado(null);
@@ -199,6 +209,8 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     window.postMessage({ tipo: "turo-fcbq-inicio" }, location.origin);
     window.postMessage({ tipo: "turo-fcbq-pedir", club: CLUB }, location.origin);
   };
+  const actualizarRef = useRef(actualizar);
+  actualizarRef.current = actualizar;
 
   if (instalada === false) {
     return (

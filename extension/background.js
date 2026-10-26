@@ -5,6 +5,50 @@
 // Todo ocurre en el navegador del usuario, como si navegara él.
 
 const FCBQ = "https://www.basquetcatala.cat";
+const APP = "https://turo-coach1.vercel.app";
+
+// ---------- Actualización automática: cada lunes a las 6:00 ----------
+// El ordenador tiene que estar encendido con el navegador abierto (y la sesión de Turó Coach iniciada).
+// Si a esa hora estaba apagado, se hace en cuanto se abra el navegador.
+function proximoLunes6() {
+  const d = new Date();
+  d.setHours(6, 0, 0, 0);
+  const faltan = (1 - d.getDay() + 7) % 7; // 1 = lunes
+  d.setDate(d.getDate() + faltan);
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 7);
+  return d.getTime();
+}
+async function programar() {
+  await chrome.alarms.clear("fcbq-semanal");
+  chrome.alarms.create("fcbq-semanal", { when: proximoLunes6() });
+}
+async function lanzarAuto() {
+  await chrome.storage.local.set({ ultimaAuto: Date.now() });
+  const tab = await chrome.tabs.create({ url: `${APP}/partidos/importar?auto=1`, active: false });
+  await chrome.storage.local.set({ pestanaAuto: tab.id });
+}
+async function revisarPendiente() {
+  const { ultimaAuto = 0 } = await chrome.storage.local.get("ultimaAuto");
+  // Último lunes a las 6:00
+  const ultimoLunes = proximoLunes6() - 7 * 864e5;
+  if (ultimaAuto < ultimoLunes && Date.now() > ultimoLunes) await lanzarAuto();
+}
+chrome.runtime.onInstalled.addListener(() => { programar(); chrome.storage.local.set({ ultimaAuto: Date.now() }); });
+chrome.runtime.onStartup.addListener(() => { programar(); revisarPendiente(); });
+chrome.alarms.onAlarm.addListener(async (a) => {
+  if (a.name !== "fcbq-semanal") return;
+  await programar();
+  await lanzarAuto();
+});
+// La página avisa cuando ha terminado: cerramos la pestaña que abrimos nosotros
+chrome.runtime.onMessage.addListener(async (m, sender) => {
+  if (m?.tipo !== "terminado" || !sender.tab?.id) return;
+  const { pestanaAuto } = await chrome.storage.local.get("pestanaAuto");
+  if (pestanaAuto === sender.tab.id) {
+    await chrome.storage.local.remove("pestanaAuto");
+    if (m.ok) chrome.tabs.remove(sender.tab.id).catch(() => {});
+  }
+});
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Abre (o reutiliza) la pestaña y espera a que muestre la web de verdad y deje de recargarse */
