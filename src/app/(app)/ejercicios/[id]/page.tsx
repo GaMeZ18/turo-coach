@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { urlEmbed } from "@/lib/video";
-import { borrarEjercicio, duplicarEjercicio } from "../actions";
+import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actions";
 import VisorPizarra from "./VisorPizarra";
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, Library, Pencil, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
 
 export default async function VerEjercicio({ params }: { params: Promise<{ id: string }> }) {
@@ -34,6 +34,12 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
             {e.duracion ? ` · ${e.duracion} min` : ""}{e.jugadores_min ? ` · ${e.jugadores_min} jugadores` : ""}
             {e.visibilidad === "privado" ? " · privado" : ""}
           </p>
+          {(e.en_biblioteca || e.edades?.length > 0) && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {e.en_biblioteca && <Link href="/biblioteca" className="inline-flex items-center gap-1 rounded-full bg-oro/30 px-2 py-0.5 text-xs font-semibold text-tinta"><Library size={12} /> Biblioteca del club</Link>}
+              {(e.edades ?? []).map((x: string) => <span key={x} className="rounded-full bg-azul/10 px-2 py-0.5 text-xs text-azul">{x}</span>)}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {puedeEditar && <Link href={`/ejercicios/${e.id}/editar`} className="btn-primario"><Pencil size={16} /> Editar</Link>}
@@ -41,6 +47,15 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
             <input type="hidden" name="id" value={e.id} />
             <Enviar className="btn-secundario" title="Hacer una copia para modificarla"><Copy size={16} /> Copiar</Enviar>
           </form>
+          {puedeEditar && "en_biblioteca" in e && (
+            <form action={alternarBiblioteca}>
+              <input type="hidden" name="id" value={e.id} />
+              <input type="hidden" name="poner" value={e.en_biblioteca ? "0" : "1"} />
+              <Enviar className="btn-secundario" title={e.en_biblioteca ? "Quitar de la Biblioteca del club" : "Publicar en la Biblioteca del club"}>
+                <Library size={16} /> {e.en_biblioteca ? "Quitar de la biblioteca" : "A la biblioteca"}
+              </Enviar>
+            </form>
+          )}
           {puedeEditar && (
             <form action={borrarEjercicio}>
               <input type="hidden" name="id" value={e.id} />
@@ -57,6 +72,12 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           )}
         </div>
         <div className="space-y-4">
+          {e.material && (
+            <section>
+              <h2 className="etiqueta">Material</h2>
+              <p className="text-sm">{e.material}</p>
+            </section>
+          )}
           {e.descripcion && (
             <section>
               <h2 className="etiqueta">Descripción</h2>

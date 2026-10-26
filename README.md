@@ -107,7 +107,14 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Biblioteca
+- Ejercicios y sistemas del club, por categorías, con filtro por edad (Mini, Infantil, Cadete, Junior, Sénior), tipo y texto, y la pizarra dibujada en cada tarjeta.
+- Cada entrenador decide al crear o editar un ejercicio si lo publica («Publicar en la Biblioteca del club»), y puede quitarlo después.
+- El coordinador carga los 38 ejercicios iniciales (`src/lib/biblioteca-semilla.ts`, con su pizarra) con un botón.
+
+> Requiere ejecutar `0007_biblioteca.sql`.
+
 ## Próximas fases
 - Partidos y scouting (rivales, notas, control de periodos de minibásquet, informe PDF)
 - Vídeo (etiquetado por categorías y descriptores)
-- Biblioteca de enlaces · Catalán como segundo idioma
+- Catalán como segundo idioma

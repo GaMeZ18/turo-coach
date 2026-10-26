@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIAS } from "@/lib/categorias";
-import { Lock, Plus } from "lucide-react";
+import { Library, Lock, Plus } from "lucide-react";
+import MiniPizarra from "@/components/pizarra/Mini";
 
 type Ej = {
   id: string; titulo: string; tipo: string; categoria: string | null; etiquetas: string[];
-  duracion: number | null; preview: string | null; visibilidad: string; autor_id: string;
+  duracion: number | null; preview: string | null; visibilidad: string; autor_id: string; pizarra?: unknown;
   perfiles: { nombre: string | null } | null;
 };
 
@@ -19,7 +20,7 @@ export default async function EjerciciosPage({
 
   let consulta = supabase
     .from("ejercicios")
-    .select("id, titulo, tipo, categoria, etiquetas, duracion, preview, visibilidad, autor_id, perfiles(nombre)")
+    .select("id, titulo, tipo, categoria, etiquetas, duracion, preview, visibilidad, autor_id, pizarra, perfiles(nombre)")
     .order("updated_at", { ascending: false })
     .limit(120);
   if (tipo) consulta = consulta.eq("tipo", tipo);
@@ -36,7 +37,10 @@ export default async function EjerciciosPage({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Ejercicios y sistemas</h1>
-        <Link href="/ejercicios/nuevo" className="btn-primario"><Plus size={16} /> Nuevo</Link>
+        <div className="flex gap-2">
+          <Link href="/biblioteca" className="btn-secundario"><Library size={16} /> Biblioteca del club</Link>
+          <Link href="/ejercicios/nuevo" className="btn-primario"><Plus size={16} /> Nuevo</Link>
+        </div>
       </div>
 
       <form className="tarjeta mt-5 flex flex-wrap gap-2 p-3">
@@ -62,6 +66,8 @@ export default async function EjerciciosPage({
             <div className="flex aspect-[15/14] items-center justify-center bg-suave">
               {e.preview ? (
                 <img src={e.preview} alt="" className="h-full w-full object-contain" loading="lazy" />
+              ) : e.pizarra ? (
+                <MiniPizarra pizarra={e.pizarra} className="h-full w-full" />
               ) : (
                 <span className="text-xs text-tinta/40">Sin pizarra</span>
               )}

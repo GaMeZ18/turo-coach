@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import PizarraEditor from "@/components/pizarra";
 import type { Pizarra } from "@/components/pizarra/modelo";
 import { CATEGORIAS } from "@/lib/categorias";
+import { EDADES } from "@/lib/edades";
+import { Library } from "lucide-react";
 import { guardarEjercicio, type DatosEjercicio } from "./actions";
 
 
@@ -31,6 +33,9 @@ export default function FormEjercicio({
     visibilidad: inicial?.visibilidad ?? "club",
     pizarra: inicial?.pizarra ?? null,
     preview: inicial?.preview ?? null,
+    en_biblioteca: inicial?.en_biblioteca ?? false,
+    edades: inicial?.edades ?? [],
+    material: inicial?.material ?? "",
   });
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
   const [error, setError] = useState<string | null>(null);
@@ -104,11 +109,27 @@ export default function FormEjercicio({
           </div>
           <div>
             <label className="etiqueta">Visible</label>
-            <select value={d.visibilidad} onChange={(e) => set("visibilidad", e.target.value as DatosEjercicio["visibilidad"])} className="campo">
+            <select value={d.en_biblioteca ? "club" : d.visibilidad} disabled={d.en_biblioteca} onChange={(e) => set("visibilidad", e.target.value as DatosEjercicio["visibilidad"])} className="campo">
               <option value="club">Club</option>
               <option value="privado">Solo yo</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label className="etiqueta">Edades</label>
+          <div className="flex flex-wrap gap-1">
+            {EDADES.map((x) => {
+              const on = d.edades?.includes(x);
+              return (
+                <button key={x} type="button" onClick={() => set("edades", on ? (d.edades ?? []).filter((y) => y !== x) : [...(d.edades ?? []), x])}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${on ? "border-azul bg-azul text-white" : "border-linea bg-white text-tinta/70"}`}>{x}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <label className="etiqueta">Material</label>
+          <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="1 balón por jugador, 6 conos…" />
         </div>
         <div>
           <label className="etiqueta">Descripción</label>
@@ -126,6 +147,13 @@ export default function FormEjercicio({
           <label className="etiqueta">Vídeo (YouTube o Vimeo)</label>
           <input value={d.video_url} onChange={(e) => set("video_url", e.target.value)} className="campo" placeholder="https://youtu.be/…" />
         </div>
+        <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm ${d.en_biblioteca ? "border-oro bg-oro/15" : "border-linea bg-white"}`}>
+          <input type="checkbox" checked={!!d.en_biblioteca} onChange={(e) => set("en_biblioteca", e.target.checked)} className="mt-0.5 h-4 w-4" />
+          <span>
+            <span className="flex items-center gap-1.5 font-semibold"><Library size={15} /> Publicar en la Biblioteca del club</span>
+            <span className="block text-xs text-tinta/60">Lo verán todos los entrenadores en la Biblioteca y podrán copiarlo o usarlo en sus entrenos.</span>
+          </span>
+        </label>
         {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
         <button type="button" onClick={guardar} disabled={pendiente} className="btn-primario w-full">
           {pendiente ? "Guardando…" : entrenoId ? "Guardar y añadir al entreno" : "Guardar"}

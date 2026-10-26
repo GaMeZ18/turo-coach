@@ -17,7 +17,7 @@ const MODULOS = [
   { href: "/planificaciones", titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
   { href: "/scouting", titulo: "Scouting", texto: "Liga, rivales, estadísticas y fichas", icono: Binoculars },
   { titulo: "Vídeo", texto: "Etiqueta acciones por categorías", icono: Video },
-  { titulo: "Biblioteca", texto: "Libros, artículos y enlaces", icono: BookOpen },
+  { href: "/biblioteca", titulo: "Biblioteca", texto: "Ejercicios del club listos para usar", icono: BookOpen },
 ];
 
 export default async function Inicio() {
