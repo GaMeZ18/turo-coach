@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Download, Loader2 } from "lucide-react";
 import { importarPlantillaFCBQ, type JugadorFCBQ } from "./actions";
 
-export type Candidato = JugadorFCBQ & { completo: string; partidos: number };
-export type CambioDorsal = { jugadorId: string; nombre: string; antes: number | null; dorsal: number | null };
+import type { Candidato, CambioDorsal } from "@/lib/plantilla-fcbq";
 
 export default function PlantillaFCBQ({ equipoId, candidatos, cambios }: { equipoId: string; candidatos: Candidato[]; cambios: CambioDorsal[] }) {
   const router = useRouter();

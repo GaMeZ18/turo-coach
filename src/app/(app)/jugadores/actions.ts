@@ -154,3 +154,20 @@ export async function importarPlantillaFCBQ(equipoId: string, nuevos: JugadorFCB
   revalidatePath("/jugadores");
   return { altas, dorsales: dorsales.length };
 }
+
+/** Al actualizar desde la FCBQ: añade solos a la plantilla los jugadores de las actas y pone los dorsales que falten */
+export async function sincronizarPlantillas(equipoIds: string[]) {
+  const supabase = await createClient();
+  const { plantillaDesdeActas } = await import("@/lib/plantilla-fcbq");
+  let altas = 0;
+  for (const equipoId of [...new Set(equipoIds)]) {
+    const { candidatos, cambios } = await plantillaDesdeActas(supabase, equipoId);
+    if (!candidatos.length && !cambios.length) continue;
+    try {
+      const r = await importarPlantillaFCBQ(equipoId, candidatos.map(({ nombre, apellidos, dorsal }) => ({ nombre, apellidos, dorsal })),
+        cambios.filter((c) => c.antes === null).map((c) => ({ jugadorId: c.jugadorId, dorsal: c.dorsal })));
+      altas += r.altas;
+    } catch { /* sin permiso en ese equipo, o tablas sin crear */ }
+  }
+  return altas;
+}

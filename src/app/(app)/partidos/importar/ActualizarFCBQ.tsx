@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { leerCalendarioFCBQ, leerLigaFCBQ, sugerirEquipo, unirResultados, type LigaFCBQ, type PartidoFCBQ } from "@/lib/fcbq";
 import { importarFCBQ, type ResultadoImportacion } from "./actions";
 import { marcarAplazados } from "../actions";
+import { sincronizarPlantillas } from "../../jugadores/actions";
 import { guardarStatsFCBQ, statsPendientes } from "../../scouting/actions";
 import { compactarStats, type StatsPartido } from "@/lib/stats-fcbq";
 
@@ -74,6 +75,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
   const [asignacion, setAsignacion] = useState<Record<string, string>>({});
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [numStats, setNumStats] = useState(0);
+  const [numJugadores, setNumJugadores] = useState(0);
   const [informe, setInforme] = useState<string>("");
   const [copiado, setCopiado] = useState(false);
   const equipoDeStats = useRef(new Map<string, string>());
@@ -93,6 +95,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         .map((x) => ({ equipoId: asig[x.nuestro], ids: [...new Set(x.resultados.filter((y) => y.statsId && y.pl !== null).map((y) => y.statsId!))] }));
       const { pendientes, error } = await statsPendientes(pares);
       if (error) setAvisos((a) => [...a, error]);
+      equiposImportados.current = [...new Set(asignaciones.map((x) => x.equipoId))];
       if (pendientes.length) {
         equipoDeStats.current = new Map(pendientes.map((x) => [x.id, x.equipoId]));
         setTexto(`Descargando estadísticas de ${pendientes.length} partidos…`);
@@ -100,8 +103,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         window.postMessage({ tipo: "turo-fcbq-pedir-stats", ids: pendientes.map((x) => x.id) }, location.origin);
         return;
       }
-      setEstado("hecho");
-      router.refresh();
+      await terminarRef.current();
     } catch (e) {
       setEstado("error");
       setTexto(e instanceof Error ? e.message : "No se ha podido guardar.");
@@ -109,6 +111,19 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
   };
   const importarRef = useRef(importar);
   importarRef.current = importar;
+
+  const equiposImportados = useRef<string[]>([]);
+  const terminar = async () => {
+    // Plantillas: los jugadores de las actas entran solos en su equipo
+    try {
+      const n = await sincronizarPlantillas(equiposImportados.current);
+      if (n) setNumJugadores(n);
+    } catch {}
+    setEstado("hecho");
+    router.refresh();
+  };
+  const terminarRef = useRef(terminar);
+  terminarRef.current = terminar;
 
   const guardarStats = async (crudos: Record<string, unknown>, pendientesFCBQ: number) => {
     setTexto("Guardando estadísticas…");
@@ -126,8 +141,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     } catch (e) {
       setAvisos((a) => [...a, e instanceof Error ? e.message : "No se han podido guardar las estadísticas."]);
     }
-    setEstado("hecho");
-    router.refresh();
+    await terminar();
   };
   const guardarStatsRef = useRef(guardarStats);
   guardarStatsRef.current = guardarStats;
@@ -152,7 +166,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
       if (d.tipo === "turo-fcbq-progreso") setTexto(d.texto ?? "");
       if (d.tipo === "turo-fcbq-error") {
         // Si falla solo la parte de estadísticas, lo demás ya está guardado
-        if (equipoDeStats.current.size) { setAvisos((a) => [...a, `Estadísticas: ${d.texto}`]); setEstado("hecho"); equipoDeStats.current = new Map(); router.refresh(); }
+        if (equipoDeStats.current.size) { setAvisos((a) => [...a, `Estadísticas: ${d.texto}`]); equipoDeStats.current = new Map(); terminarRef.current(); }
         else { setEstado("error"); setTexto(d.texto ?? "Error"); }
       }
       if (d.tipo === "turo-fcbq-fin" && !recibido) setTexto("Se ha cortado la conexión con la extensión. Vuelve a pulsar Actualizar.");
@@ -205,6 +219,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     setResultado(null);
     setAvisos([]);
     setNumStats(0);
+    setNumJugadores(0);
     equipoDeStats.current = new Map();
     setTexto("Abriendo basquetcatala.cat…");
     window.postMessage({ tipo: "turo-fcbq-inicio" }, location.origin);
@@ -263,7 +278,8 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
             <p className="font-semibold">
               Actualizado: {resultado.nuevos} partidos nuevos, {resultado.actualizados} actualizados
               {resultado.ligas ? `, ${resultado.ligas} ligas con clasificación` : ""}
-              {numStats ? `, estadísticas de ${numStats} partidos` : ""}.
+              {numStats ? `, estadísticas de ${numStats} partidos` : ""}
+              {numJugadores ? `, ${numJugadores} jugadores añadidos a sus plantillas` : ""}.
             </p>
             {resultado.desaparecidos?.length > 0 && (
               <div className="mt-2 rounded border border-oro bg-oro/15 p-2 text-tinta">

@@ -6,9 +6,8 @@ import { incorporarJugador } from "./actions";
 import FormNuevoJugador from "./FormNuevoJugador";
 import BotonEliminar from "./BotonEliminar";
 import Enviar from "@/components/Enviar";
-import PlantillaFCBQ, { type Candidato, type CambioDorsal } from "./PlantillaFCBQ";
-import { parecido, separarNombre } from "@/lib/emparejar";
-import type { StatsPartido } from "@/lib/stats-fcbq";
+import PlantillaFCBQ from "./PlantillaFCBQ";
+import { plantillaDesdeActas } from "@/lib/plantilla-fcbq";
 
 type Fila = {
   dorsal: number | null;
@@ -21,7 +20,7 @@ export default async function JugadoresPage() {
   const equipo = await equipoActivo(supabase);
   if (!equipo) return <SinEquipo que="su plantilla" />;
 
-  const [{ data }, { data: todos }, { data: asistencias }, { data: statsRaw }] = await Promise.all([
+  const [{ data }, { data: todos }, { data: asistencias }] = await Promise.all([
     supabase
       .from("equipo_jugadores")
       .select("dorsal, posicion, jugadores(id, nombre, apellidos, fecha_nacimiento)")
@@ -31,7 +30,6 @@ export default async function JugadoresPage() {
       .from("asistencias")
       .select("jugador_id, estado, entrenamientos!inner(equipo_id)")
       .eq("entrenamientos.equipo_id", equipo.id),
-    supabase.from("fcbq_stats").select("datos").eq("equipo_id", equipo.id),
   ]);
 
   const filas = ((data ?? []) as unknown as Fila[]).sort(
@@ -39,35 +37,8 @@ export default async function JugadoresPage() {
   );
   const enEquipo = new Set(filas.map((f) => f.jugadores.id));
 
-  // Jugadores del equipo según las actas de la FCBQ (los que salen en el lado del Turó)
-  const deActas = new Map<string, { completo: string; dorsales: Map<string, number>; partidos: number }>();
-  for (const { datos: st } of (statsRaw ?? []) as { datos: StatsPartido }[]) {
-    const lado = /TUR[OÓ]/i.test(st.local.nombre) ? st.local : /TUR[OÓ]/i.test(st.visitante.nombre) ? st.visitante : null;
-    for (const j of lado?.jugadores ?? []) {
-      const k = j.uuid ?? j.nombre;
-      const x = deActas.get(k) ?? { completo: j.nombre, dorsales: new Map<string, number>(), partidos: 0 };
-      x.partidos++;
-      if (j.dorsal) x.dorsales.set(j.dorsal, (x.dorsales.get(j.dorsal) ?? 0) + 1);
-      deActas.set(k, x);
-    }
-  }
-  const candidatos: Candidato[] = [];
-  const cambios: CambioDorsal[] = [];
-  for (const x of deActas.values()) {
-    const dorsalTxt = [...x.dorsales.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-    const dorsal = dorsalTxt && /^\d+$/.test(dorsalTxt) ? Number(dorsalTxt) : null;
-    let mejor: { f: Fila; p: number } | null = null;
-    for (const f of filas) {
-      const p = parecido(`${f.jugadores.nombre} ${f.jugadores.apellidos ?? ""}`, f.dorsal, x.completo, dorsalTxt ?? "");
-      if (p >= 2 && (!mejor || p > mejor.p)) mejor = { f, p };
-    }
-    if (mejor) {
-      if (dorsal !== null && mejor.f.dorsal !== dorsal) cambios.push({ jugadorId: mejor.f.jugadores.id, nombre: mejor.f.jugadores.nombre, antes: mejor.f.dorsal, dorsal });
-    } else {
-      candidatos.push({ ...separarNombre(x.completo), dorsal, completo: x.completo, partidos: x.partidos });
-    }
-  }
-  candidatos.sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
+  // Jugadores del equipo según las actas de la FCBQ
+  const { candidatos, cambios } = await plantillaDesdeActas(supabase, equipo.id);
   const otros = (todos ?? []).filter((j) => !enEquipo.has(j.id));
 
   const pct = (id: string) => {
@@ -81,7 +52,7 @@ export default async function JugadoresPage() {
     <div>
       <h1 className="text-2xl font-semibold">Jugadores</h1>
       <p className="text-sm text-tinta/60">{equipo.nombre} · {filas.length} jugadores</p>
-      {!equipo.congelado && <PlantillaFCBQ equipoId={equipo.id} candidatos={candidatos} cambios={cambios} />}
+      {!equipo.congelado && <PlantillaFCBQ key={`${equipo.id}-${candidatos.length}-${cambios.length}`} equipoId={equipo.id} candidatos={candidatos} cambios={cambios} />}
 
       <div className="tarjeta mt-5 overflow-hidden">
         <table className="w-full text-sm">
