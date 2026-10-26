@@ -12,6 +12,7 @@ export async function guardarPista(fd: FormData) {
     capacidad: Math.min(6, Math.max(1, Number(fd.get("capacidad") || 1))),
     orden: Number(fd.get("orden") || 0),
     notas: String(fd.get("notas") ?? "").trim() || null,
+    partidos_casa: fd.get("partidos_casa") === "on",
   };
   if (!fila.nombre) throw new Error("Ponle un nombre a la pista.");
   check(id ? await supabase.from("pistas").update(fila).eq("id", id) : await supabase.from("pistas").insert(fila));

@@ -1,6 +1,6 @@
 // Reparto de pistas: detectar entrenos que coinciden en la misma pista más allá de su capacidad.
-export type Pista = { id: string; nombre: string; capacidad: number; orden: number; notas: string | null };
-export type Ocupacion = { id: string; equipo_id: string; fecha: string; duracion: number | null; lugar: string | null };
+export type Pista = { id: string; nombre: string; capacidad: number; orden: number; notas: string | null; partidos_casa?: boolean };
+export type Ocupacion = { id: string; equipo_id: string; fecha: string; duracion: number | null; lugar: string | null; tipo?: "entreno" | "partido"; detalle?: string | null };
 
 export const normPista = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();

@@ -18,7 +18,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
   const desde = aISO(lunes, "00:00"), hasta = aISO(sumarDias(lunes, 7), "00:00");
 
   const [{ data: pistasRaw, error }, { data: ocupRaw }, { equipos }, { equipos: mios }] = await Promise.all([
-    supabase.from("pistas").select("id, nombre, capacidad, orden, notas").order("orden").order("nombre"),
+    supabase.from("pistas").select("id, nombre, capacidad, orden, notas, partidos_casa").order("orden").order("nombre"),
     supabase.rpc("ocupacion_pistas", { desde, hasta }),
     equiposDeTemporada(supabase),
     misEquipos(supabase),
@@ -31,9 +31,9 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
   // Pistas escritas en algún entreno que no están dadas de alta
   const conocidas = new Set(pistas.map((p) => normPista(p.nombre)));
   const otras = [...new Set(ocup.map((o) => normPista(o.lugar)).filter((k) => k && !conocidas.has(k)))];
-  const filas: { clave: string; nombre: string; capacidad: number; notas: string | null }[] = [
-    ...pistas.map((p) => ({ clave: normPista(p.nombre), nombre: p.nombre, capacidad: p.capacidad, notas: p.notas })),
-    ...otras.map((k) => ({ clave: k, nombre: k, capacidad: 1, notas: "No está dada de alta" })),
+  const filas: { clave: string; nombre: string; capacidad: number; notas: string | null; casa: boolean }[] = [
+    ...pistas.map((p) => ({ clave: normPista(p.nombre), nombre: p.nombre, capacidad: p.capacidad, notas: p.notas, casa: !!p.partidos_casa })),
+    ...otras.map((k) => ({ clave: k, nombre: k, capacidad: 1, notas: "No está dada de alta", casa: false })),
   ];
   const dias = Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
   const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: TZ });
@@ -41,16 +41,18 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
   const Bloque = ({ o }: { o: Ocupacion }) => {
     const fin = new Date(new Date(o.fecha).getTime() + (o.duracion || 90) * 60000);
     const choca = conflictos.has(o.id);
+    const partido = o.tipo === "partido";
     const contenido = (
       <>
         <span className="block font-semibold tabular-nums">{hora(o.fecha)}–{hora(fin)}</span>
-        <span className="block truncate">{nombreEq(o.equipo_id)}</span>
+        <span className="block truncate">{partido && "🏀 "}{nombreEq(o.equipo_id)}</span>
+        {partido && <span className="block truncate text-tinta/60">Partido vs {o.detalle}</span>}
         {choca && <span className="mt-0.5 flex items-center gap-0.5 font-bold"><AlertTriangle size={11} /> Coincide</span>}
       </>
     );
-    const clase = `block rounded-md border-l-4 px-1.5 py-1 text-[11px] leading-tight ${choca ? "bg-red-50 text-red-800 ring-2 ring-red-500" : "bg-suave"}`;
-    return mioIds.has(o.equipo_id) || esCoord
-      ? <Link href={`/entrenamientos/${o.id}`} className={`${clase} hover:brightness-95`} style={{ borderLeftColor: colorEquipo(o.equipo_id, equipos) }}>{contenido}</Link>
+    const clase = `block rounded-md border-l-4 px-1.5 py-1 text-[11px] leading-tight ${choca ? "bg-red-50 text-red-800 ring-2 ring-red-500" : partido ? "bg-oro/25" : "bg-suave"}`;
+    return partido || mioIds.has(o.equipo_id) || esCoord
+      ? <Link href={partido ? `/partidos/${o.id}` : `/entrenamientos/${o.id}`} className={`${clase} hover:brightness-95`} style={{ borderLeftColor: colorEquipo(o.equipo_id, equipos) }}>{contenido}</Link>
       : <div className={clase} style={{ borderLeftColor: colorEquipo(o.equipo_id, equipos) }}>{contenido}</div>;
   };
 
@@ -59,7 +61,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><MapPin className="text-azul" /> Reparto de pistas</h1>
-          <p className="text-sm text-tinta/60">Qué equipo entrena en cada pista y a qué hora. Los bloques en rojo coinciden en la misma pista.</p>
+          <p className="text-sm text-tinta/60">Qué equipo entrena en cada pista y a qué hora. Los partidos en casa salen en amarillo. En rojo, lo que coincide en la misma pista.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/pistas?semana=${sumarDias(lunes, -7)}`} className="btn-secundario !px-2.5" aria-label="Semana anterior"><ChevronLeft size={18} /></Link>
@@ -91,7 +93,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
             {filas.map((f) => (
               <tr key={f.clave} className="border-t border-linea align-top">
                 <td className="p-2">
-                  <div className="font-semibold">{f.nombre}</div>
+                  <div className="font-semibold">{f.nombre}{f.casa && <span className="ml-1 rounded bg-oro/40 px-1 text-[10px] font-semibold uppercase">Partidos</span>}</div>
                   <div className="text-[11px] text-tinta/50">{f.capacidad === 1 ? "1 equipo a la vez" : `${f.capacidad} equipos a la vez`}</div>
                   {f.notas && <div className="text-[11px] text-tinta/50">{f.notas}</div>}
                 </td>
@@ -125,6 +127,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
                   <div className="w-36"><label className="etiqueta">Equipos a la vez</label><input name="capacidad" type="number" min={1} max={6} defaultValue={p.capacidad} className="campo" /></div>
                   <div className="w-20"><label className="etiqueta">Orden</label><input name="orden" type="number" defaultValue={p.orden} className="campo" /></div>
                   <div className="min-w-40 flex-1"><label className="etiqueta">Notas</label><input name="notas" defaultValue={p.notas ?? ""} placeholder="Dirección, media pista…" className="campo" /></div>
+                  <label className="flex items-center gap-1.5 pb-2 text-xs"><input type="checkbox" name="partidos_casa" defaultChecked={!!p.partidos_casa} /> Partidos en casa</label>
                   <Enviar className="btn-secundario">Guardar</Enviar>
                 </form>
                 <form action={borrarPista}>
@@ -139,6 +142,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
               <div className="min-w-40 flex-1"><label className="etiqueta">Notas</label><input name="notas" className="campo" /></div>
               <Enviar>Añadir</Enviar>
             </form>
+            <p className="text-xs text-tinta/50">«Partidos en casa»: la pista donde se juegan los partidos de local de los equipos federados (los de SCEEB y otros no federados no cuentan, salvo que su partido indique una pista del club).</p>
             <p className="text-xs text-tinta/50">«Equipos a la vez»: si en una pista caben dos equipos (media pista cada uno), pon 2 y solo avisará cuando haya tres.</p>
           </div>
         </details>
