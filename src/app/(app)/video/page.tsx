@@ -43,6 +43,12 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
             <option value="t3">Tiro de 3</option>
             <option value="tl">Tiro libre</option>
             <option value="perdida">Pérdida</option>
+            <option value="ro">Rebote ofensivo</option>
+            <option value="rd">Rebote defensivo</option>
+            <option value="as">Asistencia</option>
+            <option value="rob">Robo</option>
+            <option value="tap">Tapón</option>
+            <option value="fc">Falta cometida</option>
           </select>
         </label>
         <Enviar className="btn-secundario">{c ? "Guardar" : <><Plus size={15} /> Añadir</>}</Enviar>

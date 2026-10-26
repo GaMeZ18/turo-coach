@@ -328,6 +328,12 @@ export const CA: Record<string, string> = {
   "Pérdidas": "Pèrdues",
   "Partido / vídeo": "Partit / vídeo",
   "Tecla": "Tecla",
+  "Rebotes": "Rebots",
+  "Asistencias": "Assistències",
+  "Robos": "Robatoris",
+  "Valoración": "Valoració",
+  "Sin asistencia": "Sense assistència",
+  "¡Canasta! ¿Asistencia de quién?": "Cistella! Assistència de qui?",
 };
 
 // Dies i mesos (per a les dates escrites)

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { esTiro, mmss, pctTiro, statVacia, sumarStat, type Estadistica, type StatVideo } from "@/lib/video";
+import { esTiro, hayStat, mmss, pctTiro, statVacia, sumarStat, valoracion, type Estadistica, type StatVideo } from "@/lib/video";
 import { Clapperboard, ThumbsDown, ThumbsUp } from "lucide-react";
 
 type Fila = {
@@ -29,8 +29,9 @@ export default async function VideoJugador({ supabase, jugadorId }: { supabase: 
     porVideo.set(c.video_id, v);
   }
   const videos = [...porVideo.entries()].sort((a, b) => b[1].fecha.localeCompare(a[1].fecha));
-  const conStats = total.t2a + total.t3a + total.tla + total.perdidas > 0;
-  const nv = videos.filter(([, v]) => v.st.t2a + v.st.t3a + v.st.tla + v.st.perdidas > 0).length || 1;
+  const conStats = hayStat(total);
+  const nv = videos.filter(([, v]) => hayStat(v.st)).length || 1;
+  const pp = (x: number) => (x / nv).toFixed(1);
   const recientes = [...clips].sort((a, b) => (b.videos?.created_at ?? "").localeCompare(a.videos?.created_at ?? "") || b.inicio - a.inicio).slice(0, 25);
   const fecha = (iso: string) => (iso ? new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" }) : "");
 
@@ -38,13 +39,17 @@ export default async function VideoJugador({ supabase, jugadorId }: { supabase: 
     <section className="mt-8">
       <h2 className="flex items-center gap-2 font-semibold"><Clapperboard size={18} className="text-azul" /> Vídeo</h2>
       {conStats && (
-        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
           {[
-            ["Puntos", `${total.pts}`, `${(total.pts / nv).toFixed(1)} por partido`],
+            ["Puntos", pp(total.pts), `${total.pts} en ${nv} partidos`],
+            ["Rebotes", pp(total.ro + total.rd), `${total.ro} of. · ${total.rd} def.`],
+            ["Asistencias", pp(total.as), `${total.as} en total`],
+            ["Robos", pp(total.rob), `${total.tap} tapones`],
+            ["Valoración", pp(valoracion(total)), "por partido"],
             ["Tiros de 2", `${total.t2m}/${total.t2a}`, pctTiro(total.t2m, total.t2a)],
             ["Triples", `${total.t3m}/${total.t3a}`, pctTiro(total.t3m, total.t3a)],
             ["Tiros libres", `${total.tlm}/${total.tla}`, pctTiro(total.tlm, total.tla)],
-            ["Pérdidas", `${total.perdidas}`, `${(total.perdidas / nv).toFixed(1)} por partido`],
+            ["Pérdidas", pp(total.perdidas), `${total.fc} faltas (${pp(total.fc)}/p)`],
             ["Clips", `${clips.length}`, `${videos.length} vídeos`],
           ].map(([t, v, sub]) => (
             <div key={t} className="tarjeta p-2 text-center"><div className="text-lg font-bold text-azul">{v}</div><div className="text-[10px] uppercase text-tinta/60">{t}</div><div className="text-[11px] text-tinta/50">{sub}</div></div>
@@ -53,8 +58,8 @@ export default async function VideoJugador({ supabase, jugadorId }: { supabase: 
       )}
       {conStats && (
         <div className="tarjeta mt-2 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-suave text-[11px] uppercase text-tinta/60"><tr><th className="p-2 text-left">Partido / vídeo</th><th>Pts</th><th>T2</th><th>T3</th><th>TL</th><th>Pérd.</th></tr></thead>
+          <table className="w-full whitespace-nowrap text-sm">
+            <thead className="bg-suave text-[11px] uppercase text-tinta/60"><tr><th className="p-2 text-left">Partido / vídeo</th><th>Pts</th><th>T2</th><th>T3</th><th>TL</th><th>Reb</th><th>Ast</th><th>Rob</th><th>Pér</th><th>FC</th><th>Val</th></tr></thead>
             <tbody>
               {videos.map(([id, v]) => (
                 <tr key={id} className="border-t border-linea">
@@ -63,7 +68,12 @@ export default async function VideoJugador({ supabase, jugadorId }: { supabase: 
                   <td className="text-center text-xs">{v.st.t2m}/{v.st.t2a}</td>
                   <td className="text-center text-xs">{v.st.t3m}/{v.st.t3a}</td>
                   <td className="text-center text-xs">{v.st.tlm}/{v.st.tla}</td>
+                  <td className="text-center">{v.st.ro + v.st.rd || "–"}</td>
+                  <td className="text-center">{v.st.as || "–"}</td>
+                  <td className="text-center">{v.st.rob || "–"}</td>
                   <td className="text-center">{v.st.perdidas || "–"}</td>
+                  <td className="text-center">{v.st.fc || "–"}</td>
+                  <td className="text-center font-semibold">{valoracion(v.st)}</td>
                 </tr>
               ))}
             </tbody>

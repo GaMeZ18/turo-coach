@@ -3,7 +3,7 @@
 // Analizador de vídeo: reproductor de YouTube + botonera de etiquetas + clips filtrables.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, ListVideo, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
-import { NOMBRE_ESTADISTICA, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, type Categoria, type Clip, type StatVideo } from "@/lib/video";
+import { PREGUNTA_ESTADISTICA, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type StatVideo } from "@/lib/video";
 import { actualizarClip, borrarClip, crearClip } from "../actions";
 
 type Jugador = { id: string; nombre: string; apellidos: string | null; dorsal: number | null };
@@ -30,7 +30,7 @@ function cargarAPI(): Promise<void> {
 const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
-type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean };
+type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null };
 
 export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial }: {
   videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
@@ -93,8 +93,9 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   const ir = (s: number, play = true) => { player.current?.seekTo?.(Math.max(0, s), true); if (play) player.current?.playVideo?.(); };
 
   // Reloj: tiempo actual y parar al final del clip / pasar al siguiente de la lista
-  const refs = useRef({ activo, cola, clips, bucle });
-  refs.current = { activo, cola, clips, bucle };
+  const catAsist = categorias.find((c) => c.estadistica === "as") ?? null;
+  const refs = useRef({ activo, cola, clips, bucle, catAsist });
+  refs.current = { activo, cola, clips, bucle, catAsist };
   useEffect(() => {
     const iv = setInterval(() => {
       if (!player.current?.getCurrentTime) return;
@@ -162,12 +163,32 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   // --- Pregunta tras etiquetar un tiro o una pérdida: jugador (y si entra) ---
   const responder = useCallback((q: Pregunta, r: Partial<Pick<Pregunta, "jugador" | "resultado">>) => {
     const nueva = { ...q, ...r };
+    const terminar = () => { setPregunta(null); setDorsalTecleado(""); if (q.reanudar) player.current?.playVideo?.(); };
+    // Paso extra tras una canasta: ¿asistencia de quién?
+    if (q.paso === "asistencia") {
+      if (nueva.jugador === undefined) { setPregunta(nueva); return; }
+      const tiroClip = refs.current.clips.find((x) => x.id === (idReal.current.get(q.id) ?? q.id));
+      if (nueva.jugador && tiroClip) {
+        const tmp: Clip = { ...tiroClip, id: `tmp-as-${Date.now()}`, categoria_id: q.cat.id, jugador_id: nueva.jugador, resultado: "bien", nota: null };
+        setClips((l) => [...l, tmp]);
+        crearClip({ video_id: tiroClip.video_id, categoria_id: q.cat.id, inicio: tiroClip.inicio, fin: tiroClip.fin, periodo: tiroClip.periodo, jugador_id: nueva.jugador, resultado: "bien" })
+          .then((real) => setClips((l) => l.map((x) => (x.id === tmp.id ? real : x))))
+          .catch(() => { setClips((l) => l.filter((x) => x.id !== tmp.id)); setError("No se ha podido guardar la asistencia."); });
+      }
+      terminar();
+      return;
+    }
     const tiro = esTiro(q.cat.estadistica);
     const completa = nueva.jugador !== undefined && (!tiro || nueva.resultado !== undefined);
     if (!completa) { setPregunta(nueva); return; }
-    cambiar(q.id, { jugador_id: nueva.jugador ?? null, resultado: tiro ? nueva.resultado ?? null : "mal" });
-    setPregunta(null); setDorsalTecleado("");
-    if (q.reanudar) player.current?.playVideo?.();
+    cambiar(q.id, { jugador_id: nueva.jugador ?? null, resultado: tiro ? nueva.resultado ?? null : esNegativa(q.cat.estadistica) ? "mal" : "bien" });
+    const asist = refs.current.catAsist;
+    if (tiro && nueva.resultado === "bien" && q.cat.estadistica !== "tl" && asist) {
+      setDorsalTecleado("");
+      setPregunta({ id: q.id, cat: asist, reanudar: q.reanudar, paso: "asistencia", tirador: nueva.jugador ?? null });
+      return;
+    }
+    terminar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const cerrarPregunta = () => { if (pregunta?.reanudar) player.current?.playVideo?.(); setPregunta(null); setDorsalTecleado(""); };
@@ -275,27 +296,29 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
         {pregunta && (
           <div className="mt-3 rounded-xl border-2 p-3" style={{ borderColor: pregunta.cat.color }}>
             <div className="flex items-center justify-between gap-2">
-              <p className="font-bold" style={{ color: pregunta.cat.color }}>{pregunta.cat.nombre}: ¿quién{esTiro(pregunta.cat.estadistica) ? " tira" : ""}?</p>
+              <p className="font-bold" style={{ color: pregunta.cat.color }}>
+                {pregunta.paso === "asistencia" ? "¡Canasta! ¿Asistencia de quién?" : `${pregunta.cat.nombre}: ${pregunta.cat.estadistica ? PREGUNTA_ESTADISTICA[pregunta.cat.estadistica] : "¿Quién?"}`}
+              </p>
               <button onClick={cerrarPregunta} className="text-xs text-tinta/50 hover:text-tinta">Saltar (Esc)</button>
             </div>
             <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
-              {jugadores.map((j) => (
+              {jugadores.filter((j) => pregunta.paso !== "asistencia" || j.id !== pregunta.tirador).map((j) => (
                 <button key={j.id} onClick={() => responder(pregunta, { jugador: j.id })}
                   className={`rounded-lg px-1 py-2 text-center ${pregunta.jugador === j.id ? "bg-azul text-white ring-2 ring-oro" : "bg-suave hover:bg-linea"}`}>
                   <span className="block text-lg font-bold leading-none">{j.dorsal ?? "–"}</span>
                   <span className="block truncate text-[10px]">{j.nombre}</span>
                 </button>
               ))}
-              <button onClick={() => responder(pregunta, { jugador: null })} className={`rounded-lg px-1 py-2 text-xs ${pregunta.jugador === null ? "bg-azul text-white" : "bg-suave"}`}>No sé / equipo</button>
+              <button onClick={() => responder(pregunta, { jugador: null })} className={`rounded-lg px-1 py-2 text-xs ${pregunta.jugador === null ? "bg-azul text-white" : "bg-suave"}`}>{pregunta.paso === "asistencia" ? "Sin asistencia" : "No sé / equipo"}</button>
             </div>
-            {esTiro(pregunta.cat.estadistica) && (
+            {esTiro(pregunta.cat.estadistica) && pregunta.paso !== "asistencia" && (
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <button onClick={() => responder(pregunta, { resultado: "bien" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "bien" ? "ring-4 ring-oro" : ""} bg-green-600`}>✓ Anotada <span className="text-xs font-normal opacity-80">(M)</span></button>
                 <button onClick={() => responder(pregunta, { resultado: "mal" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "mal" ? "ring-4 ring-oro" : ""} bg-red-600`}>✗ Fallada <span className="text-xs font-normal opacity-80">(F)</span></button>
               </div>
             )}
             <p className="mt-2 text-[11px] text-tinta/50">
-              Teclado: escribe el dorsal{dorsalTecleado && <strong> ({dorsalTecleado})</strong>}{esTiro(pregunta.cat.estadistica) ? " y pulsa M si la mete o F si la falla." : " y pulsa Enter."} El vídeo sigue al responder.
+              Teclado: escribe el dorsal{dorsalTecleado && <strong> ({dorsalTecleado})</strong>}{esTiro(pregunta.cat.estadistica) && pregunta.paso !== "asistencia" ? " y pulsa M si la mete o F si la falla." : pregunta.paso === "asistencia" ? " y pulsa Enter (Enter solo = sin asistencia)." : " y pulsa Enter."} El vídeo sigue al responder.
             </p>
           </div>
         )}
@@ -378,34 +401,38 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
 
         {pestana === "stats" ? (
           <div className="tarjeta overflow-x-auto">
-            {!stats.hay ? <p className="p-4 text-sm text-tinta/50">Etiqueta tiros ({["t2", "t3", "tl"].map((e) => NOMBRE_ESTADISTICA[e as "t2"]).join(", ")}) o pérdidas y la estadística se hace sola.</p> : (
-              <table className="w-full text-sm">
-                <thead className="bg-suave text-[11px] uppercase text-tinta/60">
-                  <tr><th className="p-2 text-left">Jugador</th><th className="p-1">Pts</th><th className="p-1">T2</th><th className="p-1">T3</th><th className="p-1">TL</th><th className="p-1">Pérd.</th></tr>
+            {!stats.hay ? <p className="p-4 text-sm text-tinta/50">Etiqueta tiros, rebotes, asistencias, robos, tapones, pérdidas o faltas y la estadística se hace sola.</p> : (
+              <table className="w-full whitespace-nowrap text-xs">
+                <thead className="bg-suave text-[10px] uppercase text-tinta/60">
+                  <tr>
+                    <th className="sticky left-0 bg-suave p-2 text-left">Jugador</th>
+                    {["Pts", "T2", "T3", "TL", "RO", "RD", "Reb", "Ast", "Rob", "Tap", "Pér", "FC", "Val"].map((h) => <th key={h} className="px-1.5 py-2">{h}</th>)}
+                  </tr>
                 </thead>
                 <tbody>
-                  {stats.filas.map(({ id, j, st }) => (
-                    <tr key={id} onClick={() => { setFJug(id); setPestana("clips"); }} className="cursor-pointer border-t border-linea hover:bg-suave">
-                      <td className="p-2">{j ? <><strong className="text-azul">{j.dorsal ?? ""}</strong> {j.nombre}</> : <span className="text-tinta/50">Sin jugador</span>}</td>
-                      <td className="p-1 text-center font-bold">{st.pts}</td>
-                      <td className="p-1 text-center text-xs">{st.t2m}/{st.t2a}<span className="block text-tinta/50">{pctTiro(st.t2m, st.t2a)}</span></td>
-                      <td className="p-1 text-center text-xs">{st.t3m}/{st.t3a}<span className="block text-tinta/50">{pctTiro(st.t3m, st.t3a)}</span></td>
-                      <td className="p-1 text-center text-xs">{st.tlm}/{st.tla}<span className="block text-tinta/50">{pctTiro(st.tlm, st.tla)}</span></td>
-                      <td className="p-1 text-center">{st.perdidas || "–"}</td>
+                  {[...stats.filas.map((f) => ({ ...f, total: false })), { id: "__total", j: null, st: stats.total, total: true }].map(({ id, j, st, total }) => (
+                    <tr key={id} onClick={() => { if (!total) { setFJug(id); setPestana("clips"); } }}
+                      className={total ? "border-t-2 border-tinta/30 bg-suave font-semibold" : "cursor-pointer border-t border-linea hover:bg-suave"}>
+                      <td className={`sticky left-0 p-2 ${total ? "bg-suave" : "bg-white"}`}>{total ? "Equipo" : j ? <><strong className="text-azul">{j.dorsal ?? ""}</strong> {j.nombre}</> : <span className="text-tinta/50">Sin jugador</span>}</td>
+                      <td className="px-1.5 text-center text-sm font-bold">{st.pts}</td>
+                      {([[st.t2m, st.t2a], [st.t3m, st.t3a], [st.tlm, st.tla]] as const).map(([m, a], i) => (
+                        <td key={i} className="px-1.5 text-center">{a ? <>{m}/{a}<span className="block text-[10px] font-normal text-tinta/50">{pctTiro(m, a)}</span></> : "–"}</td>
+                      ))}
+                      <td className="px-1.5 text-center">{st.ro || "–"}</td>
+                      <td className="px-1.5 text-center">{st.rd || "–"}</td>
+                      <td className="px-1.5 text-center font-semibold">{st.ro + st.rd || "–"}</td>
+                      <td className="px-1.5 text-center">{st.as || "–"}</td>
+                      <td className="px-1.5 text-center">{st.rob || "–"}</td>
+                      <td className="px-1.5 text-center">{st.tap || "–"}</td>
+                      <td className="px-1.5 text-center">{st.perdidas || "–"}</td>
+                      <td className="px-1.5 text-center">{st.fc || "–"}</td>
+                      <td className={`px-1.5 text-center font-bold ${valoracion(st) > 0 ? "text-green-700" : valoracion(st) < 0 ? "text-red-700" : ""}`}>{valoracion(st)}</td>
                     </tr>
                   ))}
-                  <tr className="border-t-2 border-tinta/30 bg-suave font-semibold">
-                    <td className="p-2">Equipo</td>
-                    <td className="p-1 text-center">{stats.total.pts}</td>
-                    <td className="p-1 text-center text-xs">{stats.total.t2m}/{stats.total.t2a}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.t2m, stats.total.t2a)}</span></td>
-                    <td className="p-1 text-center text-xs">{stats.total.t3m}/{stats.total.t3a}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.t3m, stats.total.t3a)}</span></td>
-                    <td className="p-1 text-center text-xs">{stats.total.tlm}/{stats.total.tla}<span className="block font-normal text-tinta/50">{pctTiro(stats.total.tlm, stats.total.tla)}</span></td>
-                    <td className="p-1 text-center">{stats.total.perdidas || "–"}</td>
-                  </tr>
                 </tbody>
               </table>
             )}
-            {stats.hay && <p className="px-2 pb-2 pt-1 text-[11px] text-tinta/50">Toca un jugador para ver sus clips. Se guarda también en su ficha.</p>}
+            {stats.hay && <p className="px-2 pb-2 pt-1 text-[11px] text-tinta/50">Toca un jugador para ver sus clips. Val = valoración (puntos + rebotes + asistencias + robos + tapones − tiros fallados − pérdidas − faltas). Se guarda también en su ficha.</p>}
           </div>
         ) : (
           <>

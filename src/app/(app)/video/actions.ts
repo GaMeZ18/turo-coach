@@ -43,10 +43,11 @@ export async function renombrarVideo(id: string, titulo: string) {
 }
 
 // ---------- Clips ----------
-export async function crearClip(c: { video_id: string; categoria_id: string | null; inicio: number; fin: number; periodo: number | null }): Promise<Clip> {
+export async function crearClip(c: { video_id: string; categoria_id: string | null; inicio: number; fin: number; periodo: number | null; jugador_id?: string | null; resultado?: "bien" | "mal" | null }): Promise<Clip> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("video_clips").insert({
     video_id: c.video_id, categoria_id: c.categoria_id, inicio: Math.max(0, Math.round(c.inicio * 10) / 10), fin: Math.round(c.fin * 10) / 10, periodo: c.periodo,
+    jugador_id: c.jugador_id ?? null, resultado: c.resultado ?? null,
   }).select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota").single();
   if (error) throw new Error(error.message);
   return { ...data, inicio: Number(data.inicio), fin: Number(data.fin) } as Clip;
