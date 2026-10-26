@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy,
+  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge,
 } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
@@ -14,6 +14,7 @@ const MODULOS = [
   { href: "/pizarra", titulo: "Pizarra", texto: "Dibuja y anima jugadas al momento", icono: PenTool },
   { href: "/calendario", titulo: "Calendario", texto: "Partidos, entrenos, eventos y cumpleaños", icono: CalendarDays },
   { href: "/partidos", titulo: "Partidos", texto: "Resultados y convocatorias", icono: Trophy },
+  { href: "/pistas", titulo: "Pistas", texto: "Quién entrena en cada pista y a qué hora", icono: MapPin },
   { href: "/planificaciones", titulo: "Planificaciones", texto: "Objetivos de temporada en árbol", icono: Target },
   { href: "/scouting", titulo: "Scouting", texto: "Liga, rivales, estadísticas y fichas", icono: Binoculars },
   { titulo: "Vídeo", texto: "Etiqueta acciones por categorías", icono: Video },
@@ -49,7 +50,7 @@ export default async function Inicio() {
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {MODULOS.map(({ href, titulo, texto, icono: Icono }) => {
+        {[...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []), ...MODULOS].map(({ href, titulo, texto, icono: Icono }) => {
           const contenido = (
             <>
               <span className={`flex h-11 w-11 items-center justify-center rounded-full ${href ? "bg-azul text-oro ring-2 ring-oro/60 ring-offset-2" : "bg-tinta/5 text-tinta/40"}`}>

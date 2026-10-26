@@ -11,6 +11,7 @@ const NAV = [
   { href: "/entrenamientos", label: "Entrenamientos" },
   { href: "/planificaciones", label: "Planificaciones" },
   { href: "/partidos", label: "Partidos" },
+  { href: "/pistas", label: "Pistas" },
   { href: "/scouting", label: "Scouting" },
   { href: "/ejercicios", label: "Ejercicios" },
   { href: "/biblioteca", label: "Biblioteca" },
@@ -19,7 +20,7 @@ const NAV = [
 
 export default function NavPrincipal({ coordinador }: { coordinador: boolean }) {
   const ruta = usePathname();
-  const items = coordinador ? [...NAV, { href: "/club", label: "Club" }] : NAV;
+  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, { href: "/club", label: "Club" }] : NAV;
   const activo = (href: string) => (href === "/" ? ruta === "/" : ruta.startsWith(href));
 
   return (

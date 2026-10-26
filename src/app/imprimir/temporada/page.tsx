@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/supabase/server";
+import { todas } from "@/lib/db";
 import { equipoActivo } from "@/lib/equipo-activo";
 import { fechaCorta } from "@/lib/fechas";
 import { media, minutos, pct, resumenEquipo, type StatsPartido } from "@/lib/stats-fcbq";
@@ -24,13 +25,13 @@ export default async function InformeTemporada() {
     supabase.from("temporadas").select("nombre").eq("id", equipo.temporada_id).maybeSingle(),
     supabase.from("entrenamientos").select("id, fecha, duracion_prevista").eq("equipo_id", equipo.id).lte("fecha", ahora),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", equipo.id),
-    supabase.from("asistencias").select("jugador_id, estado, entrenamientos!inner(equipo_id, fecha)").eq("entrenamientos.equipo_id", equipo.id).lte("entrenamientos.fecha", ahora),
+    todas((a, b) => supabase.from("asistencias").select("jugador_id, estado, entrenamiento_id, entrenamientos!inner(equipo_id, fecha)").eq("entrenamientos.equipo_id", equipo.id).lte("entrenamientos.fecha", ahora).order("entrenamiento_id").order("jugador_id").range(a, b)),
     supabase.from("partidos").select("id, fecha, rival, local, puntos_favor, puntos_contra, competicion, jornada").eq("equipo_id", equipo.id).order("fecha"),
     supabase.from("convocatorias").select("jugador_id, partidos!inner(equipo_id)").eq("partidos.equipo_id", equipo.id),
     supabase.from("partido_periodos").select("jugador_id, periodos, partidos!inner(equipo_id)").eq("partidos.equipo_id", equipo.id),
     supabase.from("fcbq_stats").select("datos").eq("equipo_id", equipo.id),
     supabase.from("entreno_objetivos").select("objetivo_id, objetivos(nombre, color), entrenamientos!inner(equipo_id)").eq("entrenamientos.equipo_id", equipo.id),
-    supabase.from("entreno_actividades").select("ejercicio_id, tipo, duracion, ejercicios(titulo, categoria), entrenamientos!inner(equipo_id, fecha)").eq("entrenamientos.equipo_id", equipo.id).lte("entrenamientos.fecha", ahora),
+    todas((a, b) => supabase.from("entreno_actividades").select("id, ejercicio_id, tipo, duracion, ejercicios(titulo, categoria), entrenamientos!inner(equipo_id, fecha)").eq("entrenamientos.equipo_id", equipo.id).lte("entrenamientos.fecha", ahora).order("id").range(a, b)),
   ]);
 
   const jugadores: Jug[] = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])

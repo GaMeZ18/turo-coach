@@ -4,8 +4,9 @@ import { equipoActivo } from "@/lib/equipo-activo";
 import { fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import SinEquipo from "@/components/SinEquipo";
 import { crearEntrenoDesde, programarEntrenos } from "./actions";
-import { CalendarRange, ClipboardCheck, FileBarChart, LayoutTemplate } from "lucide-react";
+import { CalendarRange, ClipboardCheck, FileBarChart, LayoutTemplate, MapPin } from "lucide-react";
 import Enviar from "@/components/Enviar";
+import ListaPistas from "@/components/ListaPistas";
 
 type Entreno = {
   id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null;
@@ -66,9 +67,11 @@ export default async function EntrenamientosPage() {
           <Link href="/entrenamientos/asistencia" className="btn-secundario"><ClipboardCheck size={16} /> Asistencia</Link>
           <Link href="/entrenamientos/plantillas" className="btn-secundario"><LayoutTemplate size={16} /> Plantillas</Link>
           <Link href="/imprimir/temporada" className="btn-secundario"><FileBarChart size={16} /> Informe de temporada</Link>
+          <Link href="/pistas" className="btn-secundario"><MapPin size={16} /> Pistas</Link>
         </div>
       </div>
 
+      <ListaPistas />
       <form action={crearEntrenoDesde} className="tarjeta mt-5 grid grid-cols-2 gap-2 p-4 sm:grid-cols-6 sm:items-end">
         <input type="hidden" name="equipo_id" value={equipo.id} />
         <div className="col-span-1"><label className="etiqueta">Día</label><input name="dia" type="date" required defaultValue={hoyLocal()} className="campo" /></div>
@@ -76,7 +79,7 @@ export default async function EntrenamientosPage() {
         <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" placeholder="Ej.: Bloqueo directo" className="campo" /></div>
         <div className="col-span-1"><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" defaultValue={90} className="campo" /></div>
         <Enviar className="btn-primario col-span-1">Crear</Enviar>
-        <div className="col-span-2 sm:col-span-3"><input name="lugar" placeholder="Pista (opcional)" className="campo" /></div>
+        <div className="col-span-2 sm:col-span-3"><input name="lugar" list="lista-pistas" placeholder="Pista (opcional)" className="campo" /></div>
         <div className="col-span-2 sm:col-span-3">
           <select name="plantilla_id" className="campo" defaultValue="">
             <option value="">Sesión vacía</option>
@@ -104,7 +107,7 @@ export default async function EntrenamientosPage() {
           <div><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" defaultValue={90} className="campo" /></div>
           <div><label className="etiqueta">Desde</label><input name="desde" type="date" required defaultValue={hoyLocal()} className="campo" /></div>
           <div><label className="etiqueta">Hasta</label><input name="hasta" type="date" required className="campo" /></div>
-          <div className="col-span-2"><label className="etiqueta">Pista</label><input name="lugar" className="campo" /></div>
+          <div className="col-span-2"><label className="etiqueta">Pista</label><input name="lugar" list="lista-pistas" className="campo" /></div>
           <div className="col-span-2 sm:col-span-3">
             <select name="plantilla_id" className="campo" defaultValue="">
               <option value="">Sin plantilla (sesiones vacías)</option>

@@ -9,6 +9,8 @@ import Objetivos from "./Objetivos";
 import type { Objetivo } from "@/lib/objetivos";
 import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
+import ListaPistas from "@/components/ListaPistas";
+import { solapes, type Ocupacion, type Pista } from "@/lib/pistas";
 
 /** Edad de la biblioteca que corresponde al equipo ("U18 A" → Junior, "Sènior" → Sénior…) */
 function edadDe(t: string): string | null {
@@ -49,6 +51,22 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     supabase.from("entreno_objetivos").select("objetivo_id").eq("entrenamiento_id", id),
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
   ]);
+  // ¿Coincide en la pista con otro equipo?
+  let choque: string[] = [];
+  if (e.lugar) {
+    const ini = new Date(e.fecha).getTime();
+    const [{ data: oc }, { data: ps }] = await Promise.all([
+      supabase.rpc("ocupacion_pistas", { desde: new Date(ini - 6 * 3600000).toISOString(), hasta: new Date(ini + 6 * 3600000).toISOString() }),
+      supabase.from("pistas").select("id, nombre, capacidad, orden, notas"),
+    ]);
+    const conf = solapes((oc ?? []) as Ocupacion[], (ps ?? []) as Pista[]).get(e.id) ?? [];
+    if (conf.length) {
+      const otros = ((oc ?? []) as Ocupacion[]).filter((o) => conf.includes(o.id));
+      const { data: eqs } = await supabase.from("equipos").select("id, nombre").in("id", otros.map((o) => o.equipo_id));
+      choque = otros.map((o) => `${(eqs ?? []).find((x) => x.id === o.equipo_id)?.nombre ?? "Otro equipo"} (${hora(o.fecha)})`);
+    }
+  }
+
   const planesEntreno = ((planes ?? []) as unknown as { id: string; nombre: string; equipo_id: string | null; temporada_id: string | null; objetivos: Objetivo[] }[])
     .filter((p) => !p.temporada_id || p.temporada_id === temporada?.id)
     .sort((a, b) => (a.equipo_id ? 0 : 1) - (b.equipo_id ? 0 : 1))
@@ -84,6 +102,11 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {choque.length > 0 && (
+        <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          ⚠ Coincide en la pista {e.lugar} con: <strong>{choque.join(", ")}</strong>. <Link href="/pistas" className="underline">Ver el reparto de pistas</Link>
+        </p>
+      )}
       {e.notas && <p className="mt-3 whitespace-pre-line rounded-lg bg-oro/15 p-3 text-sm">{e.notas}</p>}
 
       <details className="mt-3">
@@ -96,7 +119,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           <div><label className="etiqueta">Hora</label><input name="hora" type="time" required defaultValue={horaInput(e.fecha)} className="campo" /></div>
           <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" defaultValue={e.titulo ?? ""} className="campo" /></div>
           <div><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" min={0} defaultValue={e.duracion_prevista} className="campo" /></div>
-          <div><label className="etiqueta">Pista</label><input name="lugar" defaultValue={e.lugar ?? ""} className="campo" /></div>
+          <div><label className="etiqueta">Pista</label><input name="lugar" list="lista-pistas" defaultValue={e.lugar ?? ""} className="campo" /><ListaPistas /></div>
           <div className="col-span-2 sm:col-span-5"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
           <Enviar>Guardar</Enviar>
         </form>
