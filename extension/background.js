@@ -202,7 +202,7 @@ async function apiStats(ids) {
           // Muestra para diagnosticar si la FCBQ cambia el formato
           if (!res.__muestra) res.__muestra = { estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length, primeros: ev.slice(0, 3) };
         } else if (!res.__muestra) {
-          res.__muestra = { estado: q.status };
+          res.__muestra = { estado: q?.status ?? "sin respuesta" };
         }
       } catch {}
       res[id] = j;
