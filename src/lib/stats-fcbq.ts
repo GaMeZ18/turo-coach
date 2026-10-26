@@ -136,7 +136,7 @@ export interface OnOff { nombre: string; dorsal: string; segOn: number; pfOn: nu
 /** Para un equipo: minutos y puntos a favor y en contra de cada quinteto, cada pareja y cada jugador en pista / en el banquillo */
 export function sinergias(nombre: string, partidos: StatsPartido[]) {
   const quintetos = new Map<string, Unidad>(), parejas = new Map<string, Unidad>(), onoff = new Map<string, OnOff>();
-  let conDatos = 0, estimado = false;
+  let conDatos = 0, estimado = false, sinDif = false;
   for (const s of partidos) {
     const lado = mismoEquipo(s.local.nombre, nombre) ? "local" : mismoEquipo(s.visitante.nombre, nombre) ? "visitante" : null;
     if (!lado) continue;
@@ -144,10 +144,10 @@ export function sinergias(nombre: string, partidos: StatsPartido[]) {
     const jug = s[lado].jugadores.filter((j) => j.tramos?.length);
     if (!jug.length) continue;
     const exacto = (s.marcador?.length ?? 0) > 1;
-    const conMas = jug.some((j) => j.tramos!.some((t) => t.length > 2));
-    if (!exacto && !conMas) continue;
+    const conMas = s.local.jugadores.concat(s.visitante.jugadores).some((j) => (j.tramos ?? []).some((t) => t.length > 2));
     conDatos++;
     if (!exacto) estimado = true;
+    if (!exacto && !conMas) sinDif = true;
 
     const fin = Math.max(...s.local.jugadores.concat(s.visitante.jugadores).flatMap((j) => (j.tramos ?? []).map((t) => t[1])));
     const nP = Math.max(1, s.numPeriodos || s.local.porPeriodo.length || 4);
@@ -163,7 +163,7 @@ export function sinergias(nombre: string, partidos: StatsPartido[]) {
       const nuestros = (x: [number, number, number]) => (lado === "local" ? [x[1], x[2]] : [x[2], x[1]]);
       difs = tramosSeg.map(([t0, t1]) => { const [f0, c0] = nuestros(marcadorEn(t0)), [f1, c1] = nuestros(marcadorEn(t1)); return { pf: f1 - f0, pc: c1 - c0 }; });
     } else {
-      difs = estimarDiferencias(s, lado, otro, tramosSeg, limites).map((d) => ({ pf: d, pc: 0 }));
+      difs = conMas ? estimarDiferencias(s, lado, otro, tramosSeg, limites).map((d) => ({ pf: d, pc: 0 })) : tramosSeg.map(() => ({ pf: 0, pc: 0 }));
     }
 
     const enPista = (j: JugadorStats, t0: number, t1: number) => j.tramos!.some((t) => t[0] <= t0 && t[1] >= t1);
@@ -192,7 +192,7 @@ export function sinergias(nombre: string, partidos: StatsPartido[]) {
     }
   }
   const orden = (m: Map<string, Unidad>) => [...m.values()].sort((a, b) => b.seg - a.seg);
-  return { quintetos: orden(quintetos), parejas: orden(parejas), onoff: [...onoff.values()].sort((a, b) => b.segOn - a.segOn), partidos: conDatos, estimado };
+  return { quintetos: orden(quintetos), parejas: orden(parejas), onoff: [...onoff.values()].sort((a, b) => b.segOn - a.segOn), partidos: conDatos, estimado, sinDif };
 }
 
 /** Sin jugada a jugada: estima la diferencia de marcador de cada tramo con mínimos cuadrados,

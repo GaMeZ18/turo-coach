@@ -62,7 +62,9 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
     <section>
       <h2 className="text-sm font-semibold uppercase tracking-wide text-tinta/60">Sinergias</h2>
       <p className="text-xs text-tinta/50">
-        {s.estimado
+        {s.sinDif
+          ? <>Solo minutos y on/off (con el +/- oficial): estos partidos se descargaron antes de la versión 1.4.3. Pulsa «Actualizar desde la FCBQ» para tener también los quintetos y las parejas.</>
+          : s.estimado
           ? <>On/off exacto con el +/- oficial. Quintetos y parejas <strong>estimados</strong> (≈) a partir de los minutos en pista y el +/- de cada tramo, porque la FCBQ no publica la jugada a jugada de estos partidos ({s.partidos} de {pj}).</>
           : <>Calculado con la jugada a jugada de la FCBQ ({s.partidos} de {pj} partidos). La FCBQ no publica los tiros fallados, así que se mide con puntos y +/-, no con posesiones.</>}
       </p>
@@ -80,7 +82,12 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
       </div>
 
       {s.partidos === 0 ? (
-        <p className="tarjeta mt-2 p-3 text-sm text-tinta/60">Faltan los datos de jugada a jugada. Pulsa «Actualizar desde la FCBQ» (extensión 1.4.1 o posterior) y se descargarán.</p>
+        <div className="tarjeta mt-2 p-3 text-sm text-tinta/60">
+          <p>Faltan los minutos en pista de cada jugador. Pulsa «Actualizar desde la FCBQ» (extensión 1.4.3 o posterior) y se descargarán.</p>
+          <p className="mt-1 text-xs text-tinta/40" data-no-traducir>
+            Detalle: {pj} partidos · versión de datos {[...new Set(stats.filter((p) => mismoEquipo(p.local.nombre, nombre) || mismoEquipo(p.visitante.nombre, nombre)).map((p) => p.v ?? 1))].join(",") || "–"} · con tramos {stats.filter((p) => (mismoEquipo(p.local.nombre, nombre) ? p.local : mismoEquipo(p.visitante.nombre, nombre) ? p.visitante : null)?.jugadores.some((j) => j.tramos?.length)).length}
+          </p>
+        </div>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="tarjeta overflow-x-auto">
