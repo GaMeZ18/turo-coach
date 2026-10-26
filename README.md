@@ -107,6 +107,14 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Entrenamientos (extra)
+- **Plantillas**: «Guardar como plantilla» en cualquier entreno; se usan al crear un entreno o al programar varios. Las del club (coordinador) las ven todos los equipos.
+- **Programar varios**: días de la semana, hora y fechas → crea todos los entrenos (con o sin plantilla) sin duplicar días.
+- **PDF / imprimir** (`/imprimir/entreno/<id>`): sesión con horas, pizarras, claves, objetivos y lista de asistencia para rellenar.
+- **Asistencia**: historial por jugador (presente, tarde, justificado, lesionado, ausente), % y motivos.
+
+> Requiere ejecutar `0008_plantillas_entreno.sql`.
+
 ### Biblioteca
 - Ejercicios y sistemas del club, por categorías, con filtro por edad (Mini, Infantil, Cadete, Junior, Sénior), tipo y texto, y la pizarra dibujada en cada tarjeta.
 - Cada entrenador decide al crear o editar un ejercicio si lo publica («Publicar en la Biblioteca del club»), y puede quitarlo después.

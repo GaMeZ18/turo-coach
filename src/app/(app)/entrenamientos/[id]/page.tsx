@@ -2,17 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
-import { borrarEntreno, duplicarEntreno, editarEntreno } from "../actions";
+import { borrarEntreno, duplicarEntreno, editarEntreno, guardarComoPlantilla } from "../actions";
 import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
 import type { Objetivo } from "@/lib/objetivos";
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
 
 export default async function EntrenoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, perfil } = await requireUser();
 
   const { data: e } = await supabase
     .from("entrenamientos")
@@ -60,7 +60,8 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
             {e.lugar ? ` · ${e.lugar}` : ""}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/imprimir/entreno/${e.id}`} className="btn-secundario" title="Imprimir o guardar en PDF"><Printer size={16} /> PDF</Link>
           <form action={duplicarEntreno}>
             <input type="hidden" name="id" value={e.id} />
             <Enviar className="btn-secundario" title="Copia este entreno a la semana siguiente"><Copy size={16} /> +1 semana</Enviar>
@@ -91,6 +92,19 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       </details>
 
       <Objetivos entrenoId={e.id} planes={planesEntreno} seleccionados={(marcados ?? []).map((m) => m.objetivo_id as string)} />
+
+      <details className="mt-2">
+        <summary className="inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-1 text-sm text-azul hover:underline">
+          <LayoutTemplate size={14} /> Guardar como plantilla
+        </summary>
+        <form action={guardarComoPlantilla} className="tarjeta mt-2 grid max-w-xl gap-2 p-4">
+          <input type="hidden" name="id" value={e.id} />
+          <input name="nombre" required defaultValue={e.titulo ?? ""} placeholder="Nombre de la plantilla" className="campo" />
+          <textarea name="descripcion" rows={2} placeholder="Para qué sirve (opcional)" className="campo" />
+          {perfil.rol === "coordinador" && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="club" value="1" /> Plantilla del club (para todos los equipos)</label>}
+          <Enviar>Guardar plantilla</Enviar>
+        </form>
+      </details>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px]">
         <Actividades
