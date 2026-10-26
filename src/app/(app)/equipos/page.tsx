@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/supabase/server";
-import { equiposDeTemporada } from "@/lib/equipo-activo";
+import { misEquipos } from "@/lib/equipo-activo";
 import {
   crearEquipo, actualizarEquipo, borrarEquipo, alternarCongelado, asignarStaff, quitarStaff, trabajarCon,
 } from "./actions";
@@ -9,7 +9,7 @@ import Enviar from "@/components/Enviar";
 export default async function EquiposPage() {
   const { supabase, perfil, user } = await requireUser();
   const esCoord = perfil.rol === "coordinador";
-  const { temporada, equipos } = await equiposDeTemporada(supabase);
+  const { temporada, equipos } = await misEquipos(supabase);
 
   const ids = equipos.map((e) => e.id);
   const [{ data: staff }, { data: perfiles }, { data: plantillas }] = await Promise.all([

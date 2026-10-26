@@ -107,6 +107,13 @@ Solo lo ve el cuerpo técnico de cada equipo (y el coordinador).
 
 > Requiere ejecutar `0006_scouting.sql`.
 
+### Panel del coordinador (Club)
+- Staff de cada equipo (entrenador, ayudante, delegado, preparador físico, fisioterapeuta…), con aviso de equipos sin entrenador.
+- **Añadir persona**: crea su acceso con contraseña provisional (y mensaje listo para WhatsApp) o le envía invitación por email; se le asignan equipos y función.
+- Nueva contraseña provisional, quitar/devolver acceso (no borra sus ejercicios) y cambiar entre staff y coordinador.
+- Necesita la variable `SUPABASE_SERVICE_ROLE_KEY` (clave *secret* de Supabase) en Vercel.
+- Permisos (`0011_permisos_staff.sql`): cada persona del staff solo ve sus equipos en el selector, sus jugadores, entrenamientos, asistencia, convocatorias, planificaciones y scouting. El calendario del club y los partidos siguen visibles para todos.
+
 ### Idioma (castellano / catalán)
 - Botones **ES / CA** en la cabecera, en *Mi cuenta* y en el acceso (se guarda en una cookie). En catalán, `<Traductor/>` traduce la interfaz con el diccionario `src/lib/ca.ts` (coincidencia exacta de cada texto, también fechas); lo que escribe cada usuario no se toca. Para traducir un texto nuevo, añádelo al diccionario.
 

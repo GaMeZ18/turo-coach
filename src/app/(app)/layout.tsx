@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
-import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
+import { equipoActivo, misEquipos } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
 import RegistrarSW from "@/components/RegistrarSW";
@@ -11,7 +11,7 @@ import { Bell, LogOut, UserRound } from "lucide-react";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, perfil, user } = await requireUser();
   const [{ equipos }, activo] = await Promise.all([
-    equiposDeTemporada(supabase),
+    misEquipos(supabase),
     equipoActivo(supabase),
   ]);
 

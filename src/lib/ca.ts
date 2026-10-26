@@ -224,6 +224,17 @@ export const CA: Record<string, string> = {
   "Este navegador no admite avisos. En iPhone/iPad, primero instala la app (Compartir → Añadir a pantalla de inicio) y ábrela desde el icono.": "Aquest navegador no admet avisos. A l'iPhone/iPad, primer instal·la l'app (Comparteix → Afegeix a la pantalla d'inici) i obre-la des de la icona.",
   "Los avisos están bloqueados para esta web. Permítelos en los ajustes del navegador (icono del candado junto a la dirección).": "Els avisos estan bloquejats per a aquest web. Permet-los a la configuració del navegador (icona del cadenat al costat de l'adreça).",
 
+  // ---------- Panel del coordinador ----------
+  "Panel del coordinador": "Tauler del coordinador", "Staff de cada equipo": "Staff de cada equip", "Sin entrenador": "Sense entrenador",
+  "Añadir persona…": "Afegeix persona…", "Añadir persona al staff": "Afegeix una persona al staff", "Nombre y apellidos": "Nom i cognoms",
+  "Función": "Funció", "Permisos": "Permisos", "Staff (solo sus equipos)": "Staff (només els seus equips)", "Coordinador (todo el club)": "Coordinador (tot el club)",
+  "Crear acceso": "Crea l'accés", "Personas con acceso": "Persones amb accés", "Nueva contraseña ": "Contrasenya nova", "Quitar acceso": "Treu l'accés",
+  "Devolver acceso": "Retorna l'accés", "Sin acceso": "Sense accés", "Staff": "Staff", "Copiar mensaje para WhatsApp": "Copia el missatge per a WhatsApp",
+  "Crear con contraseña provisional (se la mandas tú por WhatsApp)": "Crea amb contrasenya provisional (l'envies tu per WhatsApp)",
+  "Enviar invitación por email": "Envia invitació per correu", "Crea antes los equipos en Equipos.": "Crea abans els equips a Equips.",
+  "Staff de cada equipo, accesos a la app y temporadas. Solo lo ves tú.": "Staff de cada equip, accessos a l'app i temporades. Només ho veus tu.",
+  "Listo. Datos de acceso (solo se muestran ahora):": "Fet. Dades d'accés (només es mostren ara):", "Coordinador (tú)": "Coordinador (tu)",
+
   // ---------- Errors comuns ----------
   "No tienes permiso para hacer esto en este equipo.": "No tens permís per fer això en aquest equip.", "Ya existe un registro igual.": "Ja existeix un registre igual.",
   "No se puede: hay otros datos que dependen de este.": "No es pot: hi ha altres dades que en depenen.", "No hay conexión con la base de datos. Inténtalo de nuevo.": "No hi ha connexió amb la base de dades. Torna-ho a provar.",

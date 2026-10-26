@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
+import { equipoActivo, misEquipos } from "@/lib/equipo-activo";
 import { aplanar, arbol, conDescendientes, COLORES_OBJETIVO, type Nodo, type Objetivo } from "@/lib/objetivos";
 import { diaInput, hoyLocal } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
@@ -23,7 +23,7 @@ export default async function PlanificacionPage({ params, searchParams }: { para
 
   const [{ data: objs }, { equipos }, activo, { data: staff }] = await Promise.all([
     supabase.from("objetivos").select("id, planificacion_id, padre_id, nombre, descripcion, color, orden").eq("planificacion_id", id),
-    equiposDeTemporada(supabase),
+    misEquipos(supabase),
     equipoActivo(supabase),
     supabase.from("equipo_staff").select("equipo_id").eq("perfil_id", user.id),
   ]);

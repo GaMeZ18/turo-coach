@@ -146,6 +146,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
         </section>
       )}
 
+      {esStaff ? (
       <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">
           {/* Resultado y notas */}
@@ -192,6 +193,9 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
 
         <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} />
       </div>
+      ) : (
+        p.notas ? <p className="tarjeta mt-5 whitespace-pre-line p-4 text-sm">{p.notas}</p> : null
+      )}
 
       {esStaff && (
         <div className="mt-5">
