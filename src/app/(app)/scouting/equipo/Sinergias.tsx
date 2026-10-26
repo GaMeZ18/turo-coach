@@ -54,7 +54,7 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
     if (!lado) continue;
     pj++;
     for (const j of p[lado].jugadores) { if (j.titular) titulares += j.pts; else banquillo += j.pts; }
-    if (p.marcador?.length) { const r = rachas(p, lado); maxV += r.maxVentaja; maxP += r.maxParcial; nRachas++; }
+    if ((p.marcador?.length ?? 0) > 1) { const r = rachas(p, lado); maxV += r.maxVentaja; maxP += r.maxParcial; nRachas++; }
   }
   const media = (x: number, n: number) => (n ? (x / n).toFixed(1) : "–");
 
@@ -78,7 +78,7 @@ export default function Sinergias({ nombre, stats }: { nombre: string; stats: St
       </div>
 
       {s.partidos === 0 ? (
-        <p className="tarjeta mt-2 p-3 text-sm text-tinta/60">Faltan los datos de jugada a jugada. Pulsa «Actualizar desde la FCBQ» (extensión 1.4 o posterior) y se descargarán.</p>
+        <p className="tarjeta mt-2 p-3 text-sm text-tinta/60">Faltan los datos de jugada a jugada. Pulsa «Actualizar desde la FCBQ» (extensión 1.4.1 o posterior) y se descargarán.</p>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="tarjeta overflow-x-auto">

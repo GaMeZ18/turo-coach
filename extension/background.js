@@ -180,7 +180,11 @@ async function apiStats(ids) {
         if (q.ok) {
           const pj = await q.json();
           const ev = Array.isArray(pj) ? pj : pj.playByPlay || pj.events || [];
-          j.pbp = ev.map((e) => ({ c: e.c, p: e.p, m: e.m, s: e.s, l: e.l, v: e.v }));
+          // Nombres de la FCBQ: eventTypeCode, period, minute, second, localScore, visitorScore
+          j.pbp = ev.map((e) => ({
+            c: e.c ?? e.eventTypeCode, p: e.p ?? e.period ?? e.periodNumber,
+            m: e.m ?? e.minute, s: e.s ?? e.second, l: e.l ?? e.localScore, v: e.v ?? e.visitorScore,
+          }));
         }
       } catch {}
       res[id] = j;

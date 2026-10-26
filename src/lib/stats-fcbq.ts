@@ -38,12 +38,12 @@ export interface StatsPartido {
   numPeriodos: number;
   local: EquipoStats;
   visitante: EquipoStats;
-  v?: number;                       // 2 = con tramos en pista y marcador minuto a minuto
+  v?: number;                       // 3 = con tramos en pista y marcador a lo largo del partido
   marcador?: [number, number, number][]; // [segundo de partido, puntos local, puntos visitante] en cada cambio
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 2;
+export const VERSION_STATS = 3;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };
@@ -51,7 +51,7 @@ type EqFCBQ = { name?: string; accumulated?: Acum; players?: JugFCBQ[] };
 type Stint = { startSeconds?: number; endSeconds?: number };
 type FCBQ = {
   stints?: { local?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[]; visitor?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[] };
-  pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number; v?: number }[];
+  pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null }[];
   header?: { date?: string; matchDayNum?: number; localTeam?: { name?: string }; visitorTeam?: { name?: string }; score?: { local?: number; visitor?: number }; periods?: { period: number; local: number; visitor: number }[] };
   boxscore?: { period: number; local?: EqFCBQ; visitor?: EqFCBQ }[];
 };
@@ -103,8 +103,11 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
     numPeriodos: Math.max(periodos.length, d.header.periods?.length ?? 0),
     local: equipo("local"),
     visitante: equipo("visitor"),
-    v: d.pbp?.length ? VERSION_STATS : 1,
-    marcador: d.pbp?.length ? lineaMarcador(d.pbp) : undefined,
+    ...(() => {
+      const m = d.pbp?.length ? lineaMarcador(d.pbp) : [];
+      // Solo vale si el marcador avanza (si no, se volverá a descargar)
+      return m.length > 1 ? { v: VERSION_STATS, marcador: m } : { v: 1 };
+    })(),
   };
 }
 
@@ -116,7 +119,7 @@ function lineaMarcador(pbp: NonNullable<FCBQ["pbp"]>): [number, number, number][
   const inicio = (p: number) => { let t = 0; for (let i = 1; i < p; i++) t += dur[i] ?? (i > 4 ? 300 : 600); return t; };
   const res: [number, number, number][] = [[0, 0, 0]];
   for (const e of pbp) {
-    if (!e.p || e.l === undefined || e.v === undefined) continue;
+    if (!e.p || e.l === undefined || e.l === null || e.v === undefined || e.v === null) continue;
     const t = inicio(e.p) + (dur[e.p] ?? (e.p > 4 ? 300 : 600)) - (n(e.m) * 60 + n(e.s));
     const [, l, v] = res[res.length - 1];
     if (e.l !== l || e.v !== v) res.push([t, n(e.l), n(e.v)]);
@@ -135,11 +138,11 @@ export function sinergias(nombre: string, partidos: StatsPartido[]) {
   let conDatos = 0;
   for (const s of partidos) {
     const lado = mismoEquipo(s.local.nombre, nombre) ? "local" : mismoEquipo(s.visitante.nombre, nombre) ? "visitante" : null;
-    if (!lado || !s.marcador?.length) continue;
+    if (!lado || (s.marcador?.length ?? 0) < 2) continue;
     const jug = s[lado].jugadores.filter((j) => j.tramos?.length);
     if (!jug.length) continue;
     conDatos++;
-    const linea = s.marcador;
+    const linea = s.marcador!;
     const marcadorEn = (t: number) => { let r = linea[0]; for (const x of linea) { if (x[0] <= t) r = x; else break; } return r; };
     const nuestros = (x: [number, number, number]) => (lado === "local" ? [x[1], x[2]] : [x[2], x[1]]);
     // Cortes: cada cambio de jugadores
