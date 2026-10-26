@@ -7,3 +7,26 @@ export function parecido(nombreApp: string, dorsalApp: number | string | null, n
   const comunes = tokens(nombreApp).filter((t) => tf.has(t)).length;
   return comunes + (dorsalApp !== null && dorsalApp !== "" && String(dorsalApp) === String(dorsalFcbq) ? 2 : 0);
 }
+
+const PARTICULAS = new Set(["I", "Y", "DE", "DEL", "LA", "LAS", "LOS", "DA", "DOS", "VAN", "VON"]);
+const capital = (w: string) => {
+  const l = w.toLowerCase();
+  if (["i", "y", "de", "del", "la", "las", "los"].includes(l)) return l;
+  return l.replace(/(^|[-'’])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+};
+
+/** "AINHOA PADRÓS I ZABALETA" → { nombre: "Ainhoa", apellidos: "Padrós i Zabaleta" } (dos apellidos, con sus partículas) */
+export function separarNombre(completo: string) {
+  const t = completo.trim().split(/\s+/).filter(Boolean);
+  if (t.length <= 1) return { nombre: capital(t[0] ?? ""), apellidos: "" };
+  if (t.length === 2) return { nombre: capital(t[0]), apellidos: capital(t[1]) };
+  // Recogemos dos apellidos desde el final, arrastrando partículas (de, la, i…)
+  let i = t.length - 1, apellidos = 0;
+  while (i > 0 && apellidos < 2) {
+    apellidos++;
+    i--;
+    while (i > 0 && PARTICULAS.has(t[i].toUpperCase())) i--;
+  }
+  const corte = Math.max(1, i + 1);
+  return { nombre: t.slice(0, corte).map(capital).join(" "), apellidos: t.slice(corte).map(capital).join(" ") };
+}

@@ -235,6 +235,9 @@ export const CA: Record<string, string> = {
   "Staff de cada equipo, accesos a la app y temporadas. Solo lo ves tú.": "Staff de cada equip, accessos a l'app i temporades. Només ho veus tu.",
   "Listo. Datos de acceso (solo se muestran ahora):": "Fet. Dades d'accés (només es mostren ara):", "Coordinador (tú)": "Coordinador (tu)",
 
+  "Revisar e importar": "Revisa i importa", "En las actas de la FCBQ": "A les actes de la FCBQ", "En el acta": "A l'acta",
+  "Revisa cómo ha separado nombre y apellidos. Si el jugador ya existe en el club (otra temporada), se vincula en lugar de duplicarlo.": "Revisa com ha separat el nom i els cognoms. Si el jugador ja existeix al club (una altra temporada), es vincula en lloc de duplicar-lo.",
+
   // ---------- Errors comuns ----------
   "No tienes permiso para hacer esto en este equipo.": "No tens permís per fer això en aquest equip.", "Ya existe un registro igual.": "Ja existeix un registre igual.",
   "No se puede: hay otros datos que dependen de este.": "No es pot: hi ha altres dades que en depenen.", "No hay conexión con la base de datos. Inténtalo de nuevo.": "No hi ha connexió amb la base de dades. Torna-ho a provar.",

@@ -127,3 +127,30 @@ export async function guardarJugador(formData: FormData) {
   revalidatePath("/jugadores");
   redirect("/jugadores");
 }
+
+// ---------- Plantilla desde la FCBQ ----------
+export type JugadorFCBQ = { nombre: string; apellidos: string; dorsal: number | null };
+
+/** Da de alta (o vincula, si ya existían) los jugadores de la FCBQ en el equipo y actualiza dorsales */
+export async function importarPlantillaFCBQ(equipoId: string, nuevos: JugadorFCBQ[], dorsales: { jugadorId: string; dorsal: number | null }[]) {
+  const supabase = await createClient();
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  // Jugadores que ya existen en el club (de otras temporadas o equipos que se puedan ver)
+  const { data: todos } = await supabase.from("jugadores").select("id, nombre, apellidos");
+  const existente = (j: JugadorFCBQ) => (todos ?? []).find((x) => norm(`${x.nombre} ${x.apellidos ?? ""}`) === norm(`${j.nombre} ${j.apellidos}`));
+  let altas = 0;
+  for (const j of nuevos) {
+    let id = existente(j)?.id as string | undefined;
+    if (!id) {
+      const { data, error } = await supabase.from("jugadores").insert({ nombre: j.nombre.trim(), apellidos: j.apellidos.trim() || null }).select("id").single();
+      if (error) throw new Error(`${j.nombre}: ${error.message}`);
+      id = data.id;
+    }
+    const { error } = await supabase.from("equipo_jugadores").upsert({ equipo_id: equipoId, jugador_id: id, dorsal: j.dorsal });
+    if (error) throw new Error(`${j.nombre}: ${error.message}`);
+    altas++;
+  }
+  for (const d of dorsales) await supabase.from("equipo_jugadores").update({ dorsal: d.dorsal }).eq("equipo_id", equipoId).eq("jugador_id", d.jugadorId);
+  revalidatePath("/jugadores");
+  return { altas, dorsales: dorsales.length };
+}
