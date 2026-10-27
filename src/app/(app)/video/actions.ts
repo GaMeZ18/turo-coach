@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
-import { youtubeId, type Clip } from "@/lib/video";
+import { youtubeId, type Clip, type EventoVideo } from "@/lib/video";
 
 export async function crearVideo(fd: FormData) {
   const supabase = await createClient();
@@ -86,4 +86,24 @@ export async function borrarCategoria(fd: FormData) {
   const supabase = await createClient();
   check(await supabase.from("video_categorias").delete().eq("id", String(fd.get("id"))));
   revalidatePath("/video");
+}
+
+// ---------- Pista (quinteto, fin de cuarto, puntos del rival) ----------
+export async function crearEventoVideo(e: { video_id: string; t: number; tipo: "quinteto" | "fin_periodo" | "rival"; periodo: number | null; jugadores?: string[] | null; puntos?: number | null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("video_eventos").insert({
+    video_id: e.video_id, t: Math.max(0, Math.round(e.t * 10) / 10), tipo: e.tipo, periodo: e.periodo, jugadores: e.jugadores ?? null, puntos: e.puntos ?? null,
+  }).select("id, video_id, t, tipo, periodo, jugadores, puntos").single();
+  if (error) throw new Error(/video_eventos/.test(error.message) ? "Falta preparar la base de datos (0019_video_pista.sql)." : error.message);
+  return { ...data, t: Number(data.t) } as EventoVideo;
+}
+
+export async function borrarEventoVideo(id: string) {
+  const supabase = await createClient();
+  check(await supabase.from("video_eventos").delete().eq("id", id));
+}
+
+export async function guardarMinutosPeriodo(videoId: string, minutos: number) {
+  const supabase = await createClient();
+  check(await supabase.from("videos").update({ minutos_periodo: Math.min(20, Math.max(4, Math.round(minutos))) }).eq("id", videoId));
 }

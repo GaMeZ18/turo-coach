@@ -2,9 +2,9 @@
 
 // Analizador de vídeo: reproductor de YouTube + botonera de etiquetas + clips filtrables.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, ListVideo, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
-import { PREGUNTA_ESTADISTICA, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type StatVideo } from "@/lib/video";
-import { actualizarClip, borrarClip, crearClip } from "../actions";
+import { ArrowLeftRight, BarChart3, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { PREGUNTA_ESTADISTICA, analisisPista, enPista, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type EventoVideo, type StatVideo } from "@/lib/video";
+import { actualizarClip, borrarClip, borrarEventoVideo, crearClip, crearEventoVideo, guardarMinutosPeriodo } from "../actions";
 
 type Jugador = { id: string; nombre: string; apellidos: string | null; dorsal: number | null };
 
@@ -30,10 +30,12 @@ function cargarAPI(): Promise<void> {
 const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
-type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null };
+type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean };
+const VELOCIDADES = [1, 1.5, 2];
 
-export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial }: {
+export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo }: {
   videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
+  eventosIniciales: EventoVideo[]; minutosPeriodo: number;
 }) {
   const contenedor = useRef<HTMLDivElement>(null);
   const player = useRef<any>(null);
@@ -54,6 +56,11 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   const [pregunta, setPregunta] = useState<Pregunta | null>(null);
   const [dorsalTecleado, setDorsalTecleado] = useState("");
   const [pestana, setPestana] = useState<"clips" | "stats">("clips");
+  const [eventos, setEventos] = useState<EventoVideo[]>([...eventosIniciales].sort((a, b) => a.t - b.t));
+  const [minPer, setMinPer] = useState(minutosPeriodo);
+  const [velocidad, setVelocidad] = useState(1);
+  const [editorQ, setEditorQ] = useState<string[] | null>(null);   // selección del quinteto (inicio de cuarto / varios cambios)
+  const [sale, setSale] = useState<string | null>(null);            // jugador que sale en un cambio rápido
   const teclas = useMemo(() => teclasDe(categorias), [categorias]);
   const teclaDe = useCallback((c: Categoria) => [...teclas.entries()].find(([, x]) => x.id === c.id)?.[0] ?? null, [teclas]);
   // Clips recién creados: id provisional → id real, y cambios hechos antes de tener el id real
@@ -94,8 +101,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
 
   // Reloj: tiempo actual y parar al final del clip / pasar al siguiente de la lista
   const catAsist = categorias.find((c) => c.estadistica === "as") ?? null;
-  const refs = useRef({ activo, cola, clips, bucle, catAsist });
-  refs.current = { activo, cola, clips, bucle, catAsist };
+  const refs = useRef({ activo, cola, clips, bucle, catAsist, eventos, periodo });
+  refs.current = { activo, cola, clips, bucle, catAsist, eventos, periodo };
   useEffect(() => {
     const iv = setInterval(() => {
       if (!player.current?.getCurrentTime) return;
@@ -136,7 +143,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
       const sonando = player.current?.getPlayerState?.() === 1;
       if (sonando) player.current?.pauseVideo?.();
       setDorsalTecleado("");
-      setPregunta({ id: tmp.id, cat: c, reanudar: sonando });
+      setPregunta({ id: tmp.id, cat: c, reanudar: sonando, pista: enPista(refs.current.eventos, tt) });
     }
     try {
       const real = await crearClip({ video_id: videoId, categoria_id: c.id, inicio: tmp.inicio, fin: tmp.fin, periodo });
@@ -185,12 +192,44 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     const asist = refs.current.catAsist;
     if (tiro && nueva.resultado === "bien" && q.cat.estadistica !== "tl" && asist) {
       setDorsalTecleado("");
-      setPregunta({ id: q.id, cat: asist, reanudar: q.reanudar, paso: "asistencia", tirador: nueva.jugador ?? null });
+      setPregunta({ id: q.id, cat: asist, reanudar: q.reanudar, paso: "asistencia", tirador: nueva.jugador ?? null, pista: q.pista });
       return;
     }
     terminar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // --- Pista: quinteto, cambios, fin de cuarto y puntos del rival ---
+  const nuevoEvento = (e: Omit<EventoVideo, "id" | "video_id">) => {
+    const tmp: EventoVideo = { ...e, id: `tmp-ev-${Date.now()}`, video_id: videoId };
+    setEventos((l) => [...l, tmp].sort((a, b) => a.t - b.t));
+    crearEventoVideo({ video_id: videoId, t: e.t, tipo: e.tipo, periodo: e.periodo, jugadores: e.jugadores, puntos: e.puntos })
+      .then((real) => setEventos((l) => l.map((x) => (x.id === tmp.id ? real : x))))
+      .catch((err) => { setEventos((l) => l.filter((x) => x.id !== tmp.id)); setError(err instanceof Error ? err.message : "No se ha podido guardar."); });
+  };
+  const quitarEvento = (id: string) => {
+    if (id.startsWith("tmp-")) return;
+    setEventos((l) => l.filter((x) => x.id !== id));
+    borrarEventoVideo(id).catch(() => setError("No se ha podido borrar."));
+  };
+  const ponerQuinteto = (ids: string[]) => nuevoEvento({ t: ahora(), tipo: "quinteto", periodo: refs.current.periodo, jugadores: ids, puntos: null });
+  const cambioRapido = (entra: string) => {
+    if (!sale) return;
+    const actual = enPista(eventos, ahora());
+    ponerQuinteto(actual.map((x) => (x === sale ? entra : x)));
+    setSale(null);
+  };
+  const finPeriodo = () => {
+    const p = periodo ?? 1;
+    nuevoEvento({ t: ahora(), tipo: "fin_periodo", periodo: p, jugadores: null, puntos: null });
+    setPeriodo(Math.min(5, p + 1));
+    setEditorQ(enPista(eventos, ahora()));
+  };
+  const puntosRival = (n: number) => {
+    nuevoEvento({ t: ahora(), tipo: "rival", periodo, jugadores: null, puntos: n });
+    setDestello(`rival${n}`); setTimeout(() => setDestello(null), 350);
+  };
+  const cambiarVelocidad = (v: number) => { setVelocidad(v); player.current?.setPlaybackRate?.(v); };
+
   const cerrarPregunta = () => { if (pregunta?.reanudar) player.current?.playVideo?.(); setPregunta(null); setDorsalTecleado(""); };
   const quitar = (id: string) => {
     if (id.startsWith("tmp-")) return;
@@ -223,6 +262,9 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
       }
       const c = teclas.get(k);
       if (c) { e.preventDefault(); etiquetar(c); }
+      else if (k === "Z" || k === "X" || k === "C") { e.preventDefault(); refsAcc.current.puntosRival(k === "Z" ? 1 : k === "X" ? 2 : 3); }
+      else if (k === "S") { e.preventDefault(); ir(ahora() + 30, false); }
+      else if (k === "V") { e.preventDefault(); const v = refsAcc.current.velocidad; refsAcc.current.cambiarVelocidad(VELOCIDADES[(VELOCIDADES.indexOf(v) + 1) % VELOCIDADES.length]); }
       else if (e.key === " ") {
         e.preventDefault();
         if (player.current?.getPlayerState?.() === 1) player.current.pauseVideo(); else player.current?.playVideo?.();
@@ -234,6 +276,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     return () => window.removeEventListener("keydown", fn);
   }, [teclas, etiquetar, jugadores, responder]);
 
+  const refsAcc = useRef({ puntosRival, cambiarVelocidad, velocidad });
+  refsAcc.current = { puntosRival, cambiarVelocidad, velocidad };
   const refsP = useRef({ pregunta, dorsal: dorsalTecleado });
   refsP.current = { pregunta, dorsal: dorsalTecleado };
 
@@ -263,6 +307,13 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     return { hay, total, filas };
   }, [clips, cat, jug]);
 
+  const pista = useMemo(() => analisisPista(eventos, clips.filter((c) => !c.id.startsWith("tmp-")), categorias, minPer), [eventos, clips, categorias, minPer]);
+  const enPistaAhora = enPista(eventos, t);
+  const filasStats = [
+    ...stats.filas,
+    ...[...pista.jugadores.keys()].filter((id) => !stats.filas.some((f) => f.id === id)).map((id) => ({ id, j: jug(id), st: statVacia() })),
+  ];
+
   // --- Contadores ---
   const contadores = useMemo(() => categorias.map((c) => {
     const de = clips.filter((x) => x.categoria_id === c.id);
@@ -284,12 +335,78 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <button onClick={() => (tocando ? player.current?.pauseVideo?.() : player.current?.playVideo?.())} className="btn-secundario !px-2.5 !py-1.5" aria-label="Play/pausa">{tocando ? <Pause size={16} /> : <Play size={16} />}</button>
           <span className="font-mono tabular-nums">{mmss(t)}</span>
+          <button onClick={() => ir(ahora() - 10, false)} className="btn-secundario !px-2 !py-1 text-xs" title="Atrás 10 s"><Rewind size={14} /> 10</button>
+          <button onClick={() => ir(ahora() + 30, false)} className="btn-secundario !px-2 !py-1 text-xs" title="Adelante 30 s (S)"><FastForward size={14} /> 30</button>
+          <div className="flex overflow-hidden rounded-md border border-linea text-xs" title="Velocidad (V)">
+            {VELOCIDADES.map((v) => <button key={v} onClick={() => cambiarVelocidad(v)} className={`px-2 py-1 font-semibold ${velocidad === v ? "bg-azul text-white" : "bg-white text-tinta/60"}`}>{v}×</button>)}
+          </div>
           <div className="ml-auto flex items-center gap-1">
             <span className="text-xs text-tinta/60">Periodo</span>
             {PERIODOS.map((p) => (
               <button key={p} onClick={() => setPeriodo(p)} className={`h-7 min-w-8 rounded-md px-1.5 text-xs font-semibold ${periodo === p ? "bg-azul text-white" : "bg-suave text-tinta/60"}`}>{nombrePeriodo(p)}</button>
             ))}
           </div>
+        </div>
+
+        {/* En pista */}
+        <div className="mt-2 rounded-xl border border-linea bg-white p-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="flex items-center gap-1 text-xs font-semibold uppercase text-tinta/60"><Users size={14} /> En pista</span>
+            {enPistaAhora.length === 0 ? (
+              <button onClick={() => setEditorQ([])} disabled={!listo} className="btn-primario !py-1 text-xs">Poner quinteto inicial ({nombrePeriodo(periodo ?? 1)})</button>
+            ) : enPistaAhora.map((id) => {
+              const j = jug(id);
+              return (
+                <button key={id} onClick={() => setSale(sale === id ? null : id)} title="Toca para cambiarlo"
+                  className={`rounded-lg px-2 py-1 text-sm font-bold ${sale === id ? "bg-rojo text-white" : "bg-azul text-white"}`}>
+                  {j?.dorsal ?? "?"} <span className="text-[10px] font-normal opacity-80">{j?.nombre}</span>
+                </button>
+              );
+            })}
+            {enPistaAhora.length > 0 && (
+              <>
+                <button onClick={() => setEditorQ(enPistaAhora)} className="btn-secundario !px-2 !py-1 text-xs" title="Cambiar varios a la vez"><ArrowLeftRight size={13} /> Varios</button>
+                <button onClick={finPeriodo} className="btn-secundario !px-2 !py-1 text-xs"><Flag size={13} /> Fin del {nombrePeriodo(periodo ?? 1)}</button>
+              </>
+            )}
+            <div className="ml-auto flex items-center gap-1 text-xs">
+              <span className="font-semibold tabular-nums">{pista.marcador.nos}–{pista.marcador.rival}</span>
+              <span className="text-tinta/50">Rival</span>
+              {[1, 2, 3].map((n) => (
+                <button key={n} onClick={() => puntosRival(n)} disabled={!listo} title={`Rival +${n} (${n === 1 ? "Z" : n === 2 ? "X" : "C"})`}
+                  className={`rounded-md bg-tinta/80 px-2 py-1 font-bold text-white ${destello === `rival${n}` ? "ring-4 ring-oro" : ""}`}>+{n}</button>
+              ))}
+            </div>
+          </div>
+          {sale && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-linea pt-2">
+              <span className="text-xs text-tinta/60">Sale <strong>{jug(sale)?.dorsal}</strong>, entra:</span>
+              {jugadores.filter((j) => !enPistaAhora.includes(j.id)).map((j) => (
+                <button key={j.id} onClick={() => cambioRapido(j.id)} className="rounded-lg bg-suave px-2 py-1 text-sm font-bold hover:bg-linea">{j.dorsal ?? "–"} <span className="text-[10px] font-normal">{j.nombre}</span></button>
+              ))}
+              <button onClick={() => setSale(null)} className="text-xs text-tinta/50">Cancelar</button>
+            </div>
+          )}
+          {editorQ && (
+            <div className="mt-2 border-t border-linea pt-2">
+              <p className="text-xs text-tinta/60">Elige los 5 que están en pista ({editorQ.length}/5) — se guarda en el {mmss(t)} del vídeo, {nombrePeriodo(periodo ?? 1)} cuarto.</p>
+              <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
+                {jugadores.map((j) => {
+                  const on = editorQ.includes(j.id);
+                  return (
+                    <button key={j.id} onClick={() => setEditorQ(on ? editorQ.filter((x) => x !== j.id) : editorQ.length < 5 ? [...editorQ, j.id] : editorQ)}
+                      className={`rounded-lg px-1 py-2 text-center ${on ? "bg-azul text-white" : "bg-suave"}`}>
+                      <span className="block text-lg font-bold leading-none">{j.dorsal ?? "–"}</span><span className="block truncate text-[10px]">{j.nombre}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => { ponerQuinteto(editorQ); setEditorQ(null); }} disabled={editorQ.length !== 5} className="btn-primario !py-1.5 text-sm">Guardar quinteto</button>
+                <button onClick={() => setEditorQ(null)} className="btn-secundario !py-1.5 text-sm">Cancelar</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pregunta: jugador y si la mete */}
@@ -302,7 +419,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
               <button onClick={cerrarPregunta} className="text-xs text-tinta/50 hover:text-tinta">Saltar (Esc)</button>
             </div>
             <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
-              {jugadores.filter((j) => pregunta.paso !== "asistencia" || j.id !== pregunta.tirador).map((j) => (
+              {jugadores.filter((j) => (pregunta.paso !== "asistencia" || j.id !== pregunta.tirador) && (pregunta.todos || !pregunta.pista.length || pregunta.pista.includes(j.id))).map((j) => (
                 <button key={j.id} onClick={() => responder(pregunta, { jugador: j.id })}
                   className={`rounded-lg px-1 py-2 text-center ${pregunta.jugador === j.id ? "bg-azul text-white ring-2 ring-oro" : "bg-suave hover:bg-linea"}`}>
                   <span className="block text-lg font-bold leading-none">{j.dorsal ?? "–"}</span>
@@ -310,6 +427,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
                 </button>
               ))}
               <button onClick={() => responder(pregunta, { jugador: null })} className={`rounded-lg px-1 py-2 text-xs ${pregunta.jugador === null ? "bg-azul text-white" : "bg-suave"}`}>{pregunta.paso === "asistencia" ? "Sin asistencia" : "No sé / equipo"}</button>
+              {pregunta.pista.length > 0 && !pregunta.todos && <button onClick={() => setPregunta({ ...pregunta, todos: true })} className="rounded-lg bg-white px-1 py-2 text-xs text-tinta/60 ring-1 ring-linea">Otro jugador…</button>}
             </div>
             {esTiro(pregunta.cat.estadistica) && pregunta.paso !== "asistencia" && (
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -335,7 +453,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-tinta/50">Pulsa la etiqueta justo cuando acabe la acción: el clip coge unos segundos antes y después. En el ordenador: la tecla de cada botón (arriba a la derecha), espacio para pausar y flechas para ±5 s. Tiros y pérdidas te preguntan el jugador y van a su estadística.</p>
+        <p className="mt-2 text-[11px] text-tinta/50">Pulsa la etiqueta justo cuando acabe la acción: el clip coge unos segundos antes y después. Con el quinteto en pista, al preguntar «¿quién?» solo salen los 5 que juegan. Teclado: la tecla de cada botón, espacio pausa, flechas ±5 s, S salta 30 s, V cambia la velocidad, Z/X/C puntos del rival (+1/+2/+3).</p>
       </div>
 
       {/* Derecha: clip seleccionado + lista */}
@@ -401,19 +519,23 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
 
         {pestana === "stats" ? (
           <div className="tarjeta overflow-x-auto">
-            {!stats.hay ? <p className="p-4 text-sm text-tinta/50">Etiqueta tiros, rebotes, asistencias, robos, tapones, pérdidas o faltas y la estadística se hace sola.</p> : (
+            {!stats.hay && !pista.hay ? <p className="p-4 text-sm text-tinta/50">Etiqueta tiros, rebotes, asistencias, robos, tapones, pérdidas o faltas y la estadística se hace sola. Con el quinteto en pista salen también minutos y +/-.</p> : (
               <table className="w-full whitespace-nowrap text-xs">
                 <thead className="bg-suave text-[10px] uppercase text-tinta/60">
                   <tr>
                     <th className="sticky left-0 bg-suave p-2 text-left">Jugador</th>
-                    {["Pts", "T2", "T3", "TL", "RO", "RD", "Reb", "Ast", "Rob", "Tap", "Pér", "FC", "Val"].map((h) => <th key={h} className="px-1.5 py-2">{h}</th>)}
+                    {["Min", "Pts", "T2", "T3", "TL", "RO", "RD", "Reb", "Ast", "Rob", "Tap", "Pér", "FC", "Val", "+/-"].map((h) => <th key={h} className="px-1.5 py-2">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {[...stats.filas.map((f) => ({ ...f, total: false })), { id: "__total", j: null, st: stats.total, total: true }].map(({ id, j, st, total }) => (
+                  {[...filasStats.map((f) => ({ ...f, total: false })), { id: "__total", j: null, st: stats.total, total: true }].map(({ id, j, st, total }) => {
+                    const pj = total ? null : pista.jugadores.get(id);
+                    const mm = total ? pista.marcador.nos - pista.marcador.rival : pj ? pj.pf - pj.pc : null;
+                    return (
                     <tr key={id} onClick={() => { if (!total) { setFJug(id); setPestana("clips"); } }}
                       className={total ? "border-t-2 border-tinta/30 bg-suave font-semibold" : "cursor-pointer border-t border-linea hover:bg-suave"}>
                       <td className={`sticky left-0 p-2 ${total ? "bg-suave" : "bg-white"}`}>{total ? "Equipo" : j ? <><strong className="text-azul">{j.dorsal ?? ""}</strong> {j.nombre}</> : <span className="text-tinta/50">Sin jugador</span>}</td>
+                      <td className="px-1.5 text-center">{pj ? Math.round(pj.min) : "–"}</td>
                       <td className="px-1.5 text-center text-sm font-bold">{st.pts}</td>
                       {([[st.t2m, st.t2a], [st.t3m, st.t3a], [st.tlm, st.tla]] as const).map(([m, a], i) => (
                         <td key={i} className="px-1.5 text-center">{a ? <>{m}/{a}<span className="block text-[10px] font-normal text-tinta/50">{pctTiro(m, a)}</span></> : "–"}</td>
@@ -427,10 +549,54 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
                       <td className="px-1.5 text-center">{st.perdidas || "–"}</td>
                       <td className="px-1.5 text-center">{st.fc || "–"}</td>
                       <td className={`px-1.5 text-center font-bold ${valoracion(st) > 0 ? "text-green-700" : valoracion(st) < 0 ? "text-red-700" : ""}`}>{valoracion(st)}</td>
+                      <td className={`px-1.5 text-center font-semibold ${mm === null ? "" : mm > 0 ? "text-green-700" : mm < 0 ? "text-red-700" : ""}`}>{mm === null || !pista.hay ? "–" : `${mm > 0 ? "+" : ""}${mm}`}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
+            )}
+            {pista.hay && pista.quintetos.length > 0 && (
+              <div className="border-t border-linea p-2">
+                <p className="mb-1 text-[11px] font-semibold uppercase text-tinta/60">Quintetos</p>
+                <table className="w-full text-xs">
+                  <thead className="text-[10px] uppercase text-tinta/50"><tr><th className="text-left">Quinteto</th><th>Min</th><th>PF</th><th>PC</th><th>+/-</th></tr></thead>
+                  <tbody>
+                    {pista.quintetos.slice(0, 10).map((q) => (
+                      <tr key={q.ids.join()} className="border-t border-linea">
+                        <td className="py-1 font-semibold text-azul">{q.ids.map((id) => jug(id)?.dorsal ?? "?").sort((a, b) => Number(a) - Number(b)).join(" · ")}</td>
+                        <td className="text-center">{Math.round(q.min)}</td><td className="text-center">{q.pf}</td><td className="text-center">{q.pc}</td>
+                        <td className={`text-center font-bold ${q.pf - q.pc > 0 ? "text-green-700" : q.pf - q.pc < 0 ? "text-red-700" : ""}`}>{q.pf - q.pc > 0 ? "+" : ""}{q.pf - q.pc}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {pista.hay && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-linea px-2 py-1.5 text-[11px] text-tinta/60">
+                Minutos por cuarto
+                <input type="number" min={4} max={20} value={minPer} onChange={(e) => setMinPer(Number(e.target.value) || 10)}
+                  onBlur={() => guardarMinutosPeriodo(videoId, minPer).catch(() => {})} className="campo !w-14 !px-1 !py-0.5 text-center text-xs" />
+                <span>· Los minutos se calculan con el tiempo en pista de cada cuarto (descontando lo que dura el cuarto en el vídeo). El +/- necesita apuntar los puntos del rival (Z, X, C).</span>
+              </div>
+            )}
+            {eventos.length > 0 && (
+              <details className="border-t border-linea px-2 py-1.5 text-xs">
+                <summary className="cursor-pointer text-tinta/60">Cambios, cuartos y puntos del rival ({eventos.length})</summary>
+                <ul className="mt-1 max-h-48 divide-y divide-linea overflow-y-auto">
+                  {eventos.map((e) => (
+                    <li key={e.id} className="flex items-center gap-2 py-1">
+                      <button onClick={() => ir(e.t)} className="w-12 shrink-0 text-left font-mono text-tinta/60 hover:text-azul">{mmss(e.t)}</button>
+                      <span className="flex-1 truncate">
+                        {e.tipo === "quinteto" ? <>Quinteto ({nombrePeriodo(e.periodo ?? 1)}): {(e.jugadores ?? []).map((id) => jug(id)?.dorsal ?? "?").join(", ")}</>
+                          : e.tipo === "fin_periodo" ? <>Fin del {nombrePeriodo(e.periodo ?? 1)}</> : <>Rival +{e.puntos}</>}
+                      </span>
+                      <button onClick={() => quitarEvento(e.id)} className="text-tinta/40 hover:text-red-600" aria-label="Borrar"><Trash2 size={13} /></button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
             {stats.hay && <p className="px-2 pb-2 pt-1 text-[11px] text-tinta/50">Toca un jugador para ver sus clips. Val = valoración (puntos + rebotes + asistencias + robos + tapones − tiros fallados − pérdidas − faltas). Se guarda también en su ficha.</p>}
           </div>

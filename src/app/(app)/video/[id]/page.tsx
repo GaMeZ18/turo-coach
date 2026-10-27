@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaCorta } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
-import type { Categoria, Clip } from "@/lib/video";
+import type { Categoria, Clip, EventoVideo } from "@/lib/video";
 import { borrarVideo } from "../actions";
 import Analizador from "./Analizador";
 import { ExternalLink, Trash2 } from "lucide-react";
@@ -12,12 +12,13 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   const { id } = await params;
   const { clip: clipInicial } = await searchParams;
   const { supabase } = await requireUser();
-  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, partidos(id, fecha, rival, local), equipos(nombre)").eq("id", id).maybeSingle();
+  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, minutos_periodo, partidos(id, fecha, rival, local), equipos(nombre)").eq("id", id).maybeSingle();
   if (!v) notFound();
-  const [{ data: cats }, { data: clips }, { data: plantilla }] = await Promise.all([
+  const [{ data: cats }, { data: clips }, { data: plantilla }, { data: eventos }] = await Promise.all([
     supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
     supabase.from("video_clips").select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota").eq("video_id", id).order("inicio"),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", v.equipo_id),
+    supabase.from("video_eventos").select("id, video_id, t, tipo, periodo, jugadores, puntos").eq("video_id", id).order("t"),
   ]);
   const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
     .map((p) => ({ id: p.jugadores.id, nombre: p.jugadores.nombre, apellidos: p.jugadores.apellidos, dorsal: p.dorsal }))
@@ -51,6 +52,8 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
           clipsIniciales={((clips ?? []) as Clip[]).map((c) => ({ ...c, inicio: Number(c.inicio), fin: Number(c.fin) }))}
           jugadores={jugadores}
           clipInicial={clipInicial ?? null}
+          eventosIniciales={((eventos ?? []) as EventoVideo[]).map((e) => ({ ...e, t: Number(e.t) }))}
+          minutosPeriodo={(v as { minutos_periodo?: number }).minutos_periodo ?? 10}
         />
       ) : <p className="tarjeta mt-4 p-4 text-sm">El enlace no es de YouTube.</p>}
     </div>
