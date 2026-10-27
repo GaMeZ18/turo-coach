@@ -40,10 +40,11 @@ export interface StatsPartido {
   visitante: EquipoStats;
   v?: number;                       // 3 = con tramos en pista y marcador a lo largo del partido
   marcador?: [number, number, number][]; // [segundo de partido, puntos local, puntos visitante] en cada cambio
+  jugadas?: [0 | 1, number, number | null, string | null][]; // canastas en orden: [0 local / 1 visitante, puntos, dorsal, nombre]
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 4;
+export const VERSION_STATS = 5;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };
@@ -51,7 +52,7 @@ type EqFCBQ = { name?: string; accumulated?: Acum; players?: JugFCBQ[] };
 type Stint = { startSeconds?: number; endSeconds?: number; computed?: { onCourtPlusMinus?: number } };
 type FCBQ = {
   stints?: { local?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[]; visitor?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[] };
-  pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null }[];
+  pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null; x?: Record<string, string | number | boolean> }[];
   header?: { date?: string; matchDayNum?: number; localTeam?: { name?: string }; visitorTeam?: { name?: string }; score?: { local?: number; visitor?: number }; periods?: { period: number; local: number; visitor: number }[] };
   boxscore?: { period: number; local?: EqFCBQ; visitor?: EqFCBQ }[];
 };
@@ -107,9 +108,39 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
       const m = d.pbp?.length ? lineaMarcador(d.pbp) : [];
       // Con marcador (jugada a jugada) o, si no lo hay, con los tramos en pista y su +/- (sinergias estimadas)
       const conTramos = (d.stints?.local?.length ?? 0) > 0;
-      return m.length > 1 ? { v: VERSION_STATS, marcador: m } : { v: conTramos ? VERSION_STATS : 1 };
+      const jugadas = d.pbp?.length ? canastas(d.pbp) : [];
+      return m.length > 1 ? { v: VERSION_STATS, marcador: m, ...(jugadas.length ? { jugadas } : {}) } : { v: conTramos ? VERSION_STATS : 1 };
     })(),
   };
+}
+
+/** Canastas en orden con quién las hace (dorsal y nombre, si la FCBQ los da en la jugada a jugada) */
+function canastas(pbp: NonNullable<FCBQ["pbp"]>): [0 | 1, number, number | null, string | null][] {
+  const out: [0 | 1, number, number | null, string | null][] = [];
+  let l = 0, v = 0;
+  const dorsalDe = (x?: Record<string, string | number | boolean>) => {
+    if (!x) return null;
+    for (const [k, val] of Object.entries(x)) {
+      if (!/dorsal|shirt|jersey|number|num$/i.test(k) || /period|minute|second|score|match|team|id$/i.test(k)) continue;
+      const d = Number(val);
+      if (Number.isInteger(d) && d >= 0 && d < 100) return d;
+    }
+    return null;
+  };
+  const nombreDe = (x?: Record<string, string | number | boolean>) => {
+    if (!x) return null;
+    const prefer = Object.entries(x).find(([k, val]) => typeof val === "string" && /actor.*name|player.*name|playername|actorname/i.test(k));
+    const otro = Object.entries(x).find(([k, val]) => typeof val === "string" && /name|nombre/i.test(k) && !/team|equip|club|event|type/i.test(k));
+    return String((prefer ?? otro)?.[1] ?? "").trim() || null;
+  };
+  for (const e of pbp) {
+    if (e.l === undefined || e.l === null || e.v === undefined || e.v === null) continue;
+    const dl = n(e.l) - l, dv = n(e.v) - v;
+    if (dl > 0 && dl <= 3) out.push([0, dl, dorsalDe(e.x), nombreDe(e.x)]);
+    else if (dv > 0 && dv <= 3) out.push([1, dv, dorsalDe(e.x), nombreDe(e.x)]);
+    l = n(e.l); v = n(e.v);
+  }
+  return out;
 }
 
 /** Marcador a lo largo del partido a partir de la jugada a jugada (reloj descendente por periodo) */

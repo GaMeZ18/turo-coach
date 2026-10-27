@@ -30,12 +30,13 @@ function cargarAPI(): Promise<void> {
 const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
-type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean };
+type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean; sugerido?: string | null };
+type JugadaFCBQ = { pts: number; dorsal: number | null; nombre: string | null };
 const VELOCIDADES = [1, 1.5, 2];
 
-export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo }: {
+export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo, jugadasFCBQ }: {
   videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
-  eventosIniciales: EventoVideo[]; minutosPeriodo: number;
+  eventosIniciales: EventoVideo[]; minutosPeriodo: number; jugadasFCBQ?: JugadaFCBQ[] | null;
 }) {
   const contenedor = useRef<HTMLDivElement>(null);
   const player = useRef<any>(null);
@@ -131,6 +132,26 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   };
   const parar = () => { setCola(null); setActivo(null); player.current?.pauseVideo?.(); };
 
+  // --- FCBQ: quién anotó la canasta n.º X (por orden, no por tiempo) ---
+  const sugerirAnotador = (c: Categoria, tt: number): string | null => {
+    if (!jugadasFCBQ?.length) return null;
+    const pts = c.estadistica === "t3" ? 3 : c.estadistica === "t2" ? 2 : 1;
+    const anteriores = refs.current.clips.filter((x) => {
+      const k = categorias.find((y) => y.id === x.categoria_id);
+      return x.resultado === "bien" && esTiro(k?.estadistica) && x.fin - (k?.despues ?? 0) < tt;
+    }).length;
+    for (const i of [anteriores, anteriores + 1, anteriores - 1, anteriores + 2, anteriores - 2]) {
+      const jg = jugadasFCBQ[i];
+      if (!jg || jg.pts !== pts) continue;
+      const porDorsal = jg.dorsal !== null ? jugadores.find((j) => j.dorsal === jg.dorsal) : null;
+      const sinAcento = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const porNombre = !porDorsal && jg.nombre ? jugadores.find((j) => sinAcento(jg.nombre!).includes(sinAcento(j.nombre)) && (!j.apellidos || sinAcento(jg.nombre!).includes(sinAcento(j.apellidos.split(" ")[0])))) : null;
+      const j = porDorsal ?? porNombre;
+      if (j) return j.id;
+    }
+    return null;
+  };
+
   // --- Etiquetar ---
   const etiquetar = useCallback(async (c: Categoria) => {
     if (!player.current?.getCurrentTime) return;
@@ -143,7 +164,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
       const sonando = player.current?.getPlayerState?.() === 1;
       if (sonando) player.current?.pauseVideo?.();
       setDorsalTecleado("");
-      setPregunta({ id: tmp.id, cat: c, reanudar: sonando, pista: enPista(refs.current.eventos, tt) });
+      setPregunta({ id: tmp.id, cat: c, reanudar: sonando, pista: enPista(refs.current.eventos, tt), sugerido: esTiro(c.estadistica) ? sugerirAnotador(c, tt) : null });
     }
     try {
       const real = await crearClip({ video_id: videoId, categoria_id: c.id, inicio: tmp.inicio, fin: tmp.fin, periodo });
@@ -186,6 +207,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
       return;
     }
     const tiro = esTiro(q.cat.estadistica);
+    // Canasta sin elegir jugador: el que dice la FCBQ
+    if (tiro && nueva.resultado === "bien" && nueva.jugador === undefined && q.sugerido) nueva.jugador = q.sugerido;
     const completa = nueva.jugador !== undefined && (!tiro || nueva.resultado !== undefined);
     if (!completa) { setPregunta(nueva); return; }
     cambiar(q.id, { jugador_id: nueva.jugador ?? null, resultado: tiro ? nueva.resultado ?? null : esNegativa(q.cat.estadistica) ? "mal" : "bien" });
@@ -254,7 +277,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
           if (!j) { buf = k; j = jugadores.find((x) => x.dorsal === Number(k)); }
           setDorsalTecleado(buf);
           if (j) setPregunta({ ...q, jugador: j.id });
-        } else if (k === "M" && esTiro(q.cat.estadistica)) responder(q, { resultado: "bien", jugador: q.jugador === undefined ? null : q.jugador });
+        } else if (k === "M" && esTiro(q.cat.estadistica)) responder(q, { resultado: "bien", jugador: q.jugador === undefined ? q.sugerido ?? null : q.jugador });
         else if ((k === "F" || k === "X") && esTiro(q.cat.estadistica)) responder(q, { resultado: "mal", jugador: q.jugador === undefined ? null : q.jugador });
         else if (k === "Enter" && (!esTiro(q.cat.estadistica) || q.resultado !== undefined)) responder(q, { jugador: q.jugador === undefined ? null : q.jugador });
         else if (k === "Escape") cerrarPregunta();
@@ -419,9 +442,10 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
               <button onClick={cerrarPregunta} className="text-xs text-tinta/50 hover:text-tinta">Saltar (Esc)</button>
             </div>
             <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
-              {jugadores.filter((j) => (pregunta.paso !== "asistencia" || j.id !== pregunta.tirador) && (pregunta.todos || !pregunta.pista.length || pregunta.pista.includes(j.id))).map((j) => (
+              {jugadores.filter((j) => (pregunta.paso !== "asistencia" || j.id !== pregunta.tirador) && (pregunta.todos || !pregunta.pista.length || pregunta.pista.includes(j.id) || j.id === pregunta.sugerido)).map((j) => (
                 <button key={j.id} onClick={() => responder(pregunta, { jugador: j.id })}
-                  className={`rounded-lg px-1 py-2 text-center ${pregunta.jugador === j.id ? "bg-azul text-white ring-2 ring-oro" : "bg-suave hover:bg-linea"}`}>
+                  className={`relative rounded-lg px-1 py-2 text-center ${pregunta.jugador === j.id ? "bg-azul text-white ring-2 ring-oro" : pregunta.sugerido === j.id ? "bg-oro/40 ring-2 ring-oro" : "bg-suave hover:bg-linea"}`}>
+                  {pregunta.sugerido === j.id && pregunta.paso !== "asistencia" && <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded bg-oro px-1 text-[9px] font-bold uppercase text-tinta">FCBQ</span>}
                   <span className="block text-lg font-bold leading-none">{j.dorsal ?? "–"}</span>
                   <span className="block truncate text-[10px]">{j.nombre}</span>
                 </button>
@@ -436,6 +460,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
               </div>
             )}
             <p className="mt-2 text-[11px] text-tinta/50">
+              {pregunta.sugerido && pregunta.paso !== "asistencia" && pregunta.jugador === undefined && <><strong>Según la FCBQ la anota {jug(pregunta.sugerido)?.dorsal} {jug(pregunta.sugerido)?.nombre}</strong>: si es canasta, solo pulsa «Anotada» (M). </>}
               Teclado: escribe el dorsal{dorsalTecleado && <strong> ({dorsalTecleado})</strong>}{esTiro(pregunta.cat.estadistica) && pregunta.paso !== "asistencia" ? " y pulsa M si la mete o F si la falla." : pregunta.paso === "asistencia" ? " y pulsa Enter (Enter solo = sin asistencia)." : " y pulsa Enter."} El vídeo sigue al responder.
             </p>
           </div>

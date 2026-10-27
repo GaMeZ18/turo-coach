@@ -12,7 +12,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   const { id } = await params;
   const { clip: clipInicial } = await searchParams;
   const { supabase } = await requireUser();
-  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, minutos_periodo, partidos(id, fecha, rival, local), equipos(nombre)").eq("id", id).maybeSingle();
+  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, minutos_periodo, partidos(id, fecha, rival, local, fcbq_stats_id), equipos(nombre)").eq("id", id).maybeSingle();
   if (!v) notFound();
   const [{ data: cats }, { data: clips }, { data: plantilla }, { data: eventos }] = await Promise.all([
     supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
@@ -23,7 +23,19 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
     .map((p) => ({ id: p.jugadores.id, nombre: p.jugadores.nombre, apellidos: p.jugadores.apellidos, dorsal: p.dorsal }))
     .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
-  const partido = v.partidos as unknown as { id: string; fecha: string; rival: string; local: boolean } | null;
+  const partido = v.partidos as unknown as { id: string; fecha: string; rival: string; local: boolean; fcbq_stats_id: string | null } | null;
+
+  // Canastas de la FCBQ (jugada a jugada) en orden, para proponer quién anota
+  let jugadasFCBQ: { pts: number; dorsal: number | null; nombre: string | null }[] | null = null;
+  if (partido?.fcbq_stats_id) {
+    const { data: st } = await supabase.from("fcbq_stats").select("datos").eq("equipo_id", v.equipo_id).eq("stats_id", partido.fcbq_stats_id).maybeSingle();
+    const d = st?.datos as { local?: { nombre?: string }; visitante?: { nombre?: string }; jugadas?: [number, number, number | null, string | null][] } | undefined;
+    if (d?.jugadas?.length) {
+      const turo = (x?: string) => /TURO/.test((x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase());
+      const lado = turo(d.local?.nombre) ? 0 : turo(d.visitante?.nombre) ? 1 : partido.local ? 0 : 1;
+      jugadasFCBQ = d.jugadas.filter((j) => j[0] === lado).map((j) => ({ pts: j[1], dorsal: j[2], nombre: j[3] }));
+    }
+  }
 
   return (
     <div>
@@ -54,6 +66,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
           clipInicial={clipInicial ?? null}
           eventosIniciales={((eventos ?? []) as EventoVideo[]).map((e) => ({ ...e, t: Number(e.t) }))}
           minutosPeriodo={(v as { minutos_periodo?: number }).minutos_periodo ?? 10}
+          jugadasFCBQ={jugadasFCBQ}
         />
       ) : <p className="tarjeta mt-4 p-4 text-sm">El enlace no es de YouTube.</p>}
     </div>

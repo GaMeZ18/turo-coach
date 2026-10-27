@@ -19,6 +19,21 @@ function proximoLunes6() {
   if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 7);
   return d.getTime();
 }
+/** Campos sueltos de una jugada (texto y números, un nivel de profundidad) para saber quién la hace */
+function datosJugada(e) {
+  const out = {};
+  const meter = (pref, o) => {
+    for (const [k, v] of Object.entries(o || {})) {
+      if (Object.keys(out).length > 30) return;
+      if (v === null || v === undefined) continue;
+      if (typeof v === "object" && !Array.isArray(v) && !pref) meter(k + ".", v);
+      else if (["string", "number", "boolean"].includes(typeof v) && String(v).length < 60) out[pref + k] = v;
+    }
+  };
+  meter("", e);
+  return out;
+}
+
 async function programar() {
   await chrome.alarms.clear("fcbq-semanal");
   chrome.alarms.create("fcbq-semanal", { when: proximoLunes6() });
@@ -199,6 +214,8 @@ async function apiStats(ids) {
               s: num(e.s, e.second, e.sec, reloj?.[1]),
               l: num(e.l, e.localScore, e.scoreLocal, e.homeScore, e.score?.local),
               v: num(e.v, e.visitorScore, e.scoreVisitor, e.awayScore, e.score?.visitor),
+              // Quién hace la jugada (para el vídeo): dorsal, nombre y equipo, con los nombres que use la FCBQ
+              x: datosJugada(e),
             };
           });
           // Muestra para diagnosticar si la FCBQ cambia el formato
