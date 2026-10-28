@@ -29,8 +29,19 @@ jobs:
       - name: Compilar
         run: pyinstaller --noconfirm --onedir --name detector --console detector.py
       - name: Prueba del ejecutable
-        run: dist\detector\detector.exe --help
-        shell: cmd
+        shell: bash
+        run: |
+          set +e
+          python pruebas/video_sintetico.py prueba_exe.mp4 > sintetico.txt 2>&1 || echo "::warning::video sintetico: $(tr '\n' ' ' < sintetico.txt | tail -c 600)"
+          ./dist/detector/detector.exe --help > salida.txt 2>&1; r=$?
+          if [ $r -ne 0 ]; then echo "::error::--help ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+          if [ -f prueba_exe.mp4 ]; then
+            ./dist/detector/detector.exe calibrar prueba_exe.mp4 --segundo 1 --sin-balon --aro "derecha=$(cd pruebas && python -c "import video_sintetico as v; print(*v.ARO, sep=chr(44))")" > salida.txt 2>&1; r=$?
+            if [ $r -ne 0 ]; then echo "::error::calibrar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+            ./dist/detector/detector.exe analizar prueba_exe.mp4 > salida.txt 2>&1; r=$?
+            if [ $r -ne 0 ]; then echo "::error::analizar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+            echo "::notice::ejecutable OK: $(tail -c 300 salida.txt | tr '\n' ' ')"
+          fi
       - name: Empaquetar
         shell: pwsh
         run: |

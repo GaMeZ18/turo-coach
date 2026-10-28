@@ -24,10 +24,18 @@ import sys
 import time
 from dataclasses import dataclass, field, asdict
 
+# Consola de Windows: que las tildes no rompan la salida
+for _f in (sys.stdout, sys.stderr):
+    try:
+        _f.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 try:
     import cv2
     import numpy as np
-except ImportError:  # mensaje claro si falta algo
+except ImportError as _e:  # mensaje claro si falta algo
+    print(f"({_e})")
     print("Falta OpenCV o NumPy. Ejecuta primero instalar.bat (o: pip install -r requirements.txt).")
     sys.exit(1)
 
