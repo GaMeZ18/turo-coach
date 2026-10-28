@@ -30,7 +30,7 @@ export default async function DetectorPage() {
         <MonitorDown size={36} className="text-azul" />
         <div className="flex-1">
           <p className="font-semibold">Detector de tiros para Windows</p>
-          <p className="text-xs text-tinta/60">Windows 10 u 11 · .zip de unos 80 MB · siempre la última versión</p>
+          <p className="text-xs text-tinta/60">Windows 10 u 11 · .zip de unos 65 MB · siempre la última versión</p>
         </div>
         <a href={DESCARGA} className="btn-primario"><Download size={16} /> Descargar</a>
       </div>
