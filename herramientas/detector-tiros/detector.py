@@ -32,8 +32,8 @@ for _f in (sys.stdout, sys.stderr):
         pass
 
 try:
+    import numpy as np  # antes que cv2 (necesario en el ejecutable de Windows)
     import cv2
-    import numpy as np
 except ImportError as _e:  # mensaje claro si falta algo
     print(f"({_e})")
     print("Falta OpenCV o NumPy. Ejecuta primero instalar.bat (o: pip install -r requirements.txt).")

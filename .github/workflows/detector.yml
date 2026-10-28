@@ -23,11 +23,11 @@ jobs:
       - name: Dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller==6.10.0
+          pip install "numpy==1.26.4" opencv-python==4.10.0.84 pyinstaller==6.11.1
       - name: Pruebas
         run: python -m unittest discover -s pruebas -v
       - name: Compilar
-        run: pyinstaller --noconfirm --onedir --name detector --console detector.py
+        run: pyinstaller --noconfirm --onedir --name detector --console --hidden-import numpy --collect-submodules numpy --collect-submodules cv2 detector.py
       - name: Prueba del ejecutable
         shell: bash
         run: |
