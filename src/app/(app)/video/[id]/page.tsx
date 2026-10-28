@@ -6,6 +6,7 @@ import Enviar from "@/components/Enviar";
 import type { Categoria, Clip, EventoVideo } from "@/lib/video";
 import { borrarVideo } from "../actions";
 import Analizador from "./Analizador";
+import Importar from "./Importar";
 import { ExternalLink, Trash2 } from "lucide-react";
 
 export default async function VerVideo({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ clip?: string }> }) {
@@ -16,7 +17,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   if (!v) notFound();
   const [{ data: cats }, { data: clips }, { data: plantilla }, { data: eventos }] = await Promise.all([
     supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
-    supabase.from("video_clips").select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota").eq("video_id", id).order("inicio"),
+    supabase.from("video_clips").select("id, video_id, categoria_id, inicio, fin, jugador_id, resultado, periodo, nota, estado, confianza").eq("video_id", id).order("inicio"),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", v.equipo_id),
     supabase.from("video_eventos").select("id, video_id, t, tipo, periodo, jugadores, puntos").eq("video_id", id).order("t"),
   ]);
@@ -49,6 +50,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
           </p>
         </div>
         <div className="flex gap-2">
+          <Importar videoId={v.id} />
           <a href={v.url} target="_blank" rel="noopener" className="btn-secundario !py-1.5 text-sm"><ExternalLink size={15} /> YouTube</a>
           <form action={borrarVideo}>
             <input type="hidden" name="id" value={v.id} />

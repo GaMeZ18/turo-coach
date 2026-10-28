@@ -94,7 +94,7 @@ export const hayStat = (s: StatVideo) => s.t2a + s.t3a + s.tla + s.perdidas + s.
 export const valoracion = (s: StatVideo) =>
   s.pts + s.ro + s.rd + s.as + s.rob + s.tap - (s.t2a - s.t2m) - (s.t3a - s.t3m) - (s.tla - s.tlm) - s.perdidas - s.fc;
 export const pctTiro = (m: number, a: number) => (a ? `${Math.round((m * 100) / a)}%` : "–");
-export type Clip = { id: string; video_id: string; categoria_id: string | null; inicio: number; fin: number; jugador_id: string | null; resultado: "bien" | "mal" | null; periodo: number | null; nota: string | null };
+export type Clip = { id: string; video_id: string; categoria_id: string | null; inicio: number; fin: number; jugador_id: string | null; resultado: "bien" | "mal" | null; periodo: number | null; nota: string | null; estado?: "pendiente" | null; confianza?: number | null };
 
 // ---------- Pista: quinteto, cuartos y puntos del rival (minutos, +/- y quintetos) ----------
 export type EventoVideo = { id: string; video_id: string; t: number; tipo: "quinteto" | "fin_periodo" | "rival"; periodo: number | null; jugadores: string[] | null; puntos: number | null };

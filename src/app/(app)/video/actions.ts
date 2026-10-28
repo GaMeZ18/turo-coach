@@ -53,7 +53,7 @@ export async function crearClip(c: { video_id: string; categoria_id: string | nu
   return { ...data, inicio: Number(data.inicio), fin: Number(data.fin) } as Clip;
 }
 
-export async function actualizarClip(id: string, campos: Partial<Pick<Clip, "categoria_id" | "inicio" | "fin" | "jugador_id" | "resultado" | "periodo" | "nota">>) {
+export async function actualizarClip(id: string, campos: Partial<Pick<Clip, "categoria_id" | "inicio" | "fin" | "jugador_id" | "resultado" | "periodo" | "nota" | "estado">>) {
   const supabase = await createClient();
   check(await supabase.from("video_clips").update(campos).eq("id", id));
 }
@@ -106,4 +106,53 @@ export async function borrarEventoVideo(id: string) {
 export async function guardarMinutosPeriodo(videoId: string, minutos: number) {
   const supabase = await createClient();
   check(await supabase.from("videos").update({ minutos_periodo: Math.min(20, Math.max(4, Math.round(minutos))) }).eq("id", videoId));
+}
+
+// ---------- Detecciones automáticas (detector de tiros del PC) ----------
+type Deteccion = { t: number; canasta?: string; resultado?: string; confianza?: number };
+
+export async function importarDetecciones(fd: FormData): Promise<{ nuevos: number; repetidos: number; error?: string }> {
+  const supabase = await createClient();
+  const videoId = String(fd.get("video_id"));
+  const archivo = fd.get("archivo");
+  const desfase = Number(fd.get("desfase") || 0) || 0;
+  if (!(archivo instanceof File)) return { nuevos: 0, repetidos: 0, error: "Elige el archivo .detecciones.json" };
+  let datos: { herramienta?: string; eventos?: Deteccion[] };
+  try { datos = JSON.parse(await archivo.text()); } catch { return { nuevos: 0, repetidos: 0, error: "El archivo no es un JSON válido." }; }
+  const eventos = (datos.eventos ?? []).filter((e) => typeof e.t === "number");
+  if (!eventos.length) return { nuevos: 0, repetidos: 0, error: "El archivo no tiene detecciones." };
+
+  const [{ data: cats }, { data: ya }, { data: v }] = await Promise.all([
+    supabase.from("video_categorias").select("id, equipo_id, estadistica, antes, despues").eq("estadistica", "t2"),
+    supabase.from("video_clips").select("inicio, fin").eq("video_id", videoId),
+    supabase.from("videos").select("equipo_id").eq("id", videoId).maybeSingle(),
+  ]);
+  const cat = (cats ?? []).find((c) => c.equipo_id === v?.equipo_id) ?? (cats ?? []).find((c) => !c.equipo_id) ?? null;
+  const antes = cat?.antes ?? 6, despues = cat?.despues ?? 3;
+  const existentes = (ya ?? []).map((c) => Number(c.fin) - despues);
+  let repetidos = 0;
+  const filas = [];
+  for (const e of eventos) {
+    const t = e.t + desfase;
+    if (t < 0) continue;
+    if (existentes.some((x) => Math.abs(x - t) < 1.5)) { repetidos++; continue; }
+    filas.push({
+      video_id: videoId, categoria_id: cat?.id ?? null, inicio: Math.max(0, Math.round((t - antes) * 10) / 10), fin: Math.round((t + despues) * 10) / 10,
+      resultado: e.resultado === "anotada" ? "bien" : e.resultado === "fallada" ? "mal" : null,
+      estado: "pendiente", confianza: typeof e.confianza === "number" ? e.confianza : null, origen: "detector",
+      nota: e.canasta ? `Detectado · canasta ${e.canasta}` : "Detectado",
+    });
+  }
+  for (let i = 0; i < filas.length; i += 200) {
+    const { error } = await supabase.from("video_clips").insert(filas.slice(i, i + 200));
+    if (error) return { nuevos: i, repetidos, error: /estado|confianza|origen/.test(error.message) ? "Falta preparar la base de datos (0020_video_detecciones.sql)." : error.message };
+  }
+  revalidatePath(`/video/${videoId}`);
+  return { nuevos: filas.length, repetidos };
+}
+
+/** Confirmar un clip detectado (deja de estar pendiente) */
+export async function confirmarClip(id: string, campos: Partial<Pick<Clip, "categoria_id" | "jugador_id" | "resultado">>) {
+  const supabase = await createClient();
+  check(await supabase.from("video_clips").update({ ...campos, estado: null }).eq("id", id));
 }

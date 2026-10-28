@@ -1,0 +1,4 @@
+# Detector de tiros · dependencias (todas gratuitas y de código abierto)
+# OpenCV: licencia Apache 2.0 · NumPy: licencia BSD
+opencv-python==4.10.0.84
+numpy>=1.26,<3

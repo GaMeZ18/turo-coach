@@ -2,7 +2,7 @@
 
 // Analizador de vídeo: reproductor de YouTube + botonera de etiquetas + clips filtrables.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, BarChart3, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, BarChart3, ScanSearch, SkipForward, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { PREGUNTA_ESTADISTICA, analisisPista, enPista, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type EventoVideo, type StatVideo } from "@/lib/video";
 import { actualizarClip, borrarClip, borrarEventoVideo, crearClip, crearEventoVideo, guardarMinutosPeriodo } from "../actions";
 
@@ -30,7 +30,7 @@ function cargarAPI(): Promise<void> {
 const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
-type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean; sugerido?: string | null };
+type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean; sugerido?: string | null; deteccion?: "bien" | "mal" | null };
 type JugadaFCBQ = { pts: number; dorsal: number | null; nombre: string | null };
 const VELOCIDADES = [1, 1.5, 2];
 
@@ -138,7 +138,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     const pts = c.estadistica === "t3" ? 3 : c.estadistica === "t2" ? 2 : 1;
     const anteriores = refs.current.clips.filter((x) => {
       const k = categorias.find((y) => y.id === x.categoria_id);
-      return x.resultado === "bien" && esTiro(k?.estadistica) && x.fin - (k?.despues ?? 0) < tt;
+      return x.estado !== "pendiente" && x.resultado === "bien" && esTiro(k?.estadistica) && x.fin - (k?.despues ?? 0) < tt;
     }).length;
     for (const i of [anteriores, anteriores + 1, anteriores - 1, anteriores + 2, anteriores - 2]) {
       const jg = jugadasFCBQ[i];
@@ -221,6 +221,34 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     terminar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // --- Revisión de tiros detectados por el detector del PC ---
+  const [revisando, setRevisando] = useState(false);
+  const [revId, setRevId] = useState<string | null>(null);
+  const [saltados, setSaltados] = useState<string[]>([]);
+  const pendientesRev = useMemo(() => ordenados.filter((c) => c.estado === "pendiente"), [ordenados]);
+  const actualRev = revisando ? clips.find((c) => c.id === revId && c.estado === "pendiente") ?? null : null;
+  const catsTiro = categorias.filter((c) => esTiro(c.estadistica));
+  useEffect(() => {
+    if (!revisando || pregunta) return;
+    if (actualRev) return;
+    const sig = pendientesRev.find((c) => !saltados.includes(c.id)) ?? null;
+    if (!sig) { setRevisando(false); setRevId(null); return; }
+    setRevId(sig.id);
+    setCola(null); setActivo(sig.id); setSel(sig.id); ir(sig.inicio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisando, pregunta, actualRev, pendientesRev, saltados]);
+  const clasificar = (c: Clip, k: Categoria) => {
+    const momento = c.fin - (cat(c.categoria_id)?.despues ?? 3);
+    const fin = momento + k.despues, inicio = Math.max(0, momento - k.antes);
+    const deteccion = c.resultado;
+    cambiar(c.id, { categoria_id: k.id, estado: null, inicio, fin });
+    player.current?.pauseVideo?.();
+    setDorsalTecleado("");
+    setPregunta({ id: c.id, cat: k, reanudar: false, pista: enPista(eventos, momento), sugerido: sugerirAnotador(k, momento), deteccion });
+  };
+  const descartar = (c: Clip) => quitar(c.id);
+  const saltar = (c: Clip) => setSaltados((l) => [...l, c.id]);
+
   // --- Pista: quinteto, cambios, fin de cuarto y puntos del rival ---
   const nuevoEvento = (e: Omit<EventoVideo, "id" | "video_id">) => {
     const tmp: EventoVideo = { ...e, id: `tmp-ev-${Date.now()}`, video_id: videoId };
@@ -283,6 +311,13 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
         else if (k === "Escape") cerrarPregunta();
         return;
       }
+      const rv = refsRev.current;
+      if (rv.actual) {
+        const kc = teclas.get(k);
+        if (kc && esTiro(kc.estadistica)) { e.preventDefault(); rv.clasificar(rv.actual, kc); return; }
+        if (k === "N" || k === "Delete") { e.preventDefault(); rv.descartar(rv.actual); return; }
+        if (k === "J") { e.preventDefault(); rv.saltar(rv.actual); return; }
+      }
       const c = teclas.get(k);
       if (c) { e.preventDefault(); etiquetar(c); }
       else if (k === "Z" || k === "X" || k === "C") { e.preventDefault(); refsAcc.current.puntosRival(k === "Z" ? 1 : k === "X" ? 2 : 3); }
@@ -299,6 +334,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     return () => window.removeEventListener("keydown", fn);
   }, [teclas, etiquetar, jugadores, responder]);
 
+  const refsRev = useRef({ actual: actualRev, clasificar, descartar, saltar });
+  refsRev.current = { actual: actualRev, clasificar, descartar, saltar };
   const refsAcc = useRef({ puntosRival, cambiarVelocidad, velocidad });
   refsAcc.current = { puntosRival, cambiarVelocidad, velocidad };
   const refsP = useRef({ pregunta, dorsal: dorsalTecleado });
@@ -320,7 +357,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     let hay = false;
     for (const c of clips) {
       const e = cat(c.categoria_id)?.estadistica;
-      if (!e || c.id.startsWith("tmp-")) continue;
+      if (!e || c.id.startsWith("tmp-") || c.estado === "pendiente") continue;
       hay = true;
       sumarStat(total, e, c.resultado);
       const k = c.jugador_id ?? "";
@@ -330,7 +367,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
     return { hay, total, filas };
   }, [clips, cat, jug]);
 
-  const pista = useMemo(() => analisisPista(eventos, clips.filter((c) => !c.id.startsWith("tmp-")), categorias, minPer), [eventos, clips, categorias, minPer]);
+  const pista = useMemo(() => analisisPista(eventos, clips.filter((c) => !c.id.startsWith("tmp-") && c.estado !== "pendiente"), categorias, minPer), [eventos, clips, categorias, minPer]);
   const enPistaAhora = enPista(eventos, t);
   const filasStats = [
     ...stats.filas,
@@ -339,7 +376,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
 
   // --- Contadores ---
   const contadores = useMemo(() => categorias.map((c) => {
-    const de = clips.filter((x) => x.categoria_id === c.id);
+    const de = clips.filter((x) => x.categoria_id === c.id && x.estado !== "pendiente");
     return { c, n: de.length, bien: de.filter((x) => x.resultado === "bien").length, mal: de.filter((x) => x.resultado === "mal").length };
   }).filter((x) => x.n > 0), [categorias, clips]);
 
@@ -455,8 +492,8 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
             </div>
             {esTiro(pregunta.cat.estadistica) && pregunta.paso !== "asistencia" && (
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <button onClick={() => responder(pregunta, { resultado: "bien" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "bien" ? "ring-4 ring-oro" : ""} bg-green-600`}>✓ Anotada <span className="text-xs font-normal opacity-80">(M)</span></button>
-                <button onClick={() => responder(pregunta, { resultado: "mal" })} className={`rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "mal" ? "ring-4 ring-oro" : ""} bg-red-600`}>✗ Fallada <span className="text-xs font-normal opacity-80">(F)</span></button>
+                <button onClick={() => responder(pregunta, { resultado: "bien" })} className={`relative rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "bien" ? "ring-4 ring-oro" : ""} bg-green-600`}>✓ Anotada <span className="text-xs font-normal opacity-80">(M)</span>{pregunta.deteccion === "bien" && <span className="absolute -top-2 right-2 rounded bg-oro px-1 text-[9px] font-bold uppercase text-tinta">Detector</span>}</button>
+                <button onClick={() => responder(pregunta, { resultado: "mal" })} className={`relative rounded-xl py-3 text-base font-bold text-white ${pregunta.resultado === "mal" ? "ring-4 ring-oro" : ""} bg-red-600`}>✗ Fallada <span className="text-xs font-normal opacity-80">(F)</span>{pregunta.deteccion === "mal" && <span className="absolute -top-2 right-2 rounded bg-oro px-1 text-[9px] font-bold uppercase text-tinta">Detector</span>}</button>
               </div>
             )}
             <p className="mt-2 text-[11px] text-tinta/50">
@@ -466,8 +503,43 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
           </div>
         )}
 
+        {/* Tiros detectados por revisar */}
+        {!pregunta && pendientesRev.length > 0 && !actualRev && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-oro/25 p-3 text-sm">
+            <ScanSearch size={18} className="text-azul" />
+            <span className="flex-1"><strong>{pendientesRev.length} tiros detectados</strong> por revisar. No cuentan en la estadística hasta que los confirmes.</span>
+            <button onClick={() => { setSaltados([]); setRevisando(true); }} disabled={!listo} className="btn-primario !py-1.5 text-sm">Revisar ahora</button>
+          </div>
+        )}
+        {!pregunta && actualRev && (
+          <div className="mt-3 rounded-xl border-2 border-oro p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-azul">
+                Tiro detectado {pendientesRev.findIndex((c) => c.id === actualRev.id) + 1}/{pendientesRev.length} · {mmss(actualRev.inicio)}
+                <span className="ml-2 text-xs font-normal text-tinta/60">
+                  {actualRev.nota?.replace("Detectado · ", "")}{actualRev.resultado ? ` · el detector dice: ${actualRev.resultado === "bien" ? "anotada" : "fallada"}` : ""}{actualRev.confianza ? ` · confianza ${Math.round(actualRev.confianza * 100)} %` : ""}
+                </span>
+              </p>
+              <div className="flex gap-1">
+                <button onClick={() => verClip(actualRev)} className="btn-secundario !px-2 !py-1 text-xs"><Repeat size={13} /> Repetir</button>
+                <button onClick={() => { setRevisando(false); setRevId(null); }} className="btn-secundario !px-2 !py-1 text-xs">Terminar</button>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {catsTiro.map((k) => (
+                <button key={k.id} onClick={() => clasificar(actualRev, k)} className="rounded-xl px-3 py-3 text-sm font-bold text-white" style={{ background: k.color }}>
+                  {k.nombre} {teclaDe(k) && <span className="text-[10px] opacity-80">({teclaDe(k)})</span>}
+                </button>
+              ))}
+              <button onClick={() => descartar(actualRev)} className="rounded-xl bg-tinta/80 px-3 py-3 text-sm font-bold text-white">✗ No es tiro <span className="text-[10px] opacity-80">(N)</span></button>
+              <button onClick={() => saltar(actualRev)} className="flex items-center justify-center gap-1 rounded-xl bg-suave px-3 py-3 text-sm font-semibold"><SkipForward size={15} /> Saltar <span className="text-[10px] opacity-60">(J)</span></button>
+            </div>
+            <p className="mt-2 text-[11px] text-tinta/50">Mira el clip y elige el tipo de tiro: después te pregunta el jugador (en canastas, la FCBQ lo propone) y si entró (el detector marca lo que cree).</p>
+          </div>
+        )}
+
         {/* Botonera */}
-        <div className={`mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 ${pregunta ? "hidden" : ""}`}>
+        <div className={`mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 ${pregunta || actualRev ? "hidden" : ""}`}>
           {categorias.map((c) => (
             <button key={c.id} onClick={() => etiquetar(c)} disabled={!listo}
               className={`relative rounded-xl px-3 py-3 text-left text-sm font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-50 ${destello === c.id ? "scale-95 ring-4 ring-oro" : ""}`}
@@ -678,6 +750,7 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: k?.color ?? "#999" }} />
                   <span className="w-12 shrink-0 font-mono text-xs text-tinta/60">{mmss(c.inicio)}</span>
                   <span className="min-w-0 flex-1 truncate">
+                    {c.estado === "pendiente" && <span className="mr-1 rounded bg-oro/50 px-1 text-[10px] font-bold uppercase">Por revisar</span>}
                     <span className="font-medium">{k?.nombre ?? "Sin etiqueta"}</span>
                     {j && <span className="text-tinta/60"> · #{j.dorsal ?? ""} {j.nombre}</span>}
                     {c.nota && <span className="block truncate text-xs text-tinta/50">{c.nota}</span>}
