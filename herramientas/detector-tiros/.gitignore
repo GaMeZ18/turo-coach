@@ -6,3 +6,6 @@ __pycache__/
 *.aros.json
 *.detecciones.json
 *_capturas/
+build/
+dist/
+*.spec

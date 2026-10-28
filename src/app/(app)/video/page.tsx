@@ -6,7 +6,7 @@ import SinEquipo from "@/components/SinEquipo";
 import Enviar from "@/components/Enviar";
 import type { Categoria } from "@/lib/video";
 import { borrarCategoria, crearVideo, guardarCategoria } from "./actions";
-import { Clapperboard, Plus, Settings2, Tags, Trash2, Video } from "lucide-react";
+import { Clapperboard, MonitorDown, Plus, Settings2, Tags, Trash2, Video } from "lucide-react";
 
 type V = { id: string; titulo: string; youtube_id: string | null; created_at: string; partido_id: string | null; partidos: { fecha: string } | null; video_clips: { count: number }[] };
 
@@ -64,7 +64,10 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
 
   return (
     <div>
-      <h1 className="flex items-center gap-2 text-2xl font-semibold"><Clapperboard className="text-azul" /> Vídeo</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-semibold"><Clapperboard className="text-azul" /> Vídeo</h1>
+        <Link href="/video/detector" className="btn-secundario !py-1.5 text-sm"><MonitorDown size={15} /> Detector de tiros (PC)</Link>
+      </div>
       <p className="max-w-2xl text-sm text-tinta/60">
         Sube el partido a YouTube (como <strong>«Oculto»</strong>), pega aquí el enlace y etiqueta las acciones con la botonera:
         cada toque crea un clip que después puedes filtrar por jugador, acción o si salió bien o mal.

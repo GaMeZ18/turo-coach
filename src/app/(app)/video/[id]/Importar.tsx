@@ -3,7 +3,7 @@
 // Importar el archivo del detector de tiros (.detecciones.json) y exportar las etiquetas para medirlo
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, ScanSearch, Upload } from "lucide-react";
+import { Download, Loader2, MonitorDown, ScanSearch, Upload } from "lucide-react";
 import { importarDetecciones } from "../actions";
 
 export default function Importar({ videoId }: { videoId: string }) {
@@ -33,7 +33,7 @@ export default function Importar({ videoId }: { videoId: string }) {
           {msg && <p className={`mt-2 text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.t}</p>}
           <div className="mt-3 border-t border-linea pt-2">
             <a href={`/video/${videoId}/etiquetas`} className="inline-flex items-center gap-1 text-xs text-azul hover:underline"><Download size={13} /> Exportar etiquetas (para medir el detector)</a>
-            <p className="mt-1 text-[11px] text-tinta/50">El detector de tiros se instala en tu PC: carpeta <code>herramientas/detector-tiros</code> del proyecto.</p>
+            <a href="/video/detector" className="mt-1 inline-flex items-center gap-1 text-xs text-azul hover:underline"><MonitorDown size={13} /> Descargar el detector de tiros para el PC</a>
           </div>
         </div>
       )}

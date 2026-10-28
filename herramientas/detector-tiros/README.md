@@ -1,5 +1,9 @@
 # Detector de tiros · Coach Manager CBTuró (prueba piloto)
 
+> **Para los entrenadores:** no hace falta nada de esta carpeta. Descarga el programa ya preparado desde
+> coach.cbturo.com → Vídeo → «Detector de tiros (PC)». Se compila solo en GitHub con cada cambio
+> (`.github/workflows/detector.yml`) y se publica en la release `detector`.
+
 Programa para **tu ordenador** que busca en el vídeo original de un partido los momentos en los que
 **el balón llega al aro** (tiro) y, si puede, **si entra o no**. El resultado se importa en
 Coach Manager (*Vídeo → Importar detecciones*) como **clips por revisar**: tú solo confirmas

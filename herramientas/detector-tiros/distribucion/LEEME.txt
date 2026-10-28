@@ -1,0 +1,26 @@
+DETECTOR DE TIROS - Coach Manager CBTuro
+========================================
+
+No hace falta instalar nada. Descomprime esta carpeta donde quieras (por ejemplo, en el Escritorio).
+
+1) CALIBRAR (una vez por pabellon y posicion de camara)
+   Arrastra el video del partido (MP4 original) encima de 1-calibrar.bat.
+   Se abre un fotograma: marca con el raton el aro de cada canasta y, si lo pide, el balon.
+   Se guarda un archivo .aros.json junto al video.
+
+2) ANALIZAR
+   Arrastra el mismo video encima de 2-analizar.bat.
+   Tarda un rato (depende del PC). Al acabar crea PARTIDO.detecciones.json junto al video.
+
+3) IMPORTAR EN COACH MANAGER
+   Abre el video del partido en coach.cbturo.com > Video > Detecciones > Importar,
+   sube el .detecciones.json y pulsa "Revisar ahora".
+
+4) (Opcional) MEDIR LA PRECISION
+   Despues de revisar, descarga las etiquetas (Video > Detecciones > Descargar etiquetas)
+   y arrastra a la vez ese archivo y el .detecciones.json encima de 3-evaluar.bat.
+
+Si Windows muestra "Windows protegio su PC": pulsa "Mas informacion" > "Ejecutar de todas formas".
+(El programa es gratuito y no esta firmado; el codigo es publico en github.com/GaMeZ18/turo-coach.)
+
+Licencias: OpenCV (Apache 2.0) y NumPy (BSD).
