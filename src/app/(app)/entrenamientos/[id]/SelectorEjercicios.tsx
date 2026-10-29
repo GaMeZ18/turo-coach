@@ -26,6 +26,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
   const [sel, setSel] = useState<string | null>(null);
   const [minutos, setMinutos] = useState<string>("");
   const [anadidos, setAnadidos] = useState<string[]>([]);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [pendiente, start] = useTransition();
 
   const lista = useMemo(() => {
@@ -48,37 +49,51 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
     fd.set("entrenamiento_id", entrenoId);
     fd.set("ejercicio_id", elegido.id);
     if (minutos) fd.set("duracion", minutos);
+    const titulo = elegido.titulo, id = elegido.id;
     start(async () => {
       await anadirActividad(fd);
-      setAnadidos((a) => [...a, elegido.id]);
+      setAnadidos((a) => [...a, id]);
+      // Vuelve a la lista (con la búsqueda y los filtros como estaban) para elegir el siguiente
+      setSel(null);
+      setMinutos("");
+      setAviso(`Añadido: ${titulo}`);
+      setTimeout(() => setAviso((t) => (t === `Añadido: ${titulo}` ? null : t)), 2500);
     });
   };
+  const cerrar = () => { setAbierto(false); setSel(null); setAviso(null); };
 
   if (!abierto) {
     return (
-      <button type="button" onClick={() => setAbierto(true)} className="btn-primario w-full">
-        <Library size={16} /> Elegir ejercicio de la biblioteca
-      </button>
+      <>
+        <button type="button" onClick={() => setAbierto(true)} className="btn-primario w-full">
+          <Library size={16} /> Elegir ejercicio de la biblioteca
+        </button>
+        {/* En el móvil, siempre a mano sin tener que bajar hasta el final */}
+        <button type="button" onClick={() => setAbierto(true)} aria-label="Añadir ejercicio de la biblioteca"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-1.5 rounded-full bg-azul px-4 py-3 text-sm font-semibold text-white shadow-xl md:hidden">
+          <Plus size={18} /> Ejercicio
+        </button>
+      </>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:p-4" onClick={() => setAbierto(false)}>
-      <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex h-[100dvh] items-stretch justify-center bg-black/50 sm:p-4" onClick={cerrar}>
+      <div className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-linea p-3">
           <Library size={18} className="text-azul" />
           <h2 className="flex-1 font-semibold">Elegir ejercicios</h2>
           {anadidos.length > 0 && <span className="text-sm text-green-700">{anadidos.length} añadido{anadidos.length > 1 ? "s" : ""}</span>}
-          <button type="button" onClick={() => setAbierto(false)} className="rounded-lg p-1.5 hover:bg-suave" aria-label="Cerrar"><X size={18} /></button>
+          <button type="button" onClick={cerrar} className="rounded-lg p-1.5 hover:bg-suave" aria-label="Cerrar"><X size={18} /></button>
         </div>
 
-        <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           {/* Lista */}
           <div className={`flex min-h-0 flex-col border-linea md:border-r ${sel ? "hidden md:flex" : "flex"}`}>
             <div className="space-y-2 border-b border-linea p-3">
               <div className="relative">
                 <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tinta/40" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar: tiro, 2c1, ayudas…" className="campo !pl-8" autoFocus />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar: tiro, 2c1, ayudas…" className="campo !pl-8" />
               </div>
               <div className="flex flex-wrap gap-2">
                 <select value={cat} onChange={(e) => setCat(e.target.value)} className="campo !w-auto flex-1 !py-1 text-sm">
@@ -96,7 +111,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                 ))}
               </div>
             </div>
-            <ul className="min-h-0 flex-1 divide-y divide-linea overflow-y-auto">
+            <ul className="min-h-0 flex-1 divide-y divide-linea overflow-y-auto overscroll-contain">
               {lista.map((e) => (
                 <li key={e.id}>
                   <button type="button" onClick={() => { setSel(e.id); setMinutos(e.duracion ? String(e.duracion) : ""); }}
@@ -120,16 +135,20 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
           <div className={`min-h-0 flex-col ${sel ? "flex" : "hidden md:flex"}`}>
             {elegido ? (
               <>
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                  <button type="button" onClick={() => setSel(null)} className="mb-2 inline-flex items-center gap-1 text-sm text-tinta/60 md:hidden"><ArrowLeft size={14} /> Volver a la lista</button>
+                <div className="flex items-center gap-2 border-b border-linea px-3 py-2 md:hidden">
+                  <button type="button" onClick={() => setSel(null)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-azul hover:bg-suave"><ArrowLeft size={16} /> Lista</button>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{elegido.titulo}</span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                   <FichaEjercicio key={elegido.id} id={elegido.id} />
                 </div>
-                <div className="flex items-center gap-2 border-t border-linea bg-suave/60 p-3">
+                <div className="flex shrink-0 items-center gap-2 border-t border-linea bg-suave p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <label className="text-sm text-tinta/70">Minutos</label>
-                  <input type="number" min={0} value={minutos} onChange={(e) => setMinutos(e.target.value)} className="campo !w-20 !py-1.5 text-right" />
+                  <input type="number" min={0} value={minutos} onChange={(e) => setMinutos(e.target.value)} className="campo !w-16 !py-1.5 text-right" />
                   <button type="button" onClick={anadir} disabled={pendiente} className="btn-primario ml-auto">
                     {pendiente ? <Loader2 size={16} className="animate-spin" /> : anadidos.includes(elegido.id) ? <Check size={16} /> : <Plus size={16} />}
-                    {anadidos.includes(elegido.id) ? "Añadir otra vez" : "Añadir al entreno"}
+                    <span className="sm:hidden">{anadidos.includes(elegido.id) ? "Otra vez" : "Añadir"}</span>
+                    <span className="hidden sm:inline">{anadidos.includes(elegido.id) ? "Añadir otra vez" : "Añadir al entreno"}</span>
                   </button>
                 </div>
               </>
@@ -140,6 +159,11 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
             )}
           </div>
         </div>
+        {aviso && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-16 flex justify-center px-4">
+            <span className="flex items-center gap-1.5 rounded-full bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-lg"><Check size={15} /> {aviso}</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -36,6 +36,7 @@ export interface AccionBalon {
   a?: string;                  // quien lo recibe (pase / coger)
   destino?: Punto;             // canasta (tiro)
   mano?: boolean;              // pase dibujado como mano a mano (entrega)
+  rebote?: boolean;            // coger el balón que estaba en la canasta (tras un tiro)
 }
 
 export interface Fotograma {

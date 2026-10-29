@@ -106,6 +106,15 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
             const pos = est[k + 1]?.pos ?? {};
             const de = a.de ? pos[a.de] : undefined;
             const hacia = a.tipo === "tiro" ? a.destino : a.a ? pos[a.a] : undefined;
+            if (a.tipo === "coger" && a.rebote && hacia) {
+              const [x, y] = T(hacia);
+              return (
+                <g key={`b${i}`}>
+                  <circle cx={x - r * 1.2} cy={y - r * 1.2} r={r * 0.62} fill="#fff" stroke="#1f2937" strokeWidth="0.05" />
+                  <text x={x - r * 1.2} y={y - r * 1.2 + r * 0.3} textAnchor="middle" fontSize={r * 0.82} fontWeight="700" fill="#1f2937" fontFamily="system-ui, sans-serif">R</text>
+                </g>
+              );
+            }
             if (!de || !hacia) return null;
             const [x1, y1] = T(de), [x2, y2] = T(hacia);
             return <line key={`b${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={a.tipo === "tiro" ? NARANJA : "#475569"} strokeWidth="0.07" strokeDasharray="0.3 0.18" markerEnd="url(#fl)" />;

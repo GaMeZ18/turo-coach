@@ -223,12 +223,22 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     if (tiene === jugador) return;
     const accion: AccionBalon = tiene
       ? { balon, tipo: "pase", de: tiene, a: jugador, ...(modoMano ? { mano: true } : {}) }
-      : { balon, tipo: "coger", a: jugador };
+      : { balon, tipo: "coger", a: jugador, ...(balonEnCanasta(balon) ? { rebote: true } : {}) };
     if (modoMano) setModoMano(false);
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
       f.balon = [...f.balon.filter((a) => a.balon !== balon), accion];
     }, cursor + 1);
+  };
+
+  /** ¿El balón está en la canasta? (lo último que hizo fue un tiro, o está junto a un aro) */
+  const balonEnCanasta = (balon: string) => {
+    for (let j = Math.min(cursor, p.fotogramas.length) - 1; j >= 0; j--) {
+      const a = p.fotogramas[j].balon.find((x) => x.balon === balon);
+      if (a) return a.tipo === "tiro";
+    }
+    const q = E.pos[balon];
+    return !!q && canastasObjetivo.some((h) => Math.hypot(h.x - q.x, h.y - q.y) < 1.2);
   };
 
   const tirar = (destino: Punto) => {
@@ -672,8 +682,18 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   const pintarAccion = (x: AccLinea, key: string) => {
     const { a, f, op, num } = x;
-    if (a.tipo === "coger") return null;
     const S = est[f + 1];
+    if (a.tipo === "coger") {
+      // Rebote: una «R» pequeña junto al jugador que lo coge
+      const q = a.rebote && a.a ? S.pos[a.a] : undefined;
+      if (!q) return null;
+      return (
+        <Group key={key} listening={false} opacity={op}>
+          <Circle x={q.x - R * 1.15} y={q.y - R * 1.15} radius={0.32} fill="#fff" stroke={TINTA} strokeWidth={0.05} />
+          <T x={q.x - R * 1.15} y={q.y - R * 1.15} width={0.64} height={0.64} offsetX={0.32 * K} offsetY={0.32 * K} align="center" verticalAlign="middle" rotation={giroTexto} text="R" fontSize={0.42} fontStyle="bold" fill={TINTA} />
+        </Group>
+      );
+    }
     const desde = a.de ? S.pos[a.de] : undefined;
     const hasta = a.tipo === "tiro" ? a.destino : a.a ? S.pos[a.a] : undefined;
     if (!desde || !hasta) return null;
@@ -892,11 +912,11 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     if (obj.tipo === "dibujo") { setSelDibujo(obj.id); setSel(null); setBalonSel(null); return; }
     const el = obj.el;
     if (balonSel && esJugador(el.tipo)) { darBalon(balonSel, el.id); gestoRef.current = null; return; }
-    // Primero se selecciona; el arrastre solo mueve la ficha ya seleccionada
-    const lista = el.tipo === "balon" ? balonSel === el.id : sel === el.id;
+    // Se puede arrastrar directamente, sin seleccionar antes
+    const lista = true;
     const pos = posMostrada(el);
     gestoRef.current = pos ? { el, ptr: q, pos, lista, arrastrando: false } : null;
-    if (!lista && el.tipo !== "balon") { setSel(el.id); setSelDibujo(null); }
+    if (el.tipo !== "balon") { setSel(el.id); setSelDibujo(null); }
   };
 
   const alMover = (ev: React.PointerEvent<HTMLDivElement>) => {
