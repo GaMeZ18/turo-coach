@@ -291,7 +291,7 @@ const rect = (src: Uint8Array, w: number, h: number, k: number, max: boolean) =>
 export function candidatosTablero(gris: Uint8Array, sat: Uint8Array, W: number, H: number, altoReal = H): [number, number, number, number][] {
   const k = Math.max(5, Math.floor(W / 210) | 1);
   const apertura = rect(rect(gris, W, H, k, false), W, H, k, true);
-  let m = new Uint8Array(W * H);
+  let m: Uint8Array = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) m[i] = gris[i] - apertura[i] > 18 && sat[i] < 70 ? 1 : 0;
   m = rect(rect(m, W, H, 3, true), W, H, 3, false); // cierre 3×3
   const res: [number, number, number, number][] = [];

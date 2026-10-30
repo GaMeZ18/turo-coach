@@ -61,9 +61,9 @@ export async function recorrer(v: HTMLVideoElement, desde: number, hasta: number
         ventanaT = t; ventanaN = 0;
       }
     };
-    if ("requestVideoFrameCallback" in v) {
-      const vv = v as HTMLVideoElement & { requestVideoFrameCallback: (cb: (n: number, m: { mediaTime: number }) => void) => number };
-      const cb = (_: number, m: { mediaTime: number }) => { fotograma(m.mediaTime); if (!acabado) vv.requestVideoFrameCallback(cb); };
+    const vv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: (n: number, m: { mediaTime: number }) => void) => number };
+    if (typeof vv.requestVideoFrameCallback === "function") {
+      const cb = (_: number, m: { mediaTime: number }) => { fotograma(m.mediaTime); if (!acabado) vv.requestVideoFrameCallback!(cb); };
       vv.requestVideoFrameCallback(cb);
     } else {
       const tick = () => { if (acabado) return; fotograma(v.currentTime); requestAnimationFrame(tick); };
