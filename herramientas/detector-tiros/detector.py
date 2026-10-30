@@ -3,7 +3,8 @@
 Detector de tiros · Coach Manager CBTuró (prueba piloto)
 
 Analiza en tu ordenador el vídeo original de un partido grabado con cámara fija y busca
-los momentos en los que el balón llega al aro: «tiro candidato», y si puede, si entra o no.
+los momentos en los que el balón llega al aro desde arriba: «tiro candidato», y si puede, si entra o no.
+Sigue el balón por su movimiento y tamaño (no por el color) y necesita vídeo de 1080p o, como mínimo, 720p.
 El resultado es un archivo JSON que se importa en Coach Manager (Vídeo → Importar detecciones)
 como clips «por revisar».
 
@@ -39,7 +40,7 @@ except ImportError as _e:  # mensaje claro si falta algo
     print("Falta OpenCV o NumPy. Ejecuta primero instalar.bat (o: pip install -r requirements.txt).")
     sys.exit(1)
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 # Perfiles: fotogramas por segundo que se analizan alrededor de los aros
 PERFILES = {"rapido": 8, "equilibrado": 12, "preciso": 20}
@@ -100,7 +101,7 @@ def calibrar(args) -> None:
             cv2.destroyAllWindows()
             if r[2] > 3 and r[3] > 1:
                 datos["aros"].append({"nombre": nombre, "x": int(r[0]), "y": int(r[1]), "w": int(r[2]), "h": int(r[3])})
-        if not args.sin_balon:
+        if False:  # desde la 0.2 el balón se busca por movimiento, no por color
             print("\n(Opcional) Busca un momento en el que se vea bien el balón y dibuja un rectángulo pequeño SOLO sobre el balón.")
             print("  Si en este fotograma no se ve, pulsa C y se usará el naranja por defecto.")
             r = cv2.selectROI("Balón (opcional) · Enter para aceptar, C para saltar", frame, showCrosshair=True)
@@ -167,101 +168,147 @@ class Evento:
 
 
 class SeguidorAro:
-    """Busca el balón cerca de un aro y decide si hay tiro y si entra."""
+    """Busca el balón en vuelo cerca de un aro y decide si hay tiro (y, si se ve, si entra).
+
+    No depende del color (con poca luz el balón sale marrón oscuro): busca manchas que se mueven,
+    del tamaño del balón, y las une en trayectorias. Un tiro es una trayectoria que viene desde
+    encima del aro y baja hasta él.
+    """
+
+    U_MAX, V_MIN, V_MAX = 6.0, -7.0, 2.0   # zona vigilada, en anchos de aro
 
     def __init__(self, aro: Aro, balon: dict, fps_analisis: float):
         self.aro = aro
         self.balon = balon
-        self.fondo = cv2.createBackgroundSubtractorMOG2(history=int(fps_analisis * 20), varThreshold=24, detectShadows=False)
-        d = 0.53 * aro.w  # diámetro esperado del balón junto al aro (24 cm de balón / 45 cm de aro)
-        self.area_min = math.pi * (d / 2) ** 2 * 0.2
-        self.area_max = math.pi * (d / 2) ** 2 * 3.5
+        self.fps = fps_analisis
+        self.fondo = cv2.createBackgroundSubtractorMOG2(history=int(fps_analisis * 8), varThreshold=20, detectShadows=False)
+        self.d = 0.5 * aro.w  # diámetro esperado del balón (24 cm de balón / 45 cm de aro)
+        area = math.pi * (self.d / 2) ** 2
+        self.area_min = max(4.0, area * 0.25)
+        self.area_max = area * 2.6
         self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        self.obs: list[tuple[float, float, float]] = []   # observaciones de la jugada en curso
+        self.pistas: list[list[tuple[float, float, float]]] = []   # trayectorias abiertas [(t, u, v)]
         self.ultimo_t = -1e9
+        self.obs: list = []          # compatibilidad: hay algo pendiente de cerrar
         self.eventos: list[Evento] = []
         self.fin_ultimo = -1e9
 
-    def procesar(self, t: float, frame) -> None:
+    def preparar_zona(self, ancho: int, alto: int) -> None:
+        a, W = self.aro, self.aro.w
+        a.x0 = max(0, int(a.x + a.w / 2 - self.U_MAX * W))
+        a.x1 = min(ancho, int(a.x + a.w / 2 + self.U_MAX * W))
+        a.y0 = max(0, int(a.y + self.V_MIN * W))
+        a.y1 = min(alto, int(a.y + self.V_MAX * W))
+
+    def candidatos(self, frame) -> list[tuple[float, float]]:
         a = self.aro
         rec = frame[a.y0:a.y1, a.x0:a.x1]
         if rec.size == 0:
-            return
+            return []
         mov = self.fondo.apply(rec)
-        hsv = cv2.cvtColor(rec, cv2.COLOR_BGR2HSV)
-        b = self.balon
-        color = cv2.inRange(hsv, (b["h_min"], b["s_min"], b["v_min"]), (b["h_max"], 255, 255))
-        mascara = cv2.bitwise_and(mov, color)
-        mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, self.kernel)
-        mascara = cv2.dilate(mascara, self.kernel, iterations=1)
-        contornos, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        mejor = None
+        mov = cv2.morphologyEx(mov, cv2.MORPH_OPEN, self.kernel)
+        mov = cv2.dilate(mov, self.kernel, iterations=1)
+        contornos, _ = cv2.findContours(mov, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        res = []
         for c in contornos:
             area = cv2.contourArea(c)
             if not (self.area_min <= area <= self.area_max):
                 continue
             x, y, w, h = cv2.boundingRect(c)
-            if not (0.4 <= w / max(h, 1) <= 2.5):
+            if max(w, h) > 2.2 * self.d + 3 or not (0.45 <= w / max(h, 1) <= 2.2):
                 continue
-            cx, cy = a.x0 + x + w / 2, a.y0 + y + h / 2
-            u, v = a.a_aro(cx, cy)
-            if abs(u) > 1.7 or v < -2.8 or v > 1.6:
+            if area / max(1.0, w * h) < 0.4:   # poco «relleno»: un brazo, una línea
                 continue
-            # el más cercano a la última posición (o al aro si no hay)
-            ref = (self.obs[-1][1], self.obs[-1][2]) if self.obs else (0.0, -1.0)
-            dist = (u - ref[0]) ** 2 + (v - ref[1]) ** 2
-            if mejor is None or dist < mejor[0]:
-                mejor = (dist, u, v)
-        if mejor:
-            self.registrar(t, mejor[1], mejor[2])
-        elif self.obs and t - self.ultimo_t > 1.2:
-            self.cerrar()
+            u, v = a.a_aro(a.x0 + x + w / 2, a.y0 + y + h / 2)
+            res.append((u, v))
+        return res
 
-    def registrar(self, t: float, u: float, v: float) -> None:
-        if self.obs and t - self.ultimo_t > 1.2:
-            self.cerrar()
-        self.obs.append((t, u, v))
-        self.ultimo_t = t
-        if t - self.obs[0][0] > 4.0:  # una jugada no dura tanto junto al aro
-            self.cerrar()
+    def procesar(self, t: float, frame) -> None:
+        cands = self.candidatos(frame)
+        if len(cands) > 6:   # demasiado movimiento (gente pasando, cambio de luz): no fiable
+            cands = []
+        usados = set()
+        # Cada trayectoria abierta se queda con el candidato más cercano a donde debería estar
+        for pista in sorted(self.pistas, key=len, reverse=True):
+            t1, u1, v1 = pista[-1]
+            if len(pista) >= 2:
+                t0, u0, v0 = pista[-2]
+                dt0 = max(1e-3, t1 - t0)
+                du, dv = (u1 - u0) / dt0, (v1 - v0) / dt0
+            else:
+                du = dv = 0.0
+            dt = t - t1
+            pu, pv = u1 + du * dt, v1 + dv * dt
+            margen = 1.6 + (0.0 if len(pista) >= 2 else 1.4)
+            mejor = None
+            for k, (u, v) in enumerate(cands):
+                if k in usados:
+                    continue
+                dist = math.hypot(u - pu, v - pv)
+                if dist < margen and (mejor is None or dist < mejor[0]):
+                    mejor = (dist, k)
+            if mejor:
+                usados.add(mejor[1])
+                pista.append((t, *cands[mejor[1]]))
+        for k, (u, v) in enumerate(cands):
+            if k not in usados:
+                self.pistas.append([(t, u, v)])
+        # Cerrar las que llevan un rato sin verse
+        vivas = []
+        for pista in self.pistas:
+            if t - pista[-1][0] > 0.35:
+                self.evaluar(pista)
+            else:
+                vivas.append(pista)
+        self.pistas = vivas
+        self.obs = self.pistas
 
     def cerrar(self) -> None:
-        obs, self.obs = self.obs, []
-        if len(obs) < 2:
+        for pista in self.pistas:
+            self.evaluar(pista)
+        self.pistas = []
+        self.obs = []
+
+    def evaluar(self, obs: list[tuple[float, float, float]]) -> None:
+        if len(obs) < 3 or obs[-1][0] - obs[0][0] < 0.12:
             return
-        arriba = [o for o in obs if o[2] < -0.15 and abs(o[1]) < 1.4]
-        if not arriba:
-            return  # el balón no ha pasado por encima del aro: no es un tiro (un pase o un bote)
-        en_aro = [o for o in obs if abs(o[1]) < 0.5 and -0.2 <= o[2] <= 0.35]
-        red = [o for o in obs if abs(o[1]) < 0.65 and 0.3 < o[2] <= 1.5]
-        # Entra: pasa por el aro y luego por la red, bajando y centrado
-        t_arriba = arriba[0][0]
-        anotada = False
-        if red:
-            primero_red = red[0][0]
-            antes = [o for o in obs if o[0] <= primero_red and o[2] < 0.3]
-            centrado = all(abs(o[1]) < 0.8 for o in obs if o[0] >= primero_red - 0.3 and o[0] <= primero_red)
-            anotada = bool(antes) and centrado and primero_red >= t_arriba
-        if anotada:
+        recorrido = sum(math.hypot(b[1] - a[1], b[2] - a[2]) for a, b in zip(obs, obs[1:]))
+        if recorrido < 1.5:
+            return  # casi quieto: no es un balón en vuelo
+        arriba = [o for o in obs if o[2] < -1.0]
+        cerca = [k for k, o in enumerate(obs) if abs(o[1]) < 1.4 and -1.8 < o[2] < 0.9]
+        if not arriba or not cerca:
+            return  # no llega al aro viniendo desde arriba: un pase, un bote o un jugador
+        k = cerca[0]
+        if obs[k][0] < arriba[0][0]:
+            # llega al aro antes de haber estado arriba: solo vale si después sube (palmeo / rebote)
+            if not any(o[0] > obs[k][0] for o in arriba):
+                return
+        # Tiene que llegar bajando
+        previos = [o for o in obs[:k + 1] if o[0] >= obs[k][0] - 0.4]
+        if len(previos) >= 2 and previos[-1][2] < previos[0][2] - 0.2:
+            return
+        llegada = obs[k][0]
+        despues = obs[k + 1:]
+        red = [o for o in despues if abs(o[1]) < 0.75 and 0.35 < o[2] < 2.0]
+        sube = [o for o in despues if o[2] < obs[k][2] - 1.0]
+        sale = [o for o in despues if abs(o[1]) > 1.1 and o[2] < 1.0]   # rebota hacia un lado
+        if red and not sube:
             resultado = "anotada"
-        elif len(arriba) >= 2 and not red:
+        elif sube or sale:
             resultado = "fallada"
         else:
             resultado = "desconocido"
-        # Momento del tiro: cuando el balón llega a la altura del aro (o la última vez que se ve arriba)
-        llegada = en_aro[0][0] if en_aro else (red[0][0] if red else arriba[-1][0])
-        # Confianza: más observaciones y trayectoria de arco (sube o está arriba y luego baja) = más fiable
-        vs = [o[2] for o in obs]
-        baja_al_final = vs[-1] > min(vs)
-        conf = min(1.0, 0.25 + 0.1 * len(obs)) * (1.0 if baja_al_final else 0.7) * (1.0 if resultado != "desconocido" else 0.8)
-        if llegada - self.fin_ultimo < 1.5 and self.eventos:
-            # rebote en el aro y vuelve a subir: misma jugada, nos quedamos con el resultado más informativo
+        conf = min(1.0, 0.3 + 0.07 * len(obs)) * (0.85 if resultado == "desconocido" else 1.0)
+        if llegada - self.fin_ultimo < 1.6 and self.eventos and self.eventos[-1].canasta == self.aro.nombre:
+            # sigue la misma jugada (el balón bota en el aro y vuelve a caer)
             prev = self.eventos[-1]
-            if prev.resultado != "anotada" and resultado == "anotada":
-                prev.resultado, prev.confianza = "anotada", max(prev.confianza, conf)
-            prev.t_fin = obs[-1][0]
+            if resultado == "anotada" or prev.resultado == "desconocido":
+                prev.resultado = resultado if resultado != "desconocido" else ("fallada" if prev.resultado == "desconocido" else prev.resultado)
+            prev.t_fin = round(obs[-1][0], 2)
             prev.observaciones += len(obs)
-            prev.trayectoria += [list(o) for o in obs]
+            prev.confianza = round(max(prev.confianza, conf), 2)
+            prev.trayectoria += [[round(x, 2) for x in o] for o in obs]
             self.fin_ultimo = obs[-1][0]
             return
         self.eventos.append(Evento(
@@ -288,6 +335,8 @@ def analizar(args) -> dict:
         aro.preparar(ancho, alto)
         aros.append(aro)
     seguidores = [SeguidorAro(a, c.get("balon", BALON_DEFECTO), fps / paso) for a in aros]
+    for sg in seguidores:
+        sg.preparar_zona(ancho, alto)
     inicio = max(0.0, args.inicio or 0.0)
     fin = args.fin if args.fin else (n / fps if n else 1e9)
     if inicio:
