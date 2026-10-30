@@ -13,7 +13,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   const { id } = await params;
   const { clip: clipInicial } = await searchParams;
   const { supabase } = await requireUser();
-  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, minutos_periodo, partidos(id, fecha, rival, local, fcbq_stats_id), equipos(nombre)").eq("id", id).maybeSingle();
+  const { data: v } = await supabase.from("videos").select("id, equipo_id, partido_id, titulo, url, youtube_id, archivo, archivo_bytes, minutos_periodo, partidos(id, fecha, rival, local, fcbq_stats_id), equipos(nombre)").eq("id", id).maybeSingle();
   if (!v) notFound();
   const [{ data: cats }, { data: clips }, { data: plantilla }, { data: eventos }] = await Promise.all([
     supabase.from("video_categorias").select("id, equipo_id, nombre, color, antes, despues, orden, tecla, estadistica").or(`equipo_id.is.null,equipo_id.eq.${v.equipo_id}`).order("orden"),
@@ -52,17 +52,18 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
         <div className="flex gap-2">
           <Link href={`/video/${v.id}/detectar`} className="btn-primario !py-1.5 text-sm"><ScanSearch size={15} /> Detectar tiros</Link>
           <Importar videoId={v.id} />
-          <a href={v.url} target="_blank" rel="noopener" className="btn-secundario !py-1.5 text-sm"><ExternalLink size={15} /> YouTube</a>
+          {v.url && <a href={v.url} target="_blank" rel="noopener" className="btn-secundario !py-1.5 text-sm"><ExternalLink size={15} /> YouTube</a>}
           <form action={borrarVideo}>
             <input type="hidden" name="id" value={v.id} />
-            <Enviar className="btn-peligro !py-1.5" confirmar="¿Borrar este vídeo y todos sus clips? (El vídeo de YouTube no se toca.)"><Trash2 size={15} /></Enviar>
+            <Enviar className="btn-peligro !py-1.5" confirmar="¿Borrar este vídeo y todos sus clips? (El vídeo original, en YouTube o en tu ordenador, no se toca.)"><Trash2 size={15} /></Enviar>
           </form>
         </div>
       </div>
-      {v.youtube_id ? (
+      {v.youtube_id || v.archivo ? (
         <Analizador
           videoId={v.id}
           youtubeId={v.youtube_id}
+          archivo={v.archivo ? { nombre: v.archivo, bytes: v.archivo_bytes } : null}
           categorias={(cats ?? []) as Categoria[]}
           clipsIniciales={((clips ?? []) as Clip[]).map((c) => ({ ...c, inicio: Number(c.inicio), fin: Number(c.fin) }))}
           jugadores={jugadores}

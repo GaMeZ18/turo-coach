@@ -8,13 +8,16 @@ import { ArrowLeft, CheckCircle2, Crosshair, FileVideo, Loader2, ScanSearch, Squ
 import type { Aro, Evento } from "@/lib/detector";
 import { alteracionLectura, buscarCanastas, buscarTiros, type Control } from "@/lib/detector-web";
 import { importarDetecciones } from "../../actions";
+import { archivoDe, recordarArchivo } from "@/lib/archivo-local";
 import { mmss } from "@/lib/video";
 
 type Fase = "elegir" | "fondo" | "canastas" | "marcar" | "tiros" | "guardando" | "hecho" | "error";
 type Rect = { x: number; y: number; w: number; h: number };
 
 
-export default function Detectar({ videoId, titulo }: { videoId: string; titulo: string }) {
+export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
+  videoId: string; titulo: string; local: boolean; archivoEsperado?: { nombre: string; bytes: number | null } | null;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imgRef = useRef<HTMLCanvasElement>(null);
   const ctl = useRef<Control>({ parar: false, corregir: false });
@@ -24,6 +27,8 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
     nav.brave?.isBrave().then(setEsBrave).catch(() => {});
   }, []);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const archivoActual = useRef<File | null>(null);
+  archivoActual.current = archivo;
   const [desfase, setDesfase] = useState("0");
   const [fase, setFase] = useState<Fase>("elegir");
   const [msg, setMsg] = useState("");
@@ -53,9 +58,19 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
   }, [fase]);
 
   // ------------------------------------------------------------------ pasos
-  const empezar = async () => {
+  // Si se acaba de añadir el vídeo con su archivo, empezar directamente
+  const autoIniciado = useRef(false);
+  useEffect(() => {
+    const f = archivoDe(videoId);
+    if (f && !autoIniciado.current) { autoIniciado.current = true; setArchivo(f); setTimeout(() => empezarRef.current(f), 0); }
+  }, [videoId]);
+  const empezarRef = useRef<(f?: File) => void>(() => {});
+
+  const empezar = async (elegido?: File) => {
     const v = videoRef.current;
+    const archivo = elegido ?? archivoActual.current;
     if (!v || !archivo) return;
+    if (local) recordarArchivo(videoId, archivo);
     if (alteracionLectura() > 0.01) {
       setFase("error");
       setMsg(esBrave
@@ -101,6 +116,8 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
     if (!eventos) return; // se ha pedido marcar los aros a mano: se vuelve a empezar al marcarlos
     await guardar(eventos);
   };
+
+  empezarRef.current = (f?: File) => { void empezar(f); };
 
   const guardar = async (eventos: Evento[]) => {
     setFase("guardando");
@@ -166,7 +183,7 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
       <Link href={`/video/${videoId}`} className="inline-flex items-center gap-1 text-sm text-azul hover:underline"><ArrowLeft size={14} /> {titulo}</Link>
       <h1 className="mt-2 flex items-center gap-2 text-2xl font-semibold"><ScanSearch className="text-azul" /> Detectar tiros</h1>
       <p className="max-w-2xl text-sm text-tinta/60">
-        Elige el <strong>vídeo original</strong> del partido (el de la cámara, no el de YouTube). Se analiza en este ordenador:
+        Elige el <strong>vídeo original</strong> del partido (el archivo de la cámara). Se analiza en este ordenador:
         no se sube a ningún sitio. Encuentra solo las canastas y deja los tiros como clips <strong>«por revisar»</strong> en este vídeo.
       </p>
 
@@ -178,12 +195,15 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
             <span className="text-xs text-tinta/50">{archivo ? `${(archivo.size / 1e9).toFixed(1)} GB` : "MP4 de la cámara, mejor en 1080p"}</span>
             <input type="file" accept="video/*,.mp4,.mov,.mkv" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
           </label>
-          <label className="flex flex-wrap items-center gap-2 text-sm text-tinta/70">
+          {archivo && archivoEsperado && archivoEsperado.bytes && archivo.size !== archivoEsperado.bytes && (
+            <p className="rounded-lg bg-oro/30 p-2 text-sm">Ojo: este archivo no parece el de este vídeo (se añadió «{archivoEsperado.nombre}»).</p>
+          )}
+          <label className={`flex flex-wrap items-center gap-2 text-sm text-tinta/70 ${local ? "hidden" : ""}`}>
             Desfase con YouTube (s)
             <input type="number" step="0.1" value={desfase} onChange={(e) => setDesfase(e.target.value)} className="campo !w-24 !py-1" />
             <span className="text-xs text-tinta/50">0 si el vídeo de YouTube empieza en el mismo segundo que este archivo</span>
           </label>
-          <button onClick={empezar} disabled={!archivo} className="btn-primario w-full sm:w-auto"><ScanSearch size={16} /> Empezar</button>
+          <button onClick={() => empezar()} disabled={!archivo} className="btn-primario w-full sm:w-auto"><ScanSearch size={16} /> Empezar</button>
           <p className="text-xs text-tinta/50">Un partido entero tarda unos 15–25 minutos. Deja esta pestaña abierta y a la vista (puedes usar otras ventanas).</p>
         </div>
       )}
@@ -252,6 +272,7 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
             {resultado.total === 0 ? "No se ha encontrado ningún tiro." : <>Se han encontrado <strong>{resultado.total} tiros</strong>: {resultado.nuevos} guardados como clips «por revisar»{resultado.repetidos ? ` (${resultado.repetidos} ya estaban)` : ""}.</>}
           </p>
           <Link href={`/video/${videoId}`} className="btn-primario mt-3 inline-flex">Ir al vídeo y revisar</Link>
+          {local && <p className="mt-2 text-xs text-tinta/50">El vídeo se verá desde tu ordenador mientras no cierres la web; otro día te pedirá elegir el archivo otra vez.</p>}
         </div>
       )}
 

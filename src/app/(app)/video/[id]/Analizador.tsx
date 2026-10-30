@@ -2,8 +2,9 @@
 
 // Analizador de vídeo: reproductor de YouTube + botonera de etiquetas + clips filtrables.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, BarChart3, ScanSearch, SkipForward, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, BarChart3, FileVideo, ScanSearch, SkipForward, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { PREGUNTA_ESTADISTICA, analisisPista, enPista, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type EventoVideo, type StatVideo } from "@/lib/video";
+import { archivoDe, recordarArchivo, tamanoGB } from "@/lib/archivo-local";
 import { actualizarClip, borrarClip, borrarEventoVideo, crearClip, crearEventoVideo, guardarMinutosPeriodo } from "../actions";
 
 type Jugador = { id: string; nombre: string; apellidos: string | null; dorsal: number | null };
@@ -34,8 +35,8 @@ type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado
 type JugadaFCBQ = { pts: number; dorsal: number | null; nombre: string | null };
 const VELOCIDADES = [1, 1.5, 2];
 
-export default function Analizador({ videoId, youtubeId, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo, jugadasFCBQ }: {
-  videoId: string; youtubeId: string; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
+export default function Analizador({ videoId, youtubeId, archivo, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo, jugadasFCBQ }: {
+  videoId: string; youtubeId: string | null; archivo?: { nombre: string; bytes: number | null } | null; categorias: Categoria[]; clipsIniciales: Clip[]; jugadores: Jugador[]; clipInicial?: string | null;
   eventosIniciales: EventoVideo[]; minutosPeriodo: number; jugadasFCBQ?: JugadaFCBQ[] | null;
 }) {
   const contenedor = useRef<HTMLDivElement>(null);
@@ -77,7 +78,37 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
   const seleccionado = clips.find((c) => c.id === sel) ?? null;
 
   // --- Reproductor ---
+  // Vídeo del ordenador: se reproduce desde el disco con un <video> que imita lo que usamos de YouTube
+  const [archivoLocal, setArchivoLocal] = useState<File | null>(null);
+  useEffect(() => { if (!youtubeId) setArchivoLocal(archivoDe(videoId)); }, [videoId, youtubeId]);
   useEffect(() => {
+    if (youtubeId || !archivoLocal || !contenedor.current) return;
+    let vivo = true;
+    const url = URL.createObjectURL(archivoLocal);
+    const el = document.createElement("video");
+    el.src = url; el.playsInline = true; el.preload = "auto";
+    el.className = "h-full w-full";
+    contenedor.current.innerHTML = "";
+    contenedor.current.appendChild(el);
+    el.addEventListener("loadedmetadata", () => vivo && setListo(true));
+    el.addEventListener("play", () => vivo && setTocando(true));
+    el.addEventListener("pause", () => vivo && setTocando(false));
+    el.addEventListener("error", () => vivo && setError("El navegador no puede reproducir este archivo. Prueba con Chrome, Edge o Brave, o conviértelo a MP4 (H.264)."));
+    el.addEventListener("click", () => (el.paused ? el.play() : el.pause()));
+    player.current = {
+      getCurrentTime: () => el.currentTime,
+      seekTo: (s: number) => { el.currentTime = s; },
+      playVideo: () => { el.play().catch(() => {}); },
+      pauseVideo: () => el.pause(),
+      setPlaybackRate: (r: number) => { el.playbackRate = r; },
+      getPlayerState: () => (el.paused ? 2 : 1),
+      destroy: () => { el.pause(); el.removeAttribute("src"); el.load(); URL.revokeObjectURL(url); },
+    };
+    return () => { vivo = false; try { player.current?.destroy?.(); } catch {} player.current = null; };
+  }, [youtubeId, archivoLocal]);
+
+  useEffect(() => {
+    if (!youtubeId) return;
     let vivo = true;
     cargarAPI().then(() => {
       if (!vivo || !contenedor.current) return;
@@ -388,7 +419,20 @@ export default function Analizador({ videoId, youtubeId, categorias, clipsInicia
       <div className="min-w-0">
         <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
           <div ref={contenedor} className="absolute inset-0 [&_iframe]:h-full [&_iframe]:w-full" />
-          {!listo && !error && <div className="absolute inset-0 flex items-center justify-center text-white/70"><Loader2 className="animate-spin" /></div>}
+          {!youtubeId && !archivoLocal ? (
+            <label className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 p-4 text-center text-white">
+              <FileVideo size={34} className="text-oro" />
+              <span className="font-semibold">Elige el archivo del vídeo para verlo</span>
+              {archivo && <span className="text-xs text-white/60">{archivo.nombre}{archivo.bytes ? ` · ${tamanoGB(archivo.bytes)}` : ""}</span>}
+              <span className="text-[11px] text-white/50">Está en tu ordenador: no se sube a ningún sitio.</span>
+              <input type="file" accept="video/*,.mp4,.mov,.mkv" className="hidden" onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                if (archivo?.bytes && f.size !== archivo.bytes && !window.confirm(`Este archivo no parece el de este vídeo (se añadió «${archivo.nombre}»). ¿Usarlo igualmente?`)) return;
+                recordarArchivo(videoId, f); setArchivoLocal(f);
+              }} />
+            </label>
+          ) : !listo && !error && <div className="absolute inset-0 flex items-center justify-center text-white/70"><Loader2 className="animate-spin" /></div>}
         </div>
         {error && <p className="mt-2 flex items-start justify-between gap-2 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}<button onClick={() => setError(null)}><X size={14} /></button></p>}
 

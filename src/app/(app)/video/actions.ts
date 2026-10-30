@@ -6,11 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
 import { youtubeId, type Clip, type EventoVideo } from "@/lib/video";
 
-export async function crearVideo(fd: FormData) {
-  const supabase = await createClient();
-  const url = String(fd.get("url") ?? "").trim();
-  const yt = youtubeId(url);
-  if (!yt) throw new Error("Pega un enlace de YouTube (youtube.com/watch?v=… o youtu.be/…).");
+async function tituloYRival(supabase: Awaited<ReturnType<typeof createClient>>, fd: FormData) {
   const partido = String(fd.get("partido_id") ?? "") || null;
   let titulo = String(fd.get("titulo") ?? "").trim();
   let rival: string | null = null;
@@ -21,6 +17,30 @@ export async function crearVideo(fd: FormData) {
       if (!titulo) titulo = `${p.local ? "vs" : "@"} ${p.rival} · ${new Date(p.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })}`;
     }
   }
+  return { partido, titulo, rival };
+}
+
+/** Vídeo que está en el ordenador (no se sube): solo se guarda su nombre y tamaño */
+export async function crearVideoLocal(fd: FormData): Promise<{ id?: string; error?: string }> {
+  const supabase = await createClient();
+  const archivo = String(fd.get("archivo") ?? "").trim();
+  if (!archivo) return { error: "Elige el archivo del vídeo." };
+  const { partido, titulo, rival } = await tituloYRival(supabase, fd);
+  const { data, error } = await supabase.from("videos").insert({
+    equipo_id: String(fd.get("equipo_id")), partido_id: partido, url: null, youtube_id: null,
+    titulo: titulo || archivo.replace(/\.[^.]+$/, ""), rival, archivo, archivo_bytes: Number(fd.get("bytes")) || null,
+  }).select("id").single();
+  if (error) return { error: /archivo|url/.test(error.message) ? "Falta preparar la base de datos (0021_video_local.sql)." : error.message };
+  revalidatePath("/video");
+  return { id: data.id };
+}
+
+export async function crearVideo(fd: FormData) {
+  const supabase = await createClient();
+  const url = String(fd.get("url") ?? "").trim();
+  const yt = youtubeId(url);
+  if (!yt) throw new Error("Pega un enlace de YouTube (youtube.com/watch?v=… o youtu.be/…).");
+  const { partido, titulo, rival } = await tituloYRival(supabase, fd);
   const { data, error } = await supabase.from("videos").insert({
     equipo_id: String(fd.get("equipo_id")), partido_id: partido, url, youtube_id: yt, titulo: titulo || "Vídeo", rival,
   }).select("id").single();
