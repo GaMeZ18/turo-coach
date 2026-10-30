@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Crosshair, FileVideo, Loader2, ScanSearch, Square, TriangleAlert } from "lucide-react";
 import type { Aro, Evento } from "@/lib/detector";
-import { buscarCanastas, buscarTiros, type Control } from "@/lib/detector-web";
+import { alteracionLectura, buscarCanastas, buscarTiros, type Control } from "@/lib/detector-web";
 import { importarDetecciones } from "../../actions";
 import { mmss } from "@/lib/video";
 
@@ -18,6 +18,11 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
   const videoRef = useRef<HTMLVideoElement>(null);
   const imgRef = useRef<HTMLCanvasElement>(null);
   const ctl = useRef<Control>({ parar: false, corregir: false });
+  const [esBrave, setEsBrave] = useState(false);
+  useEffect(() => {
+    const nav = navigator as Navigator & { brave?: { isBrave: () => Promise<boolean> } };
+    nav.brave?.isBrave().then(setEsBrave).catch(() => {});
+  }, []);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [desfase, setDesfase] = useState("0");
   const [fase, setFase] = useState<Fase>("elegir");
@@ -51,6 +56,13 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
   const empezar = async () => {
     const v = videoRef.current;
     if (!v || !archivo) return;
+    if (alteracionLectura() > 0.01) {
+      setFase("error");
+      setMsg(esBrave
+        ? "Brave está alterando la imagen del vídeo para protegerte del rastreo, y así no se ve el balón. Pulsa el icono del león (a la derecha de la dirección) → «Controles avanzados» → «Bloquear huellas digitales» → «Permitir» para coach.cbturo.com, recarga la página y vuelve a empezar."
+        : "El navegador (o alguna extensión de privacidad) está alterando la imagen del vídeo y así no se ve el balón. Desactiva la protección contra huellas digitales para coach.cbturo.com o usa Chrome o Edge.");
+      return;
+    }
     ctl.current = { parar: false, corregir: false };
     setTiros(0); setProgreso(0); setResto(null); setResultado(null); setMsg("");
     v.muted = true;
@@ -62,7 +74,7 @@ export default function Detectar({ videoId, titulo }: { videoId: string; titulo:
       });
     } catch {
       setFase("error");
-      setMsg("Este navegador no puede leer el vídeo. Prueba con Chrome o Edge, o convierte el vídeo a MP4 (H.264).");
+      setMsg("Este navegador no puede leer el vídeo. Prueba con Chrome, Edge o Brave, o convierte el vídeo a MP4 (H.264).");
       return;
     }
     if (v.videoHeight < 700) setMsg(`Aviso: el vídeo es de ${v.videoWidth}×${v.videoHeight}. Con menos de 720p el balón se ve muy pequeño y se escaparán tiros.`);

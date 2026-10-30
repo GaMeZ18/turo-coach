@@ -154,3 +154,21 @@ export async function buscarTiros(v: HTMLVideoElement, aros: Aro[], ctl: Control
   segs.forEach((s) => s.cerrar());
   return segs.flatMap((s) => s.eventos).sort((a, b) => a.t - b.t);
 }
+
+/**
+ * ¿El navegador devuelve los píxeles tal cual? Brave (escudos contra huellas) y algunas extensiones
+ * alteran lo que se lee de un canvas: con alteraciones fuertes el detector no ve el balón.
+ * Devuelve la fracción de píxeles alterados en más de 3 niveles (0 = fiable).
+ */
+export function alteracionLectura(): number {
+  const c = document.createElement("canvas"); c.width = 64; c.height = 64;
+  const x = c.getContext("2d", { willReadFrequently: true })!;
+  for (let i = 0; i < 64; i++) { x.fillStyle = `rgb(${i * 4},${128},${255 - i * 4})`; x.fillRect(i, 0, 1, 64); }
+  const d = x.getImageData(0, 0, 64, 64).data;
+  let malos = 0;
+  for (let p = 0, i = 0; p < 64 * 64; p++, i += 4) {
+    const col = p % 64;
+    if (Math.abs(d[i] - col * 4) > 3 || Math.abs(d[i + 1] - 128) > 3 || Math.abs(d[i + 2] - (255 - col * 4)) > 3) malos++;
+  }
+  return malos / (64 * 64);
+}
