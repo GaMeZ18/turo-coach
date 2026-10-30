@@ -24,6 +24,11 @@ export default async function DetectorPage() {
         deja preparados en Coach Manager para que solo tengas que decir quién tiró. Funciona sin internet: el vídeo no sale de tu ordenador.
       </p>
 
+      <div className="mt-5 rounded-xl bg-azul/10 p-4 text-sm">
+        <strong>Ya no hace falta descargar nada:</strong> abre el vídeo del partido en Coach Manager y pulsa <strong>«Detectar tiros»</strong>.
+        El análisis se hace en el propio navegador con el archivo original de tu ordenador. Este programa queda como alternativa.
+      </div>
+
       <div className="tarjeta mt-5 flex flex-wrap items-center gap-4 p-4">
         <MonitorDown size={36} className="text-azul" />
         <div className="flex-1">

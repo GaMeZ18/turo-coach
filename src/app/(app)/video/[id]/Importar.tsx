@@ -22,7 +22,7 @@ export default function Importar({ videoId }: { videoId: string }) {
             if (!r.error) router.refresh();
           })} className="space-y-2">
             <input type="hidden" name="video_id" value={videoId} />
-            <p className="font-semibold">Importar del detector de tiros</p>
+            <p className="font-semibold">Importar archivo del programa del PC</p>
             <input type="file" name="archivo" accept=".json,application/json" required className="block w-full text-xs" />
             <label className="flex items-center gap-2 text-xs text-tinta/70">Desfase (s)
               <input type="number" name="desfase" step="0.1" defaultValue={0} className="campo !w-20 !py-1 text-xs" />
@@ -33,7 +33,8 @@ export default function Importar({ videoId }: { videoId: string }) {
           {msg && <p className={`mt-2 text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.t}</p>}
           <div className="mt-3 border-t border-linea pt-2">
             <a href={`/video/${videoId}/etiquetas`} className="inline-flex items-center gap-1 text-xs text-azul hover:underline"><Download size={13} /> Exportar etiquetas (para medir el detector)</a>
-            <a href="/video/detector" className="mt-1 inline-flex items-center gap-1 text-xs text-azul hover:underline"><MonitorDown size={13} /> Descargar el detector de tiros para el PC</a>
+            <a href={`/video/${videoId}/detectar`} className="mt-1 flex items-center gap-1 text-xs font-semibold text-azul hover:underline"><ScanSearch size={13} /> Detectar tiros aquí, en el navegador</a>
+            <a href="/video/detector" className="mt-1 inline-flex items-center gap-1 text-xs text-tinta/60 hover:underline"><MonitorDown size={13} /> o con el programa para el PC</a>
           </div>
         </div>
       )}

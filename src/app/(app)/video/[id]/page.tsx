@@ -7,7 +7,7 @@ import type { Categoria, Clip, EventoVideo } from "@/lib/video";
 import { borrarVideo } from "../actions";
 import Analizador from "./Analizador";
 import Importar from "./Importar";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, ScanSearch, Trash2 } from "lucide-react";
 
 export default async function VerVideo({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ clip?: string }> }) {
   const { id } = await params;
@@ -50,6 +50,7 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href={`/video/${v.id}/detectar`} className="btn-primario !py-1.5 text-sm"><ScanSearch size={15} /> Detectar tiros</Link>
           <Importar videoId={v.id} />
           <a href={v.url} target="_blank" rel="noopener" className="btn-secundario !py-1.5 text-sm"><ExternalLink size={15} /> YouTube</a>
           <form action={borrarVideo}>

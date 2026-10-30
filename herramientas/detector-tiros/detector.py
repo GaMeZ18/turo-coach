@@ -115,11 +115,13 @@ def candidatos_tablero(fondo) -> list[tuple[int, int, int, int]]:
     return res
 
 
-def aro_de_tablero(nombre: str, t: tuple[int, int, int, int]) -> dict:
-    """Primera estimación del aro: abajo y en el centro del tablero."""
+def aro_de_tablero(nombre: str, t: tuple[int, int, int, int], ancho_img: int | None = None) -> dict:
+    """Primera estimación del aro: abajo en el tablero, algo desplazado hacia el centro de la imagen
+    (vista desde la banda: el aro sobresale del tablero hacia la pista)."""
     x, y, w, h = t
     aw = max(4, round(0.3 * w))
-    return {"nombre": nombre, "x": int(x + w / 2 - aw / 2), "y": int(y + h - 0.12 * h), "w": aw, "h": max(2, round(aw * 0.3))}
+    hacia = (1 if ancho_img / 2 > x + w / 2 else -1) * 0.25 * w if ancho_img else 0
+    return {"nombre": nombre, "x": int(x + w / 2 + hacia - aw / 2), "y": int(y + h - 0.12 * h), "w": aw, "h": max(2, round(aw * 0.3))}
 
 
 def autocalibrar(ruta: str, minutos: float = 6.0, aviso=print) -> dict:
@@ -131,7 +133,7 @@ def autocalibrar(ruta: str, minutos: float = 6.0, aviso=print) -> dict:
     tableros = candidatos_tablero(fondo)
     if not tableros:
         raise SystemExit("No encuentro ningún tablero en la imagen. Marca los aros a mano con 1-calibrar.bat.")
-    aros = [aro_de_tablero(f"c{i}", t) for i, t in enumerate(tableros)]
+    aros = [aro_de_tablero(f"c{i}", t, ancho) for i, t in enumerate(tableros)]
     dur = n / fps if n else 600
     # Tramos repartidos por el partido (o todo el vídeo si es corto)
     tramo = 45.0
@@ -169,22 +171,25 @@ def autocalibrar(ruta: str, minutos: float = 6.0, aviso=print) -> dict:
     cap.release()
     def nota(sg):
         ruido = sg.ruido / max(1, sg.cuadros)   # encima de un aro de juego casi nunca pasa gente
-        return len(sg.eventos) * max(0.0, 1.0 - 8 * ruido)
+        return len(sg.eventos) * max(0.0, 1.0 - 12 * ruido)
     for k, sg in enumerate(seguidores):
         if os.environ.get("DETECTOR_DEPURAR"):
             print(aros[k], len(sg.eventos), round(sg.ruido / max(1, sg.cuadros), 3))
-    puntos = sorted(((nota(sg), k) for k, sg in enumerate(seguidores)), reverse=True)
-    elegidos = []
-    for cnt, k in puntos:
-        if cnt < 0.9:
-            break
-        cx = aros[k]["x"] + aros[k]["w"] / 2
-        # la otra canasta del partido está en la otra mitad de la imagen
-        if elegidos and abs(cx - (aros[elegidos[0]]["x"] + aros[elegidos[0]]["w"] / 2)) < 0.3 * ancho:
-            continue
-        elegidos.append(k)
-        if len(elegidos) == 2:
-            break
+    # Las dos canastas de una pista: lados opuestos, altura y tamaño parecidos. Mejor pareja; si no hay, la mejor sola.
+    validos = [(nota(sg), k) for k, sg in enumerate(seguidores) if nota(sg) >= 0.9]
+    cx = lambda a: a["x"] + a["w"] / 2
+    elegidos, mejor = [], 0.0
+    for i1 in range(len(validos)):
+        for i2 in range(i1 + 1, len(validos)):
+            (n1, k1), (n2, k2) = validos[i1], validos[i2]
+            a, b = aros[k1], aros[k2]
+            if abs(cx(a) - cx(b)) < 0.3 * ancho or abs(a["y"] - b["y"]) > 0.15 * alto or max(a["w"], b["w"]) / min(a["w"], b["w"]) > 1.8:
+                continue
+            n = min(n1, n2) * 2 + max(n1, n2) * 0.01
+            if n > mejor:
+                mejor, elegidos = n, [k1, k2]
+    if not elegidos and validos:
+        elegidos = [max(validos)[1]]
     if not elegidos:
         raise SystemExit("No he visto tiros en ninguna canasta. Marca los aros a mano con 1-calibrar.bat.")
     res = []
@@ -470,12 +475,13 @@ class SeguidorAro:
         else:
             # Bandeja: el balón sube desde abajo hasta la altura del aro, junto a él, y luego cae en el aro
             pico = min(range(len(obs)), key=lambda j: obs[j][2])
-            if not (obs[0][2] > 0.6 and obs[pico][2] < -0.4 and abs(obs[pico][1]) < 1.8):
-                return
             tras = [j for j in range(pico, len(obs)) if abs(obs[j][1]) < 0.9 and -0.7 < obs[j][2] < 0.9]
-            if not tras:
+            if obs[0][2] > 0.6 and obs[pico][2] < -0.4 and abs(obs[pico][1]) < 1.8 and tras:
+                k = tras[0]
+            elif abs(obs[0][1]) < 1 and -1.3 < obs[0][2] < -0.3 and any(abs(o[1]) < 0.75 and 0.35 < o[2] < 2 for o in obs[1:]):
+                k = 0  # aparece a la altura del aro (la subida se perdió entre los brazos) y cae por la red
+            else:
                 return
-            k = tras[0]
         llegada = obs[k][0]
         despues = obs[k + 1:]
         red = [o for o in despues if abs(o[1]) < 0.75 and 0.35 < o[2] < 2.0]
