@@ -22,7 +22,7 @@ No hace falta instalar nada. Descomprime esta carpeta donde quieras (por ejemplo
    Despues de revisar, descarga las etiquetas (Video > Detecciones > Descargar etiquetas)
    y arrastra a la vez ese archivo y el .detecciones.json encima de 3-evaluar.bat.
 
-Si Windows muestra "Windows protegio su PC": pulsa "Mas informacion" > "Ejecutar de todas formas".
-(El programa es gratuito y no esta firmado; el codigo es publico en github.com/GaMeZ18/turo-coach.)
+Si Windows pregunta si quieres ejecutar el archivo .bat, pulsa "Ejecutar".
+(No lleva ningun .exe propio: usa el Python oficial de python.org. El codigo es publico en github.com/GaMeZ18/turo-coach.)
 
 Licencias: OpenCV (Apache 2.0) y NumPy (BSD).

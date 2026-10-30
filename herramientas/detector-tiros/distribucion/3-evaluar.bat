@@ -10,5 +10,5 @@ if "%~2"=="" (
 set "DET=%~1"
 set "ETI=%~2"
 echo %~nx2 | find /i ".detecciones." >nul && (set "DET=%~2" & set "ETI=%~1")
-programa\detector.exe evaluar "%DET%" "%ETI%"
+programa\python\python.exe programa\detector.py evaluar "%DET%" "%ETI%"
 pause

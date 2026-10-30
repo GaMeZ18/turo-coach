@@ -6,7 +6,7 @@ if "%~1"=="" (
   pause
   exit /b 1
 )
-programa\detector.exe analizar "%~1" --depurar
+programa\python\python.exe programa\detector.py analizar "%~1" --depurar
 echo.
 echo Listo. Sube el archivo .detecciones.json que hay junto al video en Coach Manager: Video, Detecciones, Importar.
 pause

@@ -23,34 +23,42 @@ jobs:
       - name: Dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install "numpy==1.26.4" opencv-python==4.10.0.84 pyinstaller==6.11.1
+          pip install "numpy==1.26.4" opencv-python==4.10.0.84
       - name: Pruebas
         run: python -m unittest discover -s pruebas -v
-      - name: Compilar
-        run: pyinstaller --noconfirm --onedir --name detector --console --hidden-import numpy --collect-submodules numpy --collect-submodules cv2 detector.py
-      - name: Prueba del ejecutable
-        shell: bash
-        run: |
-          set +e
-          python pruebas/video_sintetico.py prueba_exe.mp4 > sintetico.txt 2>&1 || echo "::warning::video sintetico: $(tr '\n' ' ' < sintetico.txt | tail -c 600)"
-          ./dist/detector/detector.exe --help > salida.txt 2>&1; r=$?
-          if [ $r -ne 0 ]; then echo "::error::--help ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
-          if [ -f prueba_exe.mp4 ]; then
-            ./dist/detector/detector.exe calibrar prueba_exe.mp4 --segundo 1 --sin-balon --aro "derecha=$(cd pruebas && python -c "import video_sintetico as v; print(*v.ARO, sep=chr(44))")" > salida.txt 2>&1; r=$?
-            if [ $r -ne 0 ]; then echo "::error::calibrar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
-            ./dist/detector/detector.exe analizar prueba_exe.mp4 > salida.txt 2>&1; r=$?
-            if [ $r -ne 0 ]; then echo "::error::analizar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
-            echo "::notice::ejecutable OK: $(tail -c 300 salida.txt | tr '\n' ' ')"
-          fi
-      - name: Empaquetar
+      # Sin ejecutables propios (los antivirus de empresa, como ESET, bloquean los .exe de PyInstaller sin firmar):
+      # Python oficial «embeddable» (firmado por la Python Software Foundation) + el código tal cual.
+      - name: Montar el paquete portátil
         shell: pwsh
         run: |
           $d = "DetectorTiros"
-          New-Item -ItemType Directory $d | Out-Null
-          Copy-Item -Recurse dist\detector "$d\programa"
+          $py = "$d\programa\python"
+          New-Item -ItemType Directory $py -Force | Out-Null
+          Invoke-WebRequest "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip" -OutFile embed.zip
+          Expand-Archive embed.zip -DestinationPath $py
+          Set-Content "$py\python312._pth" "python312.zip`r`n.`r`nLib\site-packages`r`n..\`r`nimport site"
+          python -m pip install --no-cache-dir --target "$py\Lib\site-packages" "numpy==1.26.4" opencv-python==4.10.0.84
+          Get-ChildItem "$py\Lib\site-packages" -Directory -Filter "*.dist-info" | Out-Null
+          Copy-Item detector.py "$d\programa\"
           Copy-Item distribucion\* $d
           Copy-Item LICENCIAS.md $d
-          Compress-Archive -Path $d -DestinationPath DetectorTiros-Windows.zip
+      - name: Prueba del paquete
+        shell: bash
+        run: |
+          set +e
+          P=DetectorTiros/programa
+          python pruebas/video_sintetico.py prueba.mp4 > sintetico.txt 2>&1 || echo "::warning::video sintetico: $(tr '\n' ' ' < sintetico.txt | tail -c 600)"
+          $P/python/python.exe $P/detector.py --help > salida.txt 2>&1; r=$?
+          if [ $r -ne 0 ]; then echo "::error::--help ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+          ARO="derecha=$(cd pruebas && python -c "import video_sintetico as v; print(*v.ARO, sep=chr(44))")"
+          $P/python/python.exe $P/detector.py calibrar prueba.mp4 --aro "$ARO" > salida.txt 2>&1; r=$?
+          if [ $r -ne 0 ]; then echo "::error::calibrar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+          $P/python/python.exe $P/detector.py analizar prueba.mp4 > salida.txt 2>&1; r=$?
+          if [ $r -ne 0 ]; then echo "::error::analizar ($r): $(tr '\n' ' ' < salida.txt | tail -c 1500)"; exit 1; fi
+          rm -f prueba*; echo "::notice::paquete OK: $(tail -c 300 salida.txt | tr '\n' ' ')"
+      - name: Empaquetar
+        shell: pwsh
+        run: Compress-Archive -Path DetectorTiros -DestinationPath DetectorTiros-Windows.zip
       - name: Publicar en la release "detector"
         shell: bash
         env:
