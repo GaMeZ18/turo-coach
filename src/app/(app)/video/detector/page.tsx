@@ -9,9 +9,8 @@ const DESCARGA = "https://github.com/GaMeZ18/turo-coach/releases/download/detect
 
 const PASOS: { t: string; d: React.ReactNode }[] = [
   { t: "Descarga y descomprime", d: <>Descarga el .zip y descomprímelo donde quieras (por ejemplo, en el Escritorio). No hace falta instalar nada ni tener permisos de administrador: no lleva ningún .exe propio, usa el Python oficial de python.org (firmado), así que los antivirus de empresa no lo bloquean.</> },
-  { t: "Analiza el partido", d: <>Arrastra el vídeo original del partido (MP4, mejor en 1080p) encima de <code>2-analizar.bat</code>. Busca solo las dos canastas del partido, aunque cada pabellón y cada sitio de la cámara sean distintos, y después los tiros. Al acabar deja junto al vídeo el <code>.detecciones.json</code> y una imagen <code>.aros.jpg</code> con los aros marcados: échale un vistazo. Si se ha equivocado, borra el <code>.aros.json</code> y márcalos a mano con <code>1-calibrar.bat</code> (tecla M).</> },
-  { t: "Importa y revisa", d: <>Abre aquí el vídeo de YouTube de ese partido, pulsa <strong>Detecciones → Importar</strong>, sube el archivo y luego <strong>Revisar ahora</strong>: eliges tipo de tiro, jugador y si entró. Hasta que no lo confirmas no cuenta en la estadística.</> },
-  { t: "Mide cuánto acierta (opcional)", d: <>Tras revisar, en <strong>Detecciones → Exportar etiquetas</strong> descargas lo confirmado. Arrastra a la vez ese archivo y el <code>.detecciones.json</code> encima de <code>3-evaluar.bat</code>.</> },
+  { t: "Abre «Detector de tiros»", d: <>Doble clic y elige el vídeo original del partido (MP4, mejor en 1080p), o arrástralo encima. Busca solo las dos canastas del partido, sea el pabellón que sea, y te las enseña: <strong>Enter</strong> si están bien, <strong>M</strong> para marcarlas a mano. Luego busca los tiros (un partido entero, unos 15–20 minutos) y te abre la carpeta con el archivo <code>.detecciones.json</code>.</> },
+  { t: "Importa y revisa", d: <>Abre aquí el vídeo de YouTube de ese partido, pulsa <strong>Detecciones → Importar</strong>, sube el archivo y luego <strong>Revisar ahora</strong>: eliges tipo de tiro, jugador y si entró. Los tiros del rival los descartas con la tecla <strong>N</strong>. Hasta que no lo confirmas no cuenta en la estadística.</> },
 ];
 
 export default async function DetectorPage() {

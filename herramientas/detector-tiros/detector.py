@@ -40,7 +40,7 @@ except ImportError as _e:  # mensaje claro si falta algo
     print("Falta OpenCV o NumPy. Ejecuta primero instalar.bat (o: pip install -r requirements.txt).")
     sys.exit(1)
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # Perfiles: fotogramas por segundo que se analizan alrededor de los aros
 PERFILES = {"rapido": 8, "equilibrado": 12, "preciso": 20}
@@ -245,7 +245,11 @@ def calibrar(args) -> None:
                     cv2.rectangle(img, (a["x"] - 3, a["y"] - 3), (a["x"] + a["w"] + 3, a["y"] + a["h"] + 3), (0, 255, 255), 2)
                     cv2.putText(img, a["nombre"], (a["x"] - 10, max(15, a["y"] - 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                 print("\nHe encontrado estas canastas (recuadros amarillos). Enter = correcto · M = marcarlas a mano")
-                cv2.imshow("Canastas encontradas · Enter = correcto, M = a mano", img)
+                ventana = "Canastas encontradas · Enter = correcto, M = a mano"
+                cv2.namedWindow(ventana, cv2.WINDOW_NORMAL)
+                esc = min(1.0, 1400 / img.shape[1])
+                cv2.resizeWindow(ventana, int(img.shape[1] * esc), int(img.shape[0] * esc))
+                cv2.imshow(ventana, img)
                 tecla = cv2.waitKey(0) & 0xFF
                 cv2.destroyAllWindows()
                 if tecla not in (ord("m"), ord("M")):
@@ -665,10 +669,72 @@ def evaluar(args) -> dict:
     return res
 
 
+# ----------------------------------------------------------------------------- asistente (un solo programa)
+def elegir_video() -> str | None:
+    """Ventana de Windows para elegir el vídeo (sin instalar nada); si no se puede, se pide la ruta."""
+    if os.name == "nt":
+        import subprocess
+        ps = ("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; "
+              "$d.Title = 'Elige el vídeo del partido'; $d.Filter = 'Vídeos|*.mp4;*.mov;*.mkv;*.avi;*.m4v|Todos|*.*'; "
+              "if ($d.ShowDialog() -eq 'OK') { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $d.FileName }")
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True, timeout=600)
+            ruta = r.stdout.decode("utf-8", "replace").strip()
+            if ruta:
+                return ruta
+        except Exception:
+            pass
+    print("Arrastra aquí el vídeo del partido (o escribe su ruta) y pulsa Enter:")
+    ruta = input("> ").strip().strip('"')
+    return ruta or None
+
+
+def abrir_carpeta(ruta: str) -> None:
+    if os.name == "nt":
+        import subprocess
+        try:
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(ruta)])
+        except Exception:
+            pass
+
+
+def asistente(args) -> None:
+    print("=" * 60)
+    print(f"  DETECTOR DE TIROS · Coach Manager CBTuró  (v{VERSION})")
+    print("=" * 60)
+    video = args.video or elegir_video()
+    if not video:
+        raise SystemExit("No has elegido ningún vídeo.")
+    video = os.path.abspath(video.strip('"'))
+    abrir_video(video)[0].release()  # comprueba que se puede abrir
+    print(f"\nVídeo: {video}\n")
+    cal = ruta_calibracion(video)
+    if not os.path.isfile(cal):
+        print("Paso 1 de 2 · Buscando las canastas del partido (unos minutos)…")
+        print("  Te enseñaré dónde están: Enter si es correcto, M para marcarlas a mano.\n")
+        calibrar(argparse.Namespace(video=video, aro=None, segundo=120.0, salida=None, manual=False, sin_balon=True))
+    else:
+        print("Este vídeo ya tiene las canastas marcadas (archivo .aros.json). Para volver a buscarlas, bórralo.\n")
+    print("\nPaso 2 de 2 · Buscando los tiros…  (puedes pararlo con Ctrl+C y se guarda lo hecho)\n")
+    analizar(argparse.Namespace(video=video, perfil="equilibrado", fps=None, inicio=None, fin=None, calibracion=None,
+                                confianza_min=0.0, depurar=True, salida=None))
+    salida = ruta_salida(video)
+    print("\n" + "=" * 60)
+    print("  HECHO. Ahora en coach.cbturo.com abre el vídeo del partido →")
+    print("  Detecciones → Importar, sube este archivo y pulsa «Revisar ahora»:")
+    print(f"  {salida}")
+    print("=" * 60)
+    abrir_carpeta(salida)
+
+
 # ----------------------------------------------------------------------------- línea de órdenes
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description="Detector de tiros de Coach Manager CBTuró (prueba piloto)")
     sub = p.add_subparsers(dest="orden", required=True)
+
+    w = sub.add_parser("asistente", help="Todo seguido: elegir vídeo, buscar canastas, analizar")
+    w.add_argument("video", nargs="?")
+    w.set_defaults(func=asistente)
 
     c = sub.add_parser("calibrar", help="Marcar los aros (y el color del balón) con el ratón")
     c.add_argument("video")
