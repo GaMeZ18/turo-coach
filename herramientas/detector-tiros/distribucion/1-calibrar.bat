@@ -6,5 +6,6 @@ if "%~1"=="" (
   pause
   exit /b 1
 )
+echo Buscando las canastas... (pulsa M en la ventana para marcarlas a mano)
 programa\detector.exe calibrar "%~1"
 pause

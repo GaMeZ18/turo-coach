@@ -40,7 +40,7 @@ except ImportError as _e:  # mensaje claro si falta algo
     print("Falta OpenCV o NumPy. Ejecuta primero instalar.bat (o: pip install -r requirements.txt).")
     sys.exit(1)
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 # Perfiles: fotogramas por segundo que se analizan alrededor de los aros
 PERFILES = {"rapido": 8, "equilibrado": 12, "preciso": 20}
@@ -79,6 +79,143 @@ def abrir_video(ruta: str):
     return cap, fps, n, ancho, alto
 
 
+# ----------------------------------------------------------------------------- autocalibración
+def fondo_mediana(cap, n: int, fps: float, muestras: int = 40):
+    """Imagen del pabellón sin jugadores: mediana de fotogramas repartidos por el vídeo."""
+    dur = n / fps if n else 600
+    fs = []
+    for k in range(muestras):
+        cap.set(cv2.CAP_PROP_POS_MSEC, (dur * (k + 0.5) / muestras) * 1000)
+        ok, f = cap.read()
+        if ok:
+            fs.append(f)
+    if not fs:
+        raise SystemExit("No he podido leer el vídeo.")
+    return np.median(np.array(fs), axis=0).astype(np.uint8)
+
+
+def candidatos_tablero(fondo) -> list[tuple[int, int, int, int]]:
+    """Rectángulos de líneas blancas finas con forma de tablero (incluye los de otras pistas)."""
+    H, W = fondo.shape[:2]
+    gris = cv2.cvtColor(fondo, cv2.COLOR_BGR2GRAY)
+    sat = cv2.cvtColor(fondo, cv2.COLOR_BGR2HSV)[..., 1]
+    k = max(5, int(W / 210) | 1)
+    claro = cv2.morphologyEx(gris, cv2.MORPH_TOPHAT, cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
+    m = ((claro > 18) & (sat < 70)).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    res = []
+    for c in cs:
+        x, y, w, h = cv2.boundingRect(c)
+        if not (0.012 * W < w < 0.1 * W and 0.5 < w / max(h, 1) < 2.6 and y + h < 0.7 * H):
+            continue
+        if cv2.countNonZero(m[y:y + h, x:x + w]) / float(w * h) > 0.45:
+            continue  # macizo: un cartel, no un tablero
+        res.append((x, y, w, h))
+    return res
+
+
+def aro_de_tablero(nombre: str, t: tuple[int, int, int, int]) -> dict:
+    """Primera estimación del aro: abajo y en el centro del tablero."""
+    x, y, w, h = t
+    aw = max(4, round(0.3 * w))
+    return {"nombre": nombre, "x": int(x + w / 2 - aw / 2), "y": int(y + h - 0.12 * h), "w": aw, "h": max(2, round(aw * 0.3))}
+
+
+def autocalibrar(ruta: str, minutos: float = 6.0, aviso=print) -> dict:
+    """Encuentra las dos canastas del partido: de los tableros que se ven, las dos a las que llegan
+    más balones desde arriba. Con esos tiros afina la posición del aro."""
+    cap, fps, n, ancho, alto = abrir_video(ruta)
+    aviso("Buscando las canastas del partido…")
+    fondo = fondo_mediana(cap, n, fps)
+    tableros = candidatos_tablero(fondo)
+    if not tableros:
+        raise SystemExit("No encuentro ningún tablero en la imagen. Marca los aros a mano con 1-calibrar.bat.")
+    aros = [aro_de_tablero(f"c{i}", t) for i, t in enumerate(tableros)]
+    dur = n / fps if n else 600
+    # Tramos repartidos por el partido (o todo el vídeo si es corto)
+    tramo = 45.0
+    num = max(1, min(int(minutos * 60 / tramo), int(dur // tramo) or 1))
+    inicios = [0.0] if dur <= minutos * 60 else [dur * (k + 0.5) / num - tramo / 2 for k in range(num)]
+    largo = dur if dur <= minutos * 60 else tramo
+    fps_an = 10.0
+    paso = max(1, round(fps / fps_an))
+    seguidores = []
+    for a in aros:
+        aro = Aro(a["nombre"], a["x"], a["y"], a["w"], a["h"])
+        aro.preparar(ancho, alto)
+        sg = SeguidorAro(aro, {}, fps / paso)
+        sg.preparar_zona(ancho, alto)
+        seguidores.append(sg)
+    for ini in inicios:
+        cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, ini) * 1000)
+        i = 0
+        while i / fps < largo:
+            if i % paso:
+                if not cap.grab():
+                    break
+                i += 1
+                continue
+            ok, f = cap.read()
+            if not ok:
+                break
+            t = max(0.0, ini) + i / fps
+            for sg in seguidores:
+                sg.procesar(t, f)
+            i += 1
+        for sg in seguidores:
+            sg.cerrar()
+            sg.fondo = cv2.createBackgroundSubtractorMOG2(history=int(sg.fps * 8), varThreshold=20, detectShadows=False)
+    cap.release()
+    def nota(sg):
+        ruido = sg.ruido / max(1, sg.cuadros)   # encima de un aro de juego casi nunca pasa gente
+        return len(sg.eventos) * max(0.0, 1.0 - 8 * ruido)
+    for k, sg in enumerate(seguidores):
+        if os.environ.get("DETECTOR_DEPURAR"):
+            print(aros[k], len(sg.eventos), round(sg.ruido / max(1, sg.cuadros), 3))
+    puntos = sorted(((nota(sg), k) for k, sg in enumerate(seguidores)), reverse=True)
+    elegidos = []
+    for cnt, k in puntos:
+        if cnt < 0.9:
+            break
+        cx = aros[k]["x"] + aros[k]["w"] / 2
+        # la otra canasta del partido está en la otra mitad de la imagen
+        if elegidos and abs(cx - (aros[elegidos[0]]["x"] + aros[elegidos[0]]["w"] / 2)) < 0.3 * ancho:
+            continue
+        elegidos.append(k)
+        if len(elegidos) == 2:
+            break
+    if not elegidos:
+        raise SystemExit("No he visto tiros en ninguna canasta. Marca los aros a mano con 1-calibrar.bat.")
+    res = []
+    for k in sorted(elegidos, key=lambda k: aros[k]["x"]):
+        a = dict(aros[k])
+        pts = np.array([e.px for e in seguidores[k].eventos if e.px])
+        if len(pts) >= 2:  # el aro está donde llegan los tiros
+            # en horizontal, donde llegan los tiros; la altura, la del tablero (los tiros se ven llegar desde arriba)
+            a["x"] = int(round(np.median(pts[:, 0]) - a["w"] / 2))
+        a["tiros_vistos"] = len(seguidores[k].eventos)
+        res.append(a)
+    nombres = ["izquierda", "derecha"] if len(res) == 2 else ["canasta"]
+    for a, nm in zip(res, nombres):
+        a["nombre"] = nm
+    return {"video": os.path.basename(ruta), "ancho": ancho, "alto": alto, "aros": res, "auto": True, "fondo": fondo}
+
+
+def guardar_calibracion(ruta_video: str, datos: dict) -> str:
+    salida = ruta_calibracion(ruta_video)
+    fondo = datos.pop("fondo", None)
+    with open(salida, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
+    if fondo is not None:  # imagen para comprobar a ojo dónde ha puesto los aros
+        img = fondo.copy()
+        for a in datos["aros"]:
+            cv2.rectangle(img, (a["x"], a["y"]), (a["x"] + a["w"], a["y"] + a["h"]), (0, 255, 255), 2)
+            cv2.putText(img, a["nombre"], (a["x"] - 10, max(15, a["y"] - 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.imwrite(os.path.splitext(salida)[0] + ".jpg", img)
+    return salida
+
+
 # ----------------------------------------------------------------------------- calibración
 def calibrar(args) -> None:
     cap, fps, n, ancho, alto = abrir_video(args.video)
@@ -94,6 +231,33 @@ def calibrar(args) -> None:
         ok, frame = cap.read()
         if not ok:
             raise SystemExit("No he podido leer ese momento del vídeo. Prueba con --segundo 60.")
+        manual = getattr(args, "manual", False)
+        if not manual:
+            # Propuesta automática: se enseña y se acepta con Enter (o M para marcar a mano)
+            try:
+                prop = autocalibrar(args.video)
+            except SystemExit as e:
+                print(e)
+                prop = None
+            if prop:
+                img = frame.copy()
+                for a in prop["aros"]:
+                    cv2.rectangle(img, (a["x"] - 3, a["y"] - 3), (a["x"] + a["w"] + 3, a["y"] + a["h"] + 3), (0, 255, 255), 2)
+                    cv2.putText(img, a["nombre"], (a["x"] - 10, max(15, a["y"] - 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                print("\nHe encontrado estas canastas (recuadros amarillos). Enter = correcto · M = marcarlas a mano")
+                cv2.imshow("Canastas encontradas · Enter = correcto, M = a mano", img)
+                tecla = cv2.waitKey(0) & 0xFF
+                cv2.destroyAllWindows()
+                if tecla not in (ord("m"), ord("M")):
+                    cap.release()
+                    salida = args.salida or ruta_calibracion(args.video)
+                    guardar_calibracion(args.video, prop) if not args.salida else None
+                    if args.salida:
+                        prop.pop("fondo", None)
+                        with open(salida, "w", encoding="utf-8") as f:
+                            json.dump(prop, f, ensure_ascii=False, indent=2)
+                    print(f"\nCalibración guardada en: {salida}")
+                    return
         for nombre in ("izquierda", "derecha"):
             print(f"\nDibuja un rectángulo justo alrededor del ARO de la canasta {nombre.upper()} (solo el aro, no el tablero).")
             print("  Enter o Espacio = aceptar · C = no se ve esta canasta / saltar")
@@ -165,6 +329,7 @@ class Evento:
     confianza: float
     observaciones: int
     trayectoria: list = field(default_factory=list)  # [(t, u, v)] para depurar
+    px: list = field(default_factory=list)           # punto de llegada al aro en píxeles (para la autocalibración)
 
 
 class SeguidorAro:
@@ -192,6 +357,8 @@ class SeguidorAro:
         self.obs: list = []          # compatibilidad: hay algo pendiente de cerrar
         self.eventos: list[Evento] = []
         self.fin_ultimo = -1e9
+        self.cuadros = 0   # fotogramas analizados
+        self.ruido = 0     # fotogramas con algo grande moviéndose encima del aro (gente): no es un aro de juego
 
     def preparar_zona(self, ancho: int, alto: int) -> None:
         a, W = self.aro, self.aro.w
@@ -209,9 +376,16 @@ class SeguidorAro:
         mov = cv2.morphologyEx(mov, cv2.MORPH_OPEN, self.kernel)
         mov = cv2.dilate(mov, self.kernel, iterations=1)
         contornos, _ = cv2.findContours(mov, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        grande = False
         res = []
+        self.cuadros += 1
+        grande = False
         for c in contornos:
             area = cv2.contourArea(c)
+            if area > self.area_max * 4:
+                x, y, w, h = cv2.boundingRect(c)
+                if a.a_aro(a.x0 + x + w / 2, a.y0 + y + h / 2)[1] < -1.0:
+                    grande = True
             if not (self.area_min <= area <= self.area_max):
                 continue
             x, y, w, h = cv2.boundingRect(c)
@@ -221,6 +395,8 @@ class SeguidorAro:
                 continue
             u, v = a.a_aro(a.x0 + x + w / 2, a.y0 + y + h / 2)
             res.append((u, v))
+        if grande:
+            self.ruido += 1
         return res
 
     def procesar(self, t: float, frame) -> None:
@@ -319,9 +495,11 @@ class SeguidorAro:
             prev.trayectoria += [[round(x, 2) for x in o] for o in obs]
             self.fin_ultimo = obs[-1][0]
             return
+        a = self.aro
         self.eventos.append(Evento(
             t=round(llegada, 2), t_inicio=round(obs[0][0], 2), t_fin=round(obs[-1][0], 2), canasta=self.aro.nombre,
             resultado=resultado, confianza=round(conf, 2), observaciones=len(obs), trayectoria=[[round(x, 2) for x in o] for o in obs],
+            px=[round(a.x + a.w / 2 + obs[k][1] * a.w, 1), round(a.y + obs[k][2] * a.w, 1)],
         ))
         self.fin_ultimo = obs[-1][0]
 
@@ -329,7 +507,14 @@ class SeguidorAro:
 def analizar(args) -> dict:
     cal = args.calibracion or ruta_calibracion(args.video)
     if not os.path.isfile(cal):
-        raise SystemExit(f"Falta la calibración ({cal}). Ejecuta primero: python detector.py calibrar \"{args.video}\"")
+        # Sin calibrar: busca él solo las canastas (cada partido es un pabellón distinto)
+        datos = autocalibrar(args.video)
+        cal = guardar_calibracion(args.video, datos)
+        print("Canastas encontradas:")
+        for a in datos["aros"]:
+            print(f"  {a['nombre']}: x={a['x']} y={a['y']} (tiros vistos al buscar: {a.get('tiros_vistos', 0)})")
+        print(f"  Comprueba que los recuadros están sobre los aros en: {os.path.splitext(cal)[0]}.jpg")
+        print("  Si no, borra ese .aros.json y márcalos con 1-calibrar.bat\n")
     with open(cal, encoding="utf-8") as f:
         c = json.load(f)
     cap, fps, n, ancho, alto = abrir_video(args.video)
@@ -393,7 +578,7 @@ def analizar(args) -> dict:
         "ajustes": {"perfil": args.perfil, "fps_analisis": round(fps / paso, 2), "inicio": inicio, "fin": None if fin >= 1e9 else fin},
         "aros": [{"nombre": a.nombre, "x": a.x, "y": a.y, "w": a.w, "h": a.h} for a in aros],
         "analizado_hasta": round(min(fin, i / fps), 1), "interrumpido": interrumpido, "segundos_proceso": round(time.time() - t0, 1),
-        "eventos": [{k: v for k, v in asdict(e).items() if args.depurar or k != "trayectoria"} for e in eventos],
+        "eventos": [{k: v for k, v in asdict(e).items() if k != "px" and (args.depurar or k != "trayectoria")} for e in eventos],
     }
     salida = args.salida or ruta_salida(args.video)
     with open(salida, "w", encoding="utf-8") as f:
@@ -490,6 +675,7 @@ def main(argv=None) -> None:
     c.add_argument("--segundo", type=float, default=120, help="Momento del vídeo que se muestra para marcar (por defecto 120)")
     c.add_argument("--aro", action="append", help="Sin ventana: nombre=x,y,ancho,alto (se puede repetir)")
     c.add_argument("--sin-balon", action="store_true", help="No preguntar por el color del balón")
+    c.add_argument("--manual", action="store_true", help="Marcar los aros a mano sin propuesta automática")
     c.add_argument("--salida")
     c.set_defaults(func=calibrar)
 

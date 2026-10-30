@@ -9,8 +9,7 @@ const DESCARGA = "https://github.com/GaMeZ18/turo-coach/releases/download/detect
 
 const PASOS: { t: string; d: React.ReactNode }[] = [
   { t: "Descarga y descomprime", d: <>Descarga el .zip y descomprímelo donde quieras (por ejemplo, en el Escritorio). No hace falta instalar nada. La primera vez Windows puede avisar con «Windows protegió su PC»: pulsa <em>Más información → Ejecutar de todas formas</em>.</> },
-  { t: "Calibra los aros", d: <>Arrastra el vídeo original del partido (MP4) encima de <code>1-calibrar.bat</code> y marca con el ratón el aro de cada canasta. Solo hace falta una vez por pabellón y posición de cámara.</> },
-  { t: "Analiza el partido", d: <>Arrastra el mismo vídeo encima de <code>2-analizar.bat</code>. Al acabar deja un archivo <code>.detecciones.json</code> junto al vídeo. Tarda más o menos según el PC.</> },
+  { t: "Analiza el partido", d: <>Arrastra el vídeo original del partido (MP4, mejor en 1080p) encima de <code>2-analizar.bat</code>. Busca solo las dos canastas del partido, aunque cada pabellón y cada sitio de la cámara sean distintos, y después los tiros. Al acabar deja junto al vídeo el <code>.detecciones.json</code> y una imagen <code>.aros.jpg</code> con los aros marcados: échale un vistazo. Si se ha equivocado, borra el <code>.aros.json</code> y márcalos a mano con <code>1-calibrar.bat</code> (tecla M).</> },
   { t: "Importa y revisa", d: <>Abre aquí el vídeo de YouTube de ese partido, pulsa <strong>Detecciones → Importar</strong>, sube el archivo y luego <strong>Revisar ahora</strong>: eliges tipo de tiro, jugador y si entró. Hasta que no lo confirmas no cuenta en la estadística.</> },
   { t: "Mide cuánto acierta (opcional)", d: <>Tras revisar, en <strong>Detecciones → Exportar etiquetas</strong> descargas lo confirmado. Arrastra a la vez ese archivo y el <code>.detecciones.json</code> encima de <code>3-evaluar.bat</code>.</> },
 ];
@@ -22,7 +21,7 @@ export default async function DetectorPage() {
       <Link href="/video" className="inline-flex items-center gap-1 text-sm text-azul hover:underline"><ArrowLeft size={14} /> Vídeo</Link>
       <h1 className="mt-2 flex items-center gap-2 text-2xl font-semibold"><ScanSearch className="text-azul" /> Detector de tiros</h1>
       <p className="text-sm text-tinta/60">
-        Programa gratuito para el PC que busca los tiros en el vídeo de un partido grabado con <strong>cámara fija</strong> y te los
+        Programa gratuito para el PC que busca los tiros en el vídeo de un partido grabado con <strong>cámara fija</strong> (en cualquier pabellón) y te los
         deja preparados en Coach Manager para que solo tengas que decir quién tiró. Funciona sin internet: el vídeo no sale de tu ordenador.
       </p>
 

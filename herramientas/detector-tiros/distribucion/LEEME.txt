@@ -3,14 +3,16 @@ DETECTOR DE TIROS - Coach Manager CBTuro
 
 No hace falta instalar nada. Descomprime esta carpeta donde quieras (por ejemplo, en el Escritorio).
 
-1) CALIBRAR (una vez por pabellon y posicion de camara)
-   Arrastra el video del partido (MP4 original) encima de 1-calibrar.bat.
-   Se abre un fotograma: marca con el raton el aro de cada canasta y, si lo pide, el balon.
-   Se guarda un archivo .aros.json junto al video.
+1) ANALIZAR
+   Arrastra el video del partido (MP4 original, 1080p o 720p) encima de 2-analizar.bat.
+   Primero busca solo las dos canastas del partido (unos minutos) y luego los tiros.
+   Al acabar crea, junto al video:
+     - PARTIDO.detecciones.json  -> el archivo para Coach Manager
+     - PARTIDO.aros.jpg          -> imagen con los aros marcados en amarillo: comprueba que estan bien
 
-2) ANALIZAR
-   Arrastra el mismo video encima de 2-analizar.bat.
-   Tarda un rato (depende del PC). Al acabar crea PARTIDO.detecciones.json junto al video.
+2) SOLO SI LOS AROS ESTAN MAL
+   Borra PARTIDO.aros.json, arrastra el video encima de 1-calibrar.bat y pulsa M para marcarlos
+   a mano con el raton (un rectangulo justo alrededor de cada aro). Despues repite el paso 1.
 
 3) IMPORTAR EN COACH MANAGER
    Abre el video del partido en coach.cbturo.com > Video > Detecciones > Importar,
