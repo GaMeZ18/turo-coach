@@ -277,17 +277,25 @@ class SeguidorAro:
             return  # casi quieto: no es un balón en vuelo
         arriba = [o for o in obs if o[2] < -1.0]
         cerca = [k for k, o in enumerate(obs) if abs(o[1]) < 1.4 and -1.8 < o[2] < 0.9]
-        if not arriba or not cerca:
-            return  # no llega al aro viniendo desde arriba: un pase, un bote o un jugador
-        k = cerca[0]
-        if obs[k][0] < arriba[0][0]:
-            # llega al aro antes de haber estado arriba: solo vale si después sube (palmeo / rebote)
-            if not any(o[0] > obs[k][0] for o in arriba):
+        if arriba and cerca:
+            k = cerca[0]
+            if obs[k][0] < arriba[0][0]:
+                # llega al aro antes de haber estado arriba: solo vale si después sube (palmeo / rebote)
+                if not any(o[0] > obs[k][0] for o in arriba):
+                    return
+            # Tiene que llegar bajando
+            previos = [o for o in obs[:k + 1] if o[0] >= obs[k][0] - 0.4]
+            if len(previos) >= 2 and previos[-1][2] < previos[0][2] - 0.2:
                 return
-        # Tiene que llegar bajando
-        previos = [o for o in obs[:k + 1] if o[0] >= obs[k][0] - 0.4]
-        if len(previos) >= 2 and previos[-1][2] < previos[0][2] - 0.2:
-            return
+        else:
+            # Bandeja: el balón sube desde abajo hasta la altura del aro, junto a él, y luego cae en el aro
+            pico = min(range(len(obs)), key=lambda j: obs[j][2])
+            if not (obs[0][2] > 0.6 and obs[pico][2] < -0.4 and abs(obs[pico][1]) < 1.8):
+                return
+            tras = [j for j in range(pico, len(obs)) if abs(obs[j][1]) < 0.9 and -0.7 < obs[j][2] < 0.9]
+            if not tras:
+                return
+            k = tras[0]
         llegada = obs[k][0]
         despues = obs[k + 1:]
         red = [o for o in despues if abs(o[1]) < 0.75 and 0.35 < o[2] < 2.0]
