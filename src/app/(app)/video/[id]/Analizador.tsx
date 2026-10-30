@@ -164,6 +164,17 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
   const parar = () => { setCola(null); setActivo(null); player.current?.pauseVideo?.(); };
 
   // --- FCBQ: quién anotó la canasta n.º X (por orden, no por tiempo) ---
+  const jugadorDeJugada = (jg: JugadaFCBQ): Jugador | null => {
+    const porDorsal = jg.dorsal !== null ? jugadores.find((j) => j.dorsal === jg.dorsal) : null;
+    if (porDorsal) return porDorsal;
+    const sinAcento = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return jg.nombre ? jugadores.find((j) => sinAcento(jg.nombre!).includes(sinAcento(j.nombre)) && (!j.apellidos || sinAcento(jg.nombre!).includes(sinAcento(j.apellidos.split(" ")[0])))) ?? null : null;
+  };
+  /** Canastas ya confirmadas antes del momento tt: la siguiente del acta de la FCBQ es la n.º (esto + 1) */
+  const canastasAntes = (tt: number) => refs.current.clips.filter((x) => {
+    const k = categorias.find((y) => y.id === x.categoria_id);
+    return x.estado !== "pendiente" && x.resultado === "bien" && esTiro(k?.estadistica) && x.fin - (k?.despues ?? 0) < tt;
+  }).length;
   const sugerirAnotador = (c: Categoria, tt: number): string | null => {
     if (!jugadasFCBQ?.length) return null;
     const pts = c.estadistica === "t3" ? 3 : c.estadistica === "t2" ? 2 : 1;
@@ -277,6 +288,30 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
     setDorsalTecleado("");
     setPregunta({ id: c.id, cat: k, reanudar: false, pista: enPista(eventos, momento), sugerido: sugerirAnotador(k, momento), deteccion });
   };
+  /** Lo que dice el acta de la FCBQ para la canasta de este clip (si fue canasta): jugador y tipo de tiro */
+  const propuestaFCBQ = (c: Clip) => {
+    if (!jugadasFCBQ?.length || c.nota?.includes("RIVAL")) return null;
+    const momento = c.fin - (cat(c.categoria_id)?.despues ?? 3);
+    const n = canastasAntes(momento);
+    const jg = jugadasFCBQ[n];
+    if (!jg) return null;
+    const est = jg.pts === 3 ? "t3" : jg.pts === 2 ? "t2" : "tl";
+    const k = catsTiro.find((x) => x.estadistica === est && x.equipo_id) ?? catsTiro.find((x) => x.estadistica === est);
+    if (!k) return null;
+    return { n: n + 1, k, jg, jugador: jugadorDeJugada(jg), momento };
+  };
+  const aceptarFCBQ = (c: Clip) => {
+    const pr = propuestaFCBQ(c);
+    if (!pr) return;
+    const { k, jugador, momento } = pr;
+    cambiar(c.id, { categoria_id: k.id, estado: null, inicio: Math.max(0, momento - k.antes), fin: momento + k.despues, jugador_id: jugador?.id ?? null, resultado: "bien" });
+    // Como al etiquetar a mano: tras una canasta de 2 o de 3, ¿asistencia de quién?
+    if (refs.current.catAsist && k.estadistica !== "tl") {
+      player.current?.pauseVideo?.();
+      setDorsalTecleado("");
+      setPregunta({ id: c.id, cat: refs.current.catAsist, reanudar: false, paso: "asistencia", tirador: jugador?.id ?? null, pista: enPista(eventos, momento) });
+    }
+  };
   const descartar = (c: Clip) => quitar(c.id);
   const saltar = (c: Clip) => setSaltados((l) => [...l, c.id]);
 
@@ -348,6 +383,7 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
         if (kc && esTiro(kc.estadistica)) { e.preventDefault(); rv.clasificar(rv.actual, kc); return; }
         if (k === "N" || k === "Delete") { e.preventDefault(); rv.descartar(rv.actual); return; }
         if (k === "J") { e.preventDefault(); rv.saltar(rv.actual); return; }
+        if (k === "Enter") { e.preventDefault(); rv.aceptarFCBQ(rv.actual); return; }
       }
       const c = teclas.get(k);
       if (c) { e.preventDefault(); etiquetar(c); }
@@ -365,8 +401,8 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
     return () => window.removeEventListener("keydown", fn);
   }, [teclas, etiquetar, jugadores, responder]);
 
-  const refsRev = useRef({ actual: actualRev, clasificar, descartar, saltar });
-  refsRev.current = { actual: actualRev, clasificar, descartar, saltar };
+  const refsRev = useRef({ actual: actualRev, clasificar, descartar, saltar, aceptarFCBQ });
+  refsRev.current = { actual: actualRev, clasificar, descartar, saltar, aceptarFCBQ };
   const refsAcc = useRef({ puntosRival, cambiarVelocidad, velocidad });
   refsAcc.current = { puntosRival, cambiarVelocidad, velocidad };
   const refsP = useRef({ pregunta, dorsal: dorsalTecleado });
@@ -569,6 +605,27 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
                 <button onClick={() => { setRevisando(false); setRevId(null); }} className="btn-secundario !px-2 !py-1 text-xs">Terminar</button>
               </div>
             </div>
+            {(() => {
+              const pr = propuestaFCBQ(actualRev);
+              if (actualRev.nota?.includes("RIVAL")) return (
+                <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-800">Tiro del <strong>rival</strong>: descártalo con <strong>N</strong> (no cuenta para vuestra estadística).</p>
+              );
+              if (!pr) return jugadasFCBQ?.length ? null : (
+                <p className="mt-2 rounded-lg bg-suave p-2 text-xs text-tinta/60">Sin el acta de la FCBQ de este partido no puedo proponer quién anota. Actualízala desde el partido («Actualizar desde la FCBQ» con la extensión).</p>
+              );
+              const nombre = pr.jugador ? `${pr.jugador.dorsal !== null ? `#${pr.jugador.dorsal} ` : ""}${pr.jugador.nombre}${pr.jugador.apellidos ? ` ${pr.jugador.apellidos.split(" ")[0]}` : ""}` : pr.jg.nombre ?? (pr.jg.dorsal !== null ? `#${pr.jg.dorsal}` : "jugador sin identificar");
+              const anotada = actualRev.resultado === "bien";
+              return (
+                <button onClick={() => aceptarFCBQ(actualRev)}
+                  className={`mt-2 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-left text-white ${anotada ? "bg-green-600 ring-4 ring-oro" : "bg-green-600/80"}`}>
+                  <span>
+                    <span className="block text-[11px] font-semibold uppercase opacity-80">Si es canasta · el acta de la FCBQ dice (canasta n.º {pr.n})</span>
+                    <span className="block text-base font-bold">✓ {pr.k.nombre} anotado · {nombre}</span>
+                  </span>
+                  <span className="rounded bg-white/20 px-2 py-1 text-xs font-semibold">Enter</span>
+                </button>
+              );
+            })()}
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {catsTiro.map((k) => (
                 <button key={k.id} onClick={() => clasificar(actualRev, k)} className="rounded-xl px-3 py-3 text-sm font-bold text-white" style={{ background: k.color }}>
@@ -578,7 +635,7 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
               <button onClick={() => descartar(actualRev)} className="rounded-xl bg-tinta/80 px-3 py-3 text-sm font-bold text-white">✗ No es tiro <span className="text-[10px] opacity-80">(N)</span></button>
               <button onClick={() => saltar(actualRev)} className="flex items-center justify-center gap-1 rounded-xl bg-suave px-3 py-3 text-sm font-semibold"><SkipForward size={15} /> Saltar <span className="text-[10px] opacity-60">(J)</span></button>
             </div>
-            <p className="mt-2 text-[11px] text-tinta/50">Mira el clip y elige el tipo de tiro: después te pregunta el jugador (en canastas, la FCBQ lo propone) y si entró (el detector marca lo que cree).</p>
+            <p className="mt-2 text-[11px] text-tinta/50">Si fue canasta y coincide con el acta, pulsa <strong>Enter</strong>. Si falló (o el acta no cuadra), elige el tipo de tiro y te pregunta el jugador y si entró.</p>
           </div>
         )}
 

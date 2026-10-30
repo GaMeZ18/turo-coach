@@ -353,3 +353,24 @@ export function elegirCanastas(seguidores: SeguidorAro[], ancho: number, alto = 
 export function filasNecesarias(seg: SeguidorAro[]): [number, number] {
   return [Math.min(...seg.map((s) => s.y0)), Math.max(...seg.map((s) => s.y1))];
 }
+
+/**
+ * Momento aproximado del descanso (cuando los equipos cambian de canasta): el hueco más largo sin tiros
+ * en la parte central del vídeo. Es solo una propuesta: el entrenador la corrige si no es.
+ */
+export function estimarDescanso(eventos: { t: number }[], dur: number): number {
+  const ts = eventos.map((e) => e.t).sort((a, b) => a - b);
+  let mejor = { hueco: 0, t: dur / 2 };
+  for (let i = 1; i < ts.length; i++) {
+    const medio = (ts[i - 1] + ts[i]) / 2, hueco = ts[i] - ts[i - 1];
+    if (medio < dur * 0.3 || medio > dur * 0.75) continue;
+    if (hueco > mejor.hueco) mejor = { hueco, t: medio };
+  }
+  return Math.round(mejor.t);
+}
+
+/** ¿El tiro es del equipo propio? (canasta a la que ataca en la 1ª parte y cambio en el descanso) */
+export function esPropio(e: { t: number; canasta: string }, canasta1a: "izquierda" | "derecha", descanso: number): boolean {
+  const nuestra = e.t < descanso ? canasta1a : canasta1a === "izquierda" ? "derecha" : "izquierda";
+  return e.canasta === nuestra;
+}

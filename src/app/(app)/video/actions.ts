@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
 import { youtubeId, type Clip, type EventoVideo } from "@/lib/video";
+import { esPropio } from "@/lib/detector";
 
 async function tituloYRival(supabase: Awaited<ReturnType<typeof createClient>>, fd: FormData) {
   const partido = String(fd.get("partido_id") ?? "") || null;
@@ -131,7 +132,7 @@ export async function guardarMinutosPeriodo(videoId: string, minutos: number) {
 // ---------- Detecciones automáticas (detector de tiros del PC) ----------
 type Deteccion = { t: number; canasta?: string; resultado?: string; confianza?: number };
 
-export async function importarDetecciones(fd: FormData): Promise<{ nuevos: number; repetidos: number; error?: string }> {
+export async function importarDetecciones(fd: FormData): Promise<{ nuevos: number; repetidos: number; rival?: number; error?: string }> {
   const supabase = await createClient();
   const videoId = String(fd.get("video_id"));
   const archivo = fd.get("archivo");
@@ -150,17 +151,25 @@ export async function importarDetecciones(fd: FormData): Promise<{ nuevos: numbe
   const cat = (cats ?? []).find((c) => c.equipo_id === v?.equipo_id) ?? (cats ?? []).find((c) => !c.equipo_id) ?? null;
   const antes = cat?.antes ?? 6, despues = cat?.despues ?? 3;
   const existentes = (ya ?? []).map((c) => Number(c.fin) - despues);
-  let repetidos = 0;
+  // Equipo propio / rival: canasta a la que se ataca en la 1ª parte y momento del descanso (en tiempo del archivo)
+  const lado = String(fd.get("canasta_1a") ?? "");
+  const canasta1a = lado === "izquierda" || lado === "derecha" ? lado : null;
+  const descanso = Number(fd.get("descanso") || 0) || null;
+  const conRival = fd.get("rival") === "1";
+  if (canasta1a && descanso) await supabase.from("videos").update({ canasta_1a: canasta1a, descanso }).eq("id", videoId);
+  let repetidos = 0, rival = 0;
   const filas = [];
   for (const e of eventos) {
     const t = e.t + desfase;
     if (t < 0) continue;
+    const esRival = !!(canasta1a && descanso && (e.canasta === "izquierda" || e.canasta === "derecha") && !esPropio({ t: e.t, canasta: e.canasta }, canasta1a, descanso));
+    if (esRival) { rival++; if (!conRival) continue; }
     if (existentes.some((x) => Math.abs(x - t) < 1.5)) { repetidos++; continue; }
     filas.push({
       video_id: videoId, categoria_id: cat?.id ?? null, inicio: Math.max(0, Math.round((t - antes) * 10) / 10), fin: Math.round((t + despues) * 10) / 10,
       resultado: e.resultado === "anotada" ? "bien" : e.resultado === "fallada" ? "mal" : null,
       estado: "pendiente", confianza: typeof e.confianza === "number" ? e.confianza : null, origen: "detector",
-      nota: e.canasta ? `Detectado · canasta ${e.canasta}` : "Detectado",
+      nota: `Detectado${esRival ? " · RIVAL" : ""}${e.canasta ? ` · canasta ${e.canasta}` : ""}`,
     });
   }
   for (let i = 0; i < filas.length; i += 200) {
@@ -168,7 +177,7 @@ export async function importarDetecciones(fd: FormData): Promise<{ nuevos: numbe
     if (error) return { nuevos: i, repetidos, error: /estado|confianza|origen/.test(error.message) ? "Falta preparar la base de datos (0020_video_detecciones.sql)." : error.message };
   }
   revalidatePath(`/video/${videoId}`);
-  return { nuevos: filas.length, repetidos };
+  return { nuevos: filas.length, repetidos, rival };
 }
 
 /** Confirmar un clip detectado (deja de estar pendiente) */

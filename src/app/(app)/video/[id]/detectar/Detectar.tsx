@@ -5,18 +5,21 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Crosshair, FileVideo, Loader2, ScanSearch, Square, TriangleAlert } from "lucide-react";
-import type { Aro, Evento } from "@/lib/detector";
+import { esPropio, estimarDescanso, type Aro, type Evento } from "@/lib/detector";
 import { alteracionLectura, buscarCanastas, buscarTiros, type Control } from "@/lib/detector-web";
 import { importarDetecciones } from "../../actions";
 import { archivoDe, recordarArchivo } from "@/lib/archivo-local";
 import { mmss } from "@/lib/video";
 
-type Fase = "elegir" | "fondo" | "canastas" | "marcar" | "tiros" | "guardando" | "hecho" | "error";
+type Fase = "elegir" | "fondo" | "canastas" | "marcar" | "tiros" | "lados" | "guardando" | "hecho" | "error";
+type Lado = "izquierda" | "derecha";
+const aSeg = (txt: string) => { const m = txt.trim().match(/^(\d+)(?::(\d{1,2}))?$/); return m ? Number(m[1]) * 60 + Number(m[2] ?? 0) : NaN; };
 type Rect = { x: number; y: number; w: number; h: number };
 
 
-export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
+export default function Detectar({ videoId, titulo, local, archivoEsperado, equipo, canasta1a, descansoGuardado }: {
   videoId: string; titulo: string; local: boolean; archivoEsperado?: { nombre: string; bytes: number | null } | null;
+  equipo: string; canasta1a?: Lado | null; descansoGuardado?: number | null;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imgRef = useRef<HTMLCanvasElement>(null);
@@ -37,8 +40,12 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
   const [tiros, setTiros] = useState(0);
   const [aros, setAros] = useState<Aro[]>([]);
   const [oculto, setOculto] = useState(false);
-  const [resultado, setResultado] = useState<{ nuevos: number; repetidos: number; total: number } | null>(null);
+  const [resultado, setResultado] = useState<{ nuevos: number; repetidos: number; total: number; rival?: number } | null>(null);
   const [marcados, setMarcados] = useState<Rect[]>([]);
+  const [lado1, setLado1] = useState<Lado | null>(canasta1a ?? null);
+  const [descansoTxt, setDescansoTxt] = useState(descansoGuardado ? mmss(descansoGuardado) : "");
+  const [conRival, setConRival] = useState(false);
+  const [encontrados, setEncontrados] = useState<Evento[]>([]);
   const [arrastre, setArrastre] = useState<Rect | null>(null);
   const datos = useRef<{ W: number; H: number; dur: number; foto: ImageData | null }>({ W: 0, H: 0, dur: 0, foto: null });
 
@@ -114,28 +121,40 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
     setFase("tiros"); setProgreso(0); setTiros(0); setResto(null);
     const eventos = await buscarTiros(v, lista, ctl.current, { progreso: setProgreso, tiros: (n, r) => { setTiros(n); setResto(r); } });
     if (!eventos) return; // se ha pedido marcar los aros a mano: se vuelve a empezar al marcarlos
+    if (lista.length === 2 && eventos.length) {
+      // Último paso: cuáles son del equipo propio (canasta de la 1ª parte y descanso)
+      setEncontrados(eventos);
+      if (!descansoGuardado) setDescansoTxt(mmss(estimarDescanso(eventos, datos.current.dur)));
+      setFase("lados");
+      return;
+    }
     await guardar(eventos);
   };
 
   empezarRef.current = (f?: File) => { void empezar(f); };
 
-  const guardar = async (eventos: Evento[]) => {
+  const guardar = async (eventos: Evento[], soloPropios = false) => {
     setFase("guardando");
     if (!eventos.length) { setResultado({ nuevos: 0, repetidos: 0, total: 0 }); setFase("hecho"); return; }
     const json = JSON.stringify({ herramienta: "detector-tiros-web", version: "1", eventos: eventos.map(({ px: _px, ...e }) => e) });
     const fd = new FormData();
     fd.set("video_id", videoId);
     fd.set("desfase", desfase || "0");
+    const desc = aSeg(descansoTxt);
+    if (soloPropios && lado1 && !Number.isNaN(desc)) {
+      fd.set("canasta_1a", lado1); fd.set("descanso", String(desc));
+      if (conRival) fd.set("rival", "1");
+    }
     fd.set("archivo", new File([json], "detecciones.json", { type: "application/json" }));
     const r = await importarDetecciones(fd);
     if (r.error) { setFase("error"); setMsg(r.error); return; }
-    setResultado({ ...r, total: eventos.length });
+    setResultado({ ...r, total: eventos.length, rival: r.rival ?? 0 });
     setFase("hecho");
   };
 
   // ------------------------------------------------------------------ marcar aros a mano
   useEffect(() => {
-    if (fase !== "marcar" && fase !== "tiros" && fase !== "canastas") return;
+    if (fase !== "marcar" && fase !== "tiros" && fase !== "canastas" && fase !== "lados") return;
     const c = imgRef.current, foto = datos.current.foto;
     if (!c || !foto) return;
     c.width = foto.width; c.height = foto.height;
@@ -230,7 +249,51 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
       {msg && fase !== "error" && <p className="mt-3 rounded-lg bg-oro/25 p-2 text-sm">{msg}</p>}
 
       {/* Imagen con las canastas (encontradas o para marcar) */}
-      {(fase === "tiros" || fase === "marcar") && (
+      {/* Último paso: tiros del equipo propio */}
+      {fase === "lados" && (() => {
+        const desc = aSeg(descansoTxt), dur = datos.current.dur || 1;
+        const propios = lado1 && !Number.isNaN(desc) ? encontrados.filter((e) => esPropio(e, lado1, desc)) : null;
+        return (
+          <div className="tarjeta mt-5 space-y-3 p-4">
+            <p className="text-lg font-semibold">Último paso: ¿cuáles son los tiros del {equipo}?</p>
+            <div>
+              <p className="text-sm">En la <strong>1ª parte</strong>, el {equipo} ataca a la canasta…</p>
+              <div className="mt-1 flex gap-2">
+                {(["izquierda", "derecha"] as Lado[]).map((l) => (
+                  <button key={l} onClick={() => setLado1(l)} className={`flex-1 rounded-xl border-2 px-3 py-2 text-sm font-semibold capitalize sm:flex-none sm:px-6 ${lado1 === l ? "border-azul bg-azul text-white" : "border-linea"}`}>{l === "izquierda" ? "← " : ""}{l}{l === "derecha" ? " →" : ""}</button>
+                ))}
+              </div>
+            </div>
+            <label className="block text-sm">
+              Descanso (cambian de canasta) en el minuto del vídeo
+              <input value={descansoTxt} onChange={(e) => setDescansoTxt(e.target.value)} placeholder="mm:ss" className="campo ml-2 !inline-block !w-24 !py-1" />
+              <span className="ml-2 text-xs text-tinta/50">propuesto por el hueco más largo sin tiros; toca la línea de abajo para cambiarlo</span>
+            </label>
+            {/* Línea de tiempo: cada punto es un tiro (azul = canasta izquierda, naranja = derecha) */}
+            <svg viewBox="0 0 1000 60" className="w-full cursor-pointer rounded-lg bg-suave" onClick={(e) => {
+              const r0 = e.currentTarget.getBoundingClientRect();
+              setDescansoTxt(mmss(((e.clientX - r0.left) / r0.width) * dur));
+            }}>
+              {encontrados.map((e, i) => (
+                <circle key={i} cx={(e.t / dur) * 1000} cy={e.canasta === "izquierda" ? 20 : 40} r={5}
+                  fill={e.canasta === "izquierda" ? "#002b8e" : "#fc6401"} opacity={propios && !propios.includes(e) ? 0.3 : 1} />
+              ))}
+              {!Number.isNaN(desc) && <line x1={(desc / dur) * 1000} x2={(desc / dur) * 1000} y1={0} y2={60} stroke="#ca010c" strokeWidth={3} />}
+              <text x={6} y={14} fontSize={11} fill="#002b8e">izquierda</text>
+              <text x={6} y={56} fontSize={11} fill="#fc6401">derecha</text>
+            </svg>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={conRival} onChange={(e) => setConRival(e.target.checked)} /> Guardar también los tiros del rival (para revisarlos)</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => guardar(encontrados, true)} disabled={!propios} className="btn-primario">
+                Guardar {propios ? `${propios.length} tiros del ${equipo}` : ""}{propios && conRival ? ` y ${encontrados.length - propios.length} del rival` : ""}
+              </button>
+              <button onClick={() => guardar(encontrados)} className="btn-secundario text-sm">No lo sé: guardar los {encontrados.length}</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {(fase === "tiros" || fase === "marcar" || fase === "lados") && (
         <div className="tarjeta mt-4 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold">
@@ -269,7 +332,7 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado }: {
         <div className="tarjeta mt-5 p-4">
           <p className="flex items-center gap-2 text-lg font-semibold text-green-700"><CheckCircle2 /> Hecho</p>
           <p className="mt-1 text-sm">
-            {resultado.total === 0 ? "No se ha encontrado ningún tiro." : <>Se han encontrado <strong>{resultado.total} tiros</strong>: {resultado.nuevos} guardados como clips «por revisar»{resultado.repetidos ? ` (${resultado.repetidos} ya estaban)` : ""}.</>}
+            {resultado.total === 0 ? "No se ha encontrado ningún tiro." : <>Se han encontrado <strong>{resultado.total} tiros</strong>: {resultado.nuevos} guardados como clips «por revisar»{resultado.rival && !conRival ? ` (${resultado.rival} del rival no se guardan)` : ""}{resultado.repetidos ? ` (${resultado.repetidos} ya estaban)` : ""}.</>}
           </p>
           <Link href={`/video/${videoId}`} className="btn-primario mt-3 inline-flex">Ir al vídeo y revisar</Link>
           {local && <p className="mt-2 text-xs text-tinta/50">El vídeo se verá desde tu ordenador mientras no cierres la web; otro día te pedirá elegir el archivo otra vez.</p>}
