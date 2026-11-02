@@ -261,8 +261,9 @@ async function apiStats(ids, plantillaPbp, idBase) {
  */
 async function descubrirPbp(tabId, avisar) {
   avisar("Buscando la jugada a jugada en la web de la FCBQ…");
+  // En todos los marcos (las estadísticas pueden estar dentro de un recuadro incrustado)
   await chrome.scripting.executeScript({
-    target: { tabId }, world: "MAIN",
+    target: { tabId, allFrames: true }, world: "MAIN",
     func: () => {
       const es = [...document.querySelectorAll("a, button, li, [role=tab], .nav-link, .tab, span, div")]
         .filter((e) => e.children.length <= 2 && (e.textContent || "").trim().length < 40);
@@ -270,15 +271,24 @@ async function descubrirPbp(tabId, avisar) {
     },
   }).catch(() => {});
   await esperar(4000);
-  const [peticiones, pestanas] = await chrome.scripting.executeScript({
-    target: { tabId }, world: "MAIN",
-    func: () => [window.__turoPeticiones || [],
-      [...new Set([...document.querySelectorAll("a, button, [role=tab], .nav-link, li")].map((e) => (e.textContent || "").trim().replace(/\s+/g, " ")).filter((t) => t && t.length < 30))].slice(0, 40)],
-  }).then((x) => x[0]?.result || [[], []]).catch(() => [[], []]);
+  const marcos = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true }, world: "MAIN",
+    func: () => ({
+      marco: location.href.slice(0, 160),
+      peticiones: window.__turoPeticiones || [],
+      iframes: [...document.querySelectorAll("iframe")].map((f) => (f.src || "(sin src)").slice(0, 160)),
+      pestanas: [...new Set([...document.querySelectorAll("a, button, [role=tab], .nav-link, li")].map((e) => (e.textContent || "").trim().replace(/\s+/g, " ")).filter((t) => t && t.length < 30))].slice(-30),
+    }),
+  }).then((x) => x.map((r) => r.result).filter(Boolean)).catch(() => []);
+  const peticiones = marcos.flatMap((m) => m.peticiones);
   // La de la jugada a jugada: una lista larga de jugadas con marcador / minuto / periodo
   const buena = peticiones.find((p) => p.estado === 200 && p.resumen?.lista?.n >= 10 && !/\/stats\b/.test(p.url) &&
     p.resumen.lista.campos.some((c) => /score|minute|time|period|marcador/i.test(c)));
-  return { peticiones, pestanas, plantilla: buena?.url || null };
+  return {
+    peticiones,
+    pestanas: marcos.map((m) => ({ marco: m.marco, iframes: m.iframes, pestanas: m.pestanas, peticiones: m.peticiones.length })),
+    plantilla: buena?.url || null,
+  };
 }
 
 async function bajarEstadisticas(tabId, ids, avisar) {
