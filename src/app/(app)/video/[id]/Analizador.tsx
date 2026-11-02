@@ -279,10 +279,25 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
     setCola(null); setActivo(sig.id); setSel(sig.id); ir(sig.inicio);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revisando, pregunta, actualRev, pendientesRev, saltados]);
+  // Canasta o fallo por descarte con el acta: de los tiros detectados por revisar, tantos como canastas del
+  // acta quedan por emparejar son canastas (los que el detector ve más claro como canasta); el resto, fallos.
+  const prediccionActa = useMemo(() => {
+    const m = new Map<string, "canasta" | "fallo">();
+    if (!jugadasFCBQ?.length) return m;
+    const confirmadas = clips.filter((x) => x.estado !== "pendiente" && x.resultado === "bien" && esTiro(cat(x.categoria_id)?.estadistica)).length;
+    const restantes = Math.max(0, jugadasFCBQ.length - confirmadas);
+    const nota = (x: Clip) => (x.resultado === "bien" ? 2 : x.resultado === "mal" ? 0 : 1) + (x.confianza ?? 0.5) * 0.5;
+    [...clips].filter((x) => x.estado === "pendiente" && !x.nota?.includes("RIVAL"))
+      .sort((a, b) => nota(b) - nota(a))
+      .forEach((x, i) => m.set(x.id, i < restantes ? "canasta" : "fallo"));
+    return m;
+  }, [clips, jugadasFCBQ, cat]);
+
   const clasificar = (c: Clip, k: Categoria) => {
     const momento = c.fin - (cat(c.categoria_id)?.despues ?? 3);
     const fin = momento + k.despues, inicio = Math.max(0, momento - k.antes);
-    const deteccion = c.resultado;
+    const pred = prediccionActa.get(c.id);
+    const deteccion = pred === "fallo" ? "mal" : pred === "canasta" ? "bien" : c.resultado;
     cambiar(c.id, { categoria_id: k.id, estado: null, inicio, fin });
     player.current?.pauseVideo?.();
     setDorsalTecleado("");
@@ -614,16 +629,26 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
                 <p className="mt-2 rounded-lg bg-suave p-2 text-xs text-tinta/60">Sin el acta de la FCBQ de este partido no puedo proponer quién anota. Actualízala desde el partido («Actualizar desde la FCBQ» con la extensión).</p>
               );
               const nombre = pr.jugador ? `${pr.jugador.dorsal !== null ? `#${pr.jugador.dorsal} ` : ""}${pr.jugador.nombre}${pr.jugador.apellidos ? ` ${pr.jugador.apellidos.split(" ")[0]}` : ""}` : pr.jg.nombre ?? (pr.jg.dorsal !== null ? `#${pr.jg.dorsal}` : "jugador sin identificar");
-              const anotada = actualRev.resultado === "bien";
+              const pred = prediccionActa.get(actualRev.id);
+              const anotada = pred ? pred === "canasta" : actualRev.resultado === "bien";
+              const confirmadas = jugadasFCBQ ? pr.n - 1 : 0;
               return (
+                <>
+                {pred === "fallo" && (
+                  <div className="mt-2 rounded-xl border-2 border-red-500 bg-red-50 p-3 text-sm text-red-900">
+                    <p className="font-bold">✗ Seguramente es un FALLO</p>
+                    <p className="text-xs">Llevas {confirmadas} de {jugadasFCBQ?.length} canastas del acta y este tiro el detector no lo ve como canasta. Elige el tipo de tiro (<strong>2</strong>, <strong>3</strong> o <strong>L</strong>) y luego quién tiró.</p>
+                  </div>
+                )}
                 <button onClick={() => aceptarFCBQ(actualRev)}
-                  className={`mt-2 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-left text-white ${anotada ? "bg-green-600 ring-4 ring-oro" : "bg-green-600/80"}`}>
+                  className={`mt-2 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl px-4 text-left text-white ${anotada ? "bg-green-600 py-3 ring-4 ring-oro" : "bg-green-600/60 py-2"}`}>
                   <span>
                     <span className="block text-[11px] font-semibold uppercase opacity-80">Si es canasta · el acta de la FCBQ dice (canasta n.º {pr.n})</span>
                     <span className="block text-base font-bold">✓ {pr.k.nombre} anotado · {nombre}</span>
                   </span>
                   <span className="rounded bg-white/20 px-2 py-1 text-xs font-semibold">Enter</span>
                 </button>
+                </>
               );
             })()}
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
