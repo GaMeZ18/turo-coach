@@ -13,14 +13,17 @@ type Ej = {
   perfiles: { nombre: string | null } | null;
 };
 
-export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<{ q?: string; cat?: string; edad?: string; tipo?: string }> }) {
-  const { q, cat, edad, tipo } = await searchParams;
+const POR_PAGINA = 60;
+
+export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<{ q?: string; cat?: string; edad?: string; tipo?: string; p?: string }> }) {
+  const { q, cat, edad, tipo, p } = await searchParams;
+  const pagina = Math.max(1, Number(p) || 1);
   const { supabase, perfil } = await requireUser();
   const esCoord = perfil.rol === "coordinador";
 
   let consulta = supabase
     .from("ejercicios")
-    .select("id, titulo, tipo, categoria, etiquetas, edades, duracion, jugadores_min, preview, pizarra, descripcion, perfiles(nombre)")
+    .select("id, titulo, tipo, categoria, etiquetas, edades, duracion, jugadores_min, preview, pizarra, descripcion, perfiles(nombre)", { count: "exact" })
     .eq("en_biblioteca", true)
     .order("categoria")
     .order("titulo");
@@ -31,7 +34,11 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
     const limpio = q.replace(/[%,(){}"]/g, " ").trim();
     consulta = consulta.or(`titulo.ilike.%${limpio}%,descripcion.ilike.%${limpio}%,etiquetas.cs.{"${limpio.toLowerCase()}"}`);
   }
-  const { data, error } = await consulta;
+  // Con más de 1000 ejercicios, por páginas (y mucho más rápido)
+  const { data, error, count } = await consulta.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1);
+  const total = count ?? 0, paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+  const enlace = (n: number) => `/biblioteca?${new URLSearchParams({ ...(q ? { q } : {}), ...(cat ? { cat } : {}), ...(edad ? { edad } : {}), ...(tipo ? { tipo } : {}), p: String(n) })}`;
+  const enlaceCat = (c: string) => `/biblioteca?${new URLSearchParams({ ...(edad ? { edad } : {}), ...(tipo ? { tipo } : {}), cat: c })}`;
   const faltaSQL = error && /en_biblioteca|edades/.test(error.message);
   const lista = (data ?? []) as unknown as Ej[];
   const filtrando = !!(q || cat || edad || tipo);
@@ -73,6 +80,14 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
             {filtrando && <Link href="/biblioteca" className="self-center px-1 text-sm text-tinta/60 underline">Quitar filtros</Link>}
           </form>
 
+          {/* Accesos rápidos por categoría */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {CATEGORIAS.map((c) => (
+              <Link key={c} href={enlaceCat(c)} className={`rounded-full px-2.5 py-1 text-xs font-medium ${cat === c ? "bg-azul text-white" : "bg-suave hover:bg-linea"}`}>{c}</Link>
+            ))}
+          </div>
+          {total > 0 && <p className="mt-3 text-sm text-tinta/60">{total} {total === 1 ? "resultado" : "resultados"}{paginas > 1 ? ` · página ${pagina} de ${paginas}` : ""}</p>}
+
           {esCoord && !filtrando && (
             <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length} entre ejercicios y sistemas; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
           )}
@@ -102,6 +117,18 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
               </Link>
             ))}
           </div>
+          {paginas > 1 && (
+            <nav className="mt-6 flex flex-wrap items-center justify-center gap-1.5 text-sm">
+              {pagina > 1 && <Link href={enlace(pagina - 1)} className="btn-secundario !px-3 !py-1.5">← Anterior</Link>}
+              {Array.from({ length: paginas }, (_, i) => i + 1).filter((n) => n === 1 || n === paginas || Math.abs(n - pagina) <= 2).map((n, i, l) => (
+                <span key={n} className="flex items-center gap-1.5">
+                  {i > 0 && n - l[i - 1] > 1 && <span className="text-tinta/40">…</span>}
+                  <Link href={enlace(n)} className={`rounded-md px-2.5 py-1.5 ${n === pagina ? "bg-azul font-semibold text-white" : "hover:bg-suave"}`}>{n}</Link>
+                </span>
+              ))}
+              {pagina < paginas && <Link href={enlace(pagina + 1)} className="btn-secundario !px-3 !py-1.5">Siguiente →</Link>}
+            </nav>
+          )}
           {lista.length === 0 && (
             <p className="mt-8 text-center text-sm text-tinta/50">
               {filtrando ? "No hay ejercicios con esos filtros." : "Todavía no hay ejercicios en la biblioteca."}
