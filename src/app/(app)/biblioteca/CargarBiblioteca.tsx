@@ -11,9 +11,16 @@ export default function CargarBiblioteca({ texto }: { texto: string }) {
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const cargar = () => start(async () => {
     try {
-      const r = await cargarBibliotecaInicial();
-      if (r.error) setMsg({ ok: false, t: r.error });
-      else setMsg({ ok: true, t: r.nuevos ? `Añadidos ${r.nuevos} ejercicios.` : "Ya estaban todos cargados." });
+      // Se carga por tandas (el servidor tiene un tiempo límite por llamada) hasta que no quede ninguno
+      let total = 0;
+      for (let vuelta = 0; vuelta < 10; vuelta++) {
+        const r = await cargarBibliotecaInicial();
+        if (r.error) { setMsg({ ok: false, t: total ? `Añadidos ${total}, pero ha fallado: ${r.error}` : r.error }); router.refresh(); return; }
+        total += r.nuevos;
+        if (!r.quedan) break;
+        setMsg({ ok: true, t: `Añadidos ${total}… quedan ${r.quedan}` });
+      }
+      setMsg({ ok: true, t: total ? `Añadidos ${total} ejercicios y sistemas.` : "Ya estaban todos cargados." });
       router.refresh();
     } catch {
       setMsg({ ok: false, t: "No se ha podido cargar. Recarga la página (Ctrl+Shift+R) y vuelve a probar." });

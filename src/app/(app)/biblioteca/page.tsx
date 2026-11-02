@@ -74,7 +74,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
           </form>
 
           {esCoord && !filtrando && (
-            <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length}; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
+            <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length} entre ejercicios y sistemas; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
           )}
 
           {/* Una sola rejilla de 3 columnas (ordenada por categoría) para que no queden huecos */}

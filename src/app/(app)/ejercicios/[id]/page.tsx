@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { urlEmbed } from "@/lib/video";
 import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actions";
 import VisorPizarra from "./VisorPizarra";
-import { Copy, Library, Pencil, Trash2 } from "lucide-react";
+import { Copy, Library, Pencil, Trash2, PlayCircle } from "lucide-react";
 import Enviar from "@/components/Enviar";
 
 export default async function VerEjercicio({ params }: { params: Promise<{ id: string }> }) {
@@ -102,6 +102,9 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
                 <Link key={t} href={`/ejercicios?q=${encodeURIComponent(t)}`} className="rounded-full bg-suave px-2.5 py-0.5 text-xs hover:bg-linea">#{t}</Link>
               ))}
             </div>
+          )}
+          {!video && e.video_url && (
+            <a href={e.video_url} target="_blank" rel="noopener" className="btn-secundario inline-flex text-sm"><PlayCircle size={16} /> Ver vídeos que lo explican (YouTube)</a>
           )}
           {video && (
             <div className="aspect-video overflow-hidden rounded-xl border border-linea bg-black">

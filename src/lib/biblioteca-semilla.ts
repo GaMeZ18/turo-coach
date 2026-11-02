@@ -4,6 +4,8 @@ import type { AccionBalon, Elemento, Fotograma, Movimiento, Pizarra, TipoTrazo, 
 import { AROS, COLOR_DEFECTO } from "@/components/pizarra/modelo";
 import { EDADES } from "./edades";
 import { SEMILLA_2 } from "./biblioteca-semilla-2";
+import { SISTEMAS } from "./biblioteca-sistemas";
+import { GENERADOS } from "./biblioteca-generada";
 
 type P = [number, number];
 type Paso = {
@@ -89,6 +91,7 @@ export type EjercicioSemilla = {
   correcciones: string;
   etiquetas: string[];
   montaje: Montaje;
+  video?: string;          // enlace (YouTube) para verlo explicado
 };
 
 // Puntos habituales en media pista (x de 14 a 28, canasta en x = 26.4)
@@ -662,5 +665,5 @@ const SEMILLA_1: EjercicioSemilla[] = [
   },
 ];
 
-/** Todos los ejercicios iniciales de la biblioteca (63 + 100 de la ampliación) */
-export const SEMILLA: EjercicioSemilla[] = [...SEMILLA_1, ...SEMILLA_2];
+/** Todos los ejercicios iniciales de la biblioteca (63 + 100 + sistemas + ampliación grande por familias) */
+export const SEMILLA: EjercicioSemilla[] = [...SEMILLA_1, ...SEMILLA_2, ...SISTEMAS, ...GENERADOS];

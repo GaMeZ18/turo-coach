@@ -118,14 +118,20 @@ export async function alternarBiblioteca(formData: FormData) {
 }
 
 /** Carga la biblioteca inicial del club (solo el coordinador). No duplica los que ya estén. */
-export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error?: string }> {
+export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; quedan?: number; error?: string }> {
   try {
     const { SEMILLA, montar } = await import("@/lib/biblioteca-semilla");
+    const { todas } = await import("@/lib/db");
     const supabase = await createClient();
-    const { data: ya, error } = await supabase.from("ejercicios").select("titulo").eq("en_biblioteca", true);
+    // Todos los títulos ya cargados (más de 1000: hay que paginar o se duplicarían)
+    const { data: ya, error } = await todas<{ titulo: string; id: string; video_url: string | null }>((d, h) =>
+      supabase.from("ejercicios").select("id, titulo, video_url").eq("en_biblioteca", true).order("id").range(d, h));
     if (error) return { nuevos: 0, error: faltaSQL(error.message) };
-    const titulos = new Set((ya ?? []).map((x) => x.titulo));
-    const nuevos = SEMILLA.filter((e) => !titulos.has(e.titulo)).map((e) => ({
+    const titulos = new Set(ya.map((x) => x.titulo));
+    // Por llamada, como mucho 300 (el servidor tiene un tiempo límite); el botón avisa si quedan más
+    const pendientes = SEMILLA.filter((e) => !titulos.has(e.titulo));
+    const LIMITE = 300;
+    const nuevos = pendientes.slice(0, LIMITE).map((e) => ({
       tipo: e.tipo ?? "ejercicio",
       titulo: e.titulo,
       descripcion: e.descripcion,
@@ -138,18 +144,19 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error
       objetivos: e.objetivos ?? null,
       edades: e.edades,
       pizarra: montar(e.montaje),
+      video_url: e.video ?? null,
       visibilidad: "club",
       en_biblioteca: true,
     }));
     // Por tandas, para que un fallo no deje todo a medias
     let n = 0;
     let conObjetivos = true;
-    for (let i = 0; i < nuevos.length; i += 10) {
-      const tanda = nuevos.slice(i, i + 10);
+    for (let i = 0; i < nuevos.length; i += 50) {
+      const tanda = nuevos.slice(i, i + 50);
       let { error: e2 } = await supabase.from("ejercicios").insert(conObjetivos ? tanda : tanda.map(({ objetivos: _o, ...r }) => r));
       if (e2 && /objetivos/.test(e2.message)) { conObjetivos = false; ({ error: e2 } = await supabase.from("ejercicios").insert(tanda.map(({ objetivos: _o, ...r }) => r))); }
       if (e2) return { nuevos: n, error: faltaSQL(e2.message) };
-      n += Math.min(10, nuevos.length - i);
+      n += Math.min(50, nuevos.length - i);
     }
     // Completar los objetivos de los que ya estaban cargados sin ellos
     if (conObjetivos) {
@@ -160,9 +167,14 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; error
         if (o) await supabase.from("ejercicios").update({ objetivos: o }).eq("id", x.id);
       }
     }
+    // Enlaces de vídeo para los que ya estaban cargados sin él
+    const videoPorTitulo = new Map(SEMILLA.filter((e) => e.video).map((e) => [e.titulo, e.video!]));
+    for (const x of ya.filter((x) => !x.video_url && videoPorTitulo.has(x.titulo)).slice(0, 100)) {
+      await supabase.from("ejercicios").update({ video_url: videoPorTitulo.get(x.titulo) }).eq("id", x.id);
+    }
     revalidatePath("/biblioteca");
     revalidatePath("/ejercicios");
-    return { nuevos: n };
+    return { nuevos: n, quedan: Math.max(0, pendientes.length - n) };
   } catch (e) {
     return { nuevos: 0, error: e instanceof Error ? e.message : String(e) };
   }

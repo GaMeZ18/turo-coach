@@ -3,7 +3,7 @@
 // Ficha completa de un ejercicio: pizarra, objetivos, descripción, correcciones y material.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, Target, Timer, Users } from "lucide-react";
+import { ExternalLink, Loader2, Target, Timer, Users, PlayCircle } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
 import { fichaEjercicio, type FichaEjercicio as Ficha } from "@/app/(app)/entrenamientos/actions";
 
@@ -76,6 +76,9 @@ export default function FichaEjercicio({ id, compacta = false }: { id: string; c
           <h4 className="etiqueta">Material</h4>
           <p className="text-sm">{f.material}</p>
         </section>
+      )}
+      {f.video_url && (
+        <a href={f.video_url} target="_blank" rel="noopener" className="mr-3 inline-flex items-center gap-1 text-sm text-azul hover:underline"><PlayCircle size={14} /> Ver vídeos que lo explican</a>
       )}
       <Link href={`/ejercicios/${f.id}`} target="_blank" className="inline-flex items-center gap-1 text-sm text-azul hover:underline">
         <ExternalLink size={14} /> Ver la pizarra animada
