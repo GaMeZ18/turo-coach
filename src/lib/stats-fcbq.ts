@@ -44,7 +44,7 @@ export interface StatsPartido {
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 10;
+export const VERSION_STATS = 11;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };
@@ -169,14 +169,19 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
       const m = pbp.length ? lineaMarcador(pbp) : [];
       // Con marcador (jugada a jugada) o, si no lo hay, con los tramos en pista y su +/- (sinergias estimadas)
       const conTramos = (d.stints?.local?.length ?? 0) > 0;
-      const jugadas = pbp.length ? canastas(pbp) : [];
+      // Identificador de cada jugador → dorsal y nombre (la jugada a jugada solo trae el identificador)
+      const porId = new Map<string, { dorsal: number | null; nombre: string | null }>();
+      for (const lado of ["local", "visitor"] as const) for (const p of total[lado]?.players ?? []) {
+        if (p.uuid) porId.set(p.uuid, { dorsal: p.dorsal !== undefined && /^\d+$/.test(String(p.dorsal)) ? Number(p.dorsal) : null, nombre: p.name ?? null });
+      }
+      const jugadas = pbp.length ? canastas(pbp, porId) : [];
       return m.length > 1 ? { v: VERSION_STATS, marcador: m, ...(jugadas.length ? { jugadas } : {}) } : { v: conTramos ? VERSION_STATS : 1 };
     })(),
   };
 }
 
 /** Canastas en orden con quién las hace (dorsal y nombre, si la FCBQ los da en la jugada a jugada) */
-function canastas(pbp: Pbp[]): [0 | 1, number, number | null, string | null, number?][] {
+function canastas(pbp: Pbp[], porId = new Map<string, { dorsal: number | null; nombre: string | null }>()): [0 | 1, number, number | null, string | null, number?][] {
   const out: [0 | 1, number, number | null, string | null, number?][] = [];
   const seg = segundoDePartido(pbp);
   let l = 0, v = 0;
@@ -195,12 +200,19 @@ function canastas(pbp: Pbp[]): [0 | 1, number, number | null, string | null, num
     const otro = Object.entries(x).find(([k, val]) => typeof val === "string" && /name|nombre/i.test(k) && !/team|equip|club|event|type/i.test(k));
     return String((prefer ?? otro)?.[1] ?? "").trim() || null;
   };
+  const delJugador = (x?: Record<string, string | number | boolean>) => {
+    if (!x) return null;
+    for (const [k, val] of Object.entries(x)) if (typeof val === "string" && !/team|event/i.test(k) && porId.has(val)) return porId.get(val)!;
+    return null;
+  };
   for (const e of pbp) {
     if (e.l === undefined || e.l === null || e.v === undefined || e.v === null) continue;
     const dl = n(e.l) - l, dv = n(e.v) - v;
     const t = seg(e);
-    if (dl > 0 && dl <= 3) out.push([0, dl, dorsalDe(e.x), nombreDe(e.x), ...(t !== null ? [t] : [])] as [0, number, number | null, string | null, number?]);
-    else if (dv > 0 && dv <= 3) out.push([1, dv, dorsalDe(e.x), nombreDe(e.x), ...(t !== null ? [t] : [])] as [1, number, number | null, string | null, number?]);
+    const jg = delJugador(e.x);
+    const dorsal = jg?.dorsal ?? dorsalDe(e.x), nombre = jg?.nombre ?? nombreDe(e.x);
+    if (dl > 0 && dl <= 3) out.push([0, dl, dorsal, nombre, ...(t !== null ? [t] : [])] as [0, number, number | null, string | null, number?]);
+    else if (dv > 0 && dv <= 3) out.push([1, dv, dorsal, nombre, ...(t !== null ? [t] : [])] as [1, number, number | null, string | null, number?]);
     l = n(e.l); v = n(e.v);
   }
   return out;

@@ -175,15 +175,18 @@ async function pedirStats(plantilla, idBase, ids) {
 
 // Se ejecuta DENTRO de la pestaña de basquetcatala.cat: pide un token a /jwt.php (como hace la web)
 // y descarga las estadísticas del servicio de la FCBQ
-async function apiStats(ids, plantillaPbp, idBase) {
+async function apiStats(ids, plantillaPbp, idBase, cabWeb) {
   const res = {};
   const txt = await fetch("/jwt.php", { credentials: "include", cache: "no-store" }).then((r) => r.text()).catch(() => "");
   const token = (txt.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/) || [])[0];
-  if (!token) return { error: "sin token" };
+  if (!token && !cabWeb) return { error: "sin token" };
+  // Mismas cabeceras que usa la propia web (su credencial); si no las tenemos, las nuestras
+  const cab = cabWeb && Object.keys(cabWeb).length ? { Accept: "application/json, text/plain, */*", ...cabWeb }
+    : { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" };
   for (const id of ids) {
     try {
       const r = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/stats?currentSeason=true`, {
-        headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
+        headers: cab,
       });
       if (!r.ok) { res[id] = { error: r.status }; continue; }
       const j = await r.json();
@@ -218,7 +221,7 @@ async function apiStats(ids, plantillaPbp, idBase) {
         ];
         for (const url of ev.length ? [] : rutas) {
           q = await fetch(url, {
-            headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
+            headers: cab,
           }).catch(() => null);
           if (!q || !q.ok) continue;
           pj = await q.json().catch(() => null);
@@ -242,7 +245,12 @@ async function apiStats(ids, plantillaPbp, idBase) {
             };
           });
           // Muestra para diagnosticar si la FCBQ cambia el formato
-          if (!res.__muestra) res.__muestra = { estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length, primeros: ev.slice(0, 3) };
+          if (!res.__muestra || (!res.__muestra.eventos && ev.length)) res.__muestra = {
+            estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length,
+            primeros: ev.filter((e) => e.localScore !== undefined || e.visitorScore !== undefined).slice(0, 4),
+            tiros: Array.isArray(j.shotChart) ? { n: j.shotChart.length, primeros: j.shotChart.slice(0, 3) } : j.shotChart ? { claves: Object.keys(j.shotChart), muestra: JSON.stringify(j.shotChart).slice(0, 600) } : null,
+            jugador: (j.boxscore?.[0]?.local?.players || [])[0] ? Object.keys(j.boxscore[0].local.players[0]) : null,
+          };
           if (ev.length) res.__muestraOk = res.__muestraOk ?? { eventos: ev.length, primeros: ev.slice(0, 4) };
         } else if (!res.__muestra) {
           res.__muestra = { estado: q?.status ?? "sin respuesta" };
@@ -265,6 +273,7 @@ async function descubrirPbp(tabId, avisar) {
     target: { tabId, allFrames: true }, world: "MAIN",
     func: () => ({
       marco: location.href.slice(0, 160),
+      cabeceras: window.__turoCabeceras || null,
       peticiones: window.__turoPeticiones || [],
       iframes: [...document.querySelectorAll("iframe")].map((f) => (f.src || "(sin src)").slice(0, 160)),
       // Textos cortos de pestañas/botones de la zona de estadísticas (no el menú de la federación)
@@ -298,8 +307,9 @@ async function descubrirPbp(tabId, avisar) {
   // La de la jugada a jugada: una lista larga de jugadas con marcador / minuto / periodo
   const buena = peticiones.find((p) => p.estado === 200 && p.resumen?.lista?.n >= 10 && !/\/stats\b/.test(p.url) &&
     p.resumen.lista.campos.some((c) => /score|minute|time|period|marcador/i.test(c)));
+  const cabeceras = [...antes, ...despues].map((m) => m.cabeceras).find(Boolean) || null;
   return {
-    peticiones,
+    peticiones, cabeceras,
     pestanas: marcos.map((m) => ({ marco: m.marco, iframes: m.iframes, pestanas: m.pestanas, peticiones: m.peticiones.length })),
     plantilla: buena?.url || null,
   };
@@ -309,17 +319,19 @@ async function bajarEstadisticas(tabId, ids, avisar) {
   const stats = {};
   // 0) De dónde saca la página la jugada a jugada: la pestaña ya está abierta en el primer partido;
   //    si ahí no aparece, se prueba con los dos siguientes
-  let descubierto = { peticiones: [], pestanas: [], plantilla: null };
+  let descubierto = { peticiones: [], pestanas: [], plantilla: null, cabeceras: null };
   let enPagina = ids[0];
   for (let k = 0; k < Math.min(3, ids.length) && !descubierto.plantilla; k++) {
     if (k) { await abrirYEsperar(tabId, `${FCBQ}/estadistica/partit/${ids[k]}`, avisar).catch(() => {}); enPagina = ids[k]; }
     const d = await descubrirPbp(tabId, avisar).catch(() => null);
-    if (d) descubierto = { peticiones: [...descubierto.peticiones, ...d.peticiones], pestanas: d.pestanas, plantilla: d.plantilla ? { url: d.plantilla, id: ids[k] } : null };
+    if (d) descubierto = { peticiones: [...descubierto.peticiones, ...d.peticiones], pestanas: d.pestanas, plantilla: d.plantilla ? { url: d.plantilla, id: ids[k] } : null, cabeceras: d.cabeceras || descubierto.cabeceras };
   }
   const diagnostico = () => {
     stats.__muestra = {
       version: chrome.runtime.getManifest().version,
       descubierta: descubierto.plantilla?.url ?? null,
+      conCabecerasDeLaWeb: !!descubierto.cabeceras,
+      cabecerasWeb: descubierto.cabeceras ? Object.keys(descubierto.cabeceras) : [],
       pestanas: descubierto.pestanas,
       ...(stats.__muestra || {}),
       peticiones: descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves })),
@@ -329,7 +341,7 @@ async function bajarEstadisticas(tabId, ids, avisar) {
   // 1) Servicio de estadísticas de la FCBQ con el token de la web (lo más rápido)
   for (let i = 0; i < ids.length; i += 20) {
     avisar(`Estadísticas: ${Math.min(i + 20, ids.length)} de ${ids.length} partidos…`);
-    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla?.url ?? null, descubierto.plantilla?.id ?? null] })
+    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla?.url ?? null, descubierto.plantilla?.id ?? null, descubierto.cabeceras] })
       .then((x) => x[0]?.result || {}).catch(() => ({}));
     if (r.error) break;
     if (r.__muestra) stats.__muestra = stats.__muestra ?? r.__muestra;
