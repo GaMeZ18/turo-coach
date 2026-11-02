@@ -15,6 +15,8 @@ type Paso = {
   tiro?: string;                     // quien tira
   mano?: [string, string];           // mano a mano
   rebote?: string;                   // quien coge el rebote del último tiro
+  pases?: [string, string][];        // pases a la vez (ejercicios con varios balones)
+  tiros?: string[];                  // tiros a la vez
 };
 type Montaje = {
   vista?: Vista;
@@ -67,10 +69,14 @@ export function montar(m: Montaje): Pizarra {
       const b = balonDe(id(de));
       if (b) { balon.push({ balon: b, tipo: "pase", de: id(de), a: id(a), ...(paso.mano ? { mano: true } : {}) }); tiene[b] = id(a); }
     }
-    if (paso.tiro) {
-      const b = balonDe(id(paso.tiro));
+    for (const [de, a] of paso.pases ?? []) {
+      const b = balonDe(id(de));
+      if (b) { balon.push({ balon: b, tipo: "pase", de: id(de), a: id(a) }); tiene[b] = id(a); }
+    }
+    for (const t of [...(paso.tiro ? [paso.tiro] : []), ...(paso.tiros ?? [])]) {
+      const b = balonDe(id(t));
       const aro = (m.vista ?? "ofensiva") === "defensiva" ? AROS[0] : AROS[1];
-      if (b) { balon.push({ balon: b, tipo: "tiro", de: id(paso.tiro), destino: aro }); tiene[b] = null; ultimoTiro = b; }
+      if (b) { balon.push({ balon: b, tipo: "tiro", de: id(t), destino: aro }); tiene[b] = null; ultimoTiro = b; }
     }
     if (paso.rebote && ultimoTiro && tiene[ultimoTiro] === null) {
       balon.push({ balon: ultimoTiro, tipo: "coger", a: id(paso.rebote), rebote: true });

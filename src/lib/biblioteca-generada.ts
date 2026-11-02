@@ -50,7 +50,9 @@ const sano = (m: EjercicioSemilla["montaje"]): EjercicioSemilla["montaje"] => {
     ...(p.mano && existe(p.mano[0]) && existe(p.mano[1]) ? { mano: p.mano } : {}),
     ...(p.tiro && existe(p.tiro) ? { tiro: p.tiro } : {}),
     ...(p.rebote && existe(p.rebote) ? { rebote: p.rebote } : {}),
-  })).filter((p) => (p.m?.length ?? 0) > 0 || p.pase || p.mano || p.tiro || p.rebote) };
+    ...(p.pases ? { pases: p.pases.filter(([a, b]) => existe(a) && existe(b)) } : {}),
+    ...(p.tiros ? { tiros: p.tiros.filter(existe) } : {}),
+  })).filter((p) => (p.m?.length ?? 0) > 0 || p.pase || p.mano || p.tiro || p.rebote || p.pases?.length || p.tiros?.length) };
 };
 const ej = (e: Base): EjercicioSemilla => ({ tipo: "ejercicio", ...e, montaje: sano(jugada(e.montaje)) });
 const unir = (...x: (string | false | undefined | null)[]) => x.filter(Boolean).join(" ");
@@ -342,7 +344,7 @@ for (const cob of COBERTURAS) for (const fm of PNR_FORMATOS) for (const lg of PN
     video: yt(`${cob.ing} reads drill`), montaje: pnrMontaje(fm, lg, cob),
   }));
 }
-for (const cob of COBERTURAS) for (const fm of PNR_FORMATOS) {
+for (const cob of COBERTURAS) for (const fm of PNR_FORMATOS.filter((f) => f.clave !== "4c4")) {
   pnr.push(ej({
     titulo: `Defender el directo con ${cob.nombre}: ${fm.nombre}`, categoria: "Defensa", edades: fm.edades, duracion: 12, jugadores: fm.jugadores, material: "1 balón",
     objetivos: `Ejecutar la cobertura «${cob.ing.split(" ")[0]}» con sus ayudas y recuperaciones`,
@@ -451,14 +453,35 @@ const conFinal = (s: Salida, f: Final): Montaje => {
   } else pasos.splice(iTiro, 0, { m: [mov] });
   return { at: s.at, ...extra, defensa: s.clave === "closeout" ? "individual" : "ninguna", pasos };
 };
+/**
+ * El mismo ejercicio a la vez en los dos lados de la pista (dos grupos, dos balones): los del segundo grupo
+ * llevan el número + 5 y hacen lo mismo en espejo. Así trabajan el doble de jugadores y se ven las filas.
+ */
+const enDosLados = (m: Montaje, balon: string): Montaje => {
+  const k2 = (k: string) => (/^\d$/.test(k) ? String(Number(k) + 5) : k);
+  // Lo que está en el centro se aparta hacia su lado para que los dos grupos no se pisen
+  const lado1 = (p: P): P => (Math.abs(p[1] - 7.5) < 1.6 ? [p[0], r1(p[1] + 1.7)] : p);
+  const esp = (p: P): P => { const q = lado1(p); return [q[0], r1(15 - q[1])]; };
+  const dup = (r: Record<string, P> | undefined) => r ? { ...Object.fromEntries(Object.entries(r).map(([k, p]) => [k, lado1(p)])), ...Object.fromEntries(Object.entries(r).map(([k, p]) => [k2(k), esp(p)])) } : undefined;
+  const pasos: Pasos = (m.pasos ?? []).map((p) => ({
+    m: [...(p.m ?? []).map(([k, t, ...pts]) => [k, t, ...pts.map(lado1)] as Mov), ...(p.m ?? []).map(([k, t, ...pts]) => [k[0] === "d" ? "d" + k2(k.slice(1)) : k2(k), t, ...pts.map(esp)] as Mov)],
+    ...(p.dm ? { dm: [...p.dm.map(([k, ...pts]) => [k, ...pts.map(lado1)] as [string, ...P[]]), ...p.dm.map(([k, ...pts]) => [k2(k), ...pts.map(esp)] as [string, ...P[]])] } : {}),
+    ...(p.pase ? { pases: [p.pase, [k2(p.pase[0]), k2(p.pase[1])]] as [string, string][] } : {}),
+    ...(p.mano ? { mano: p.mano, pases: [[k2(p.mano[0]), k2(p.mano[1])]] as [string, string][] } : {}),
+    ...(p.tiro ? { tiros: [p.tiro, k2(p.tiro)] } : {}),
+  }));
+  return { ...m, at: dup(m.at), df: dup(m.df), defensa: "ninguna", balon: undefined, balones: [balon, k2(balon)], pasos };
+};
 for (const s of SALIDAS) for (const f of FINALES) {
   if (s.clave === "closeout" && f.clave === "cs") continue;
+  const balon = s.clave === "dho" ? "5" : s.at["1"] ? "1" : Object.keys(s.at)[0];
+  const n = Object.keys(s.at).length * 2 + (s.clave === "closeout" ? 2 : 0);
   tiroMov.push(ej({
-    titulo: `Tiro: ${s.nombre} + ${f.nombre}`, categoria: "Tiro", edades: ADULTOS, duracion: 10, jugadores: s.clave === "closeout" ? 3 : 3, material: "2-3 balones",
+    titulo: `Tiro: ${s.nombre} + ${f.nombre}`, categoria: "Tiro", edades: ADULTOS, duracion: 10, jugadores: n + 2, material: "4 balones",
     objetivos: `Tiro con ritmo de partido tras ${s.nombre} · ${f.nombre}`,
-    descripcion: unir(s.desc, "Final:", f.desc, "Series de 1 minuto por lado o de 10 canastas; el pasador recoge el rebote y cambia de rol. Variante competitiva: contar canastas y comparar con el récord del equipo."),
-    correcciones: f.corr, etiquetas: ["tiro", s.clave, f.clave, "tiro en movimiento"], video: yt(s.ing),
-    montaje: { ...conFinal(s, f), balon: s.clave === "dho" ? "5" : s.at["1"] ? "1" : Object.keys(s.at)[0] },
+    descripcion: unir(s.desc, "Final:", f.desc, `Se trabaja a la vez en los dos lados de la pista (dos grupos con dos balones cada uno y una fila de espera detrás de cada puesto, ${n + 2} jugadores). Tras tirar: el tirador coge su rebote y pasa a la fila del pasador, el pasador a la del bloqueador y el bloqueador a la de tiradores. Series de 2 minutos contando canastas por lado; el lado que pierde, una carrera.`),
+    correcciones: f.corr, etiquetas: ["tiro", s.clave, f.clave, "tiro en movimiento", "dos lados"], video: yt(s.ing),
+    montaje: enDosLados({ ...conFinal(s, f) }, balon),
   }));
 }
 // Series de tiro de equipo con formato competitivo
@@ -531,14 +554,14 @@ const SITUACIONES_FIN: Sit[] = [
     at: { "1": [17, 9], "2": [17, 4] }, df: { "1": [23.6, 7.5] }, pasos: [{ m: [bota("1", [22.6, 9.0]), corre("2", [24.6, 4.4])], dm: [["1", [23.4, 8.4]]] }, { m: [bota("1", [25.4, 8.8])], dm: [["1", [24.8, 6.2]]] }, { tiro: "1" }] },
 ];
 /** El último tramo hacia el aro según la técnica */
-const rematar = (pasos: Pasos, quien: string, tec: string): Pasos => {
+const rematar = (pasos: Pasos, quien: string, tec: string, at: Record<string, P>): Pasos => {
   const out = pasos.map((p) => ({ ...p, ...(p.m ? { m: p.m.map((x) => [...x] as Mov) } : {}) }));
   let iMov = -1, j = -1;
   out.forEach((p, i) => p.m?.forEach((x, k) => { if (x[0] === quien && x[1] !== "bloqueo") { iMov = i; j = k; } }));
   if (iMov < 0) return out;
   const mv = out[iMov].m![j] as Mov;
   const pts = mv.slice(2) as P[];
-  const fin = pts[pts.length - 1], ant = pts.length > 1 ? pts[pts.length - 2] : fin;
+  const fin = pts[pts.length - 1], ant = pts.length > 1 ? pts[pts.length - 2] : posTras(at, out.slice(0, iMov))[quien];
   const u: P = [fin[0] - ant[0], fin[1] - ant[1]], n = Math.hypot(u[0], u[1]) || 1, perp: P = [-u[1] / n, u[0] / n];
   const l = lado(fin);
   let nuevos: P[] = pts;
@@ -548,6 +571,10 @@ const rematar = (pasos: Pasos, quien: string, tec: string): Pasos => {
   else if (tec === "parada") nuevos = [...pts.slice(0, -1), hacia(fin, ant, 0.25)];
   else if (tec === "pasos") nuevos = [...pts.slice(0, -1), [r1(fin[0] + perp[0] * 0.8), r1(fin[1] + perp[1] * 0.8)], fin];
   else if (tec === "tabla") nuevos = [...pts.slice(0, -1), [24.4, r1(7.5 + l * 2.2)]];
+  else if (tec === "manoc") nuevos = [...pts.slice(0, -1), [26.0, r1(7.5 + l * 0.3)]];
+  else if (tec === "fuerza") nuevos = [...pts.slice(0, -1), [25.4, r1(7.5 + l * 1.4)], [25.6, r1(7.5 + l * 1.3)]];
+  else if (tec === "cuchara") nuevos = [...pts.slice(0, -1), [r1(fin[0] - 0.6), r1(fin[1] + l * 0.9)], [25.6, r1(7.5 + l * 0.7)]];
+  else if (tec === "interior") nuevos = [...pts.slice(0, -1), [r1(fin[0] + perp[0] * 0.6), r1(fin[1] + perp[1] * 0.6)]];
   out[iMov].m![j] = [mv[0], mv[1], ...nuevos];
   return out;
 };
@@ -557,7 +584,7 @@ for (const f of FINALIZACIONES) for (const s of SITUACIONES_FIN) finalizaciones.
   objetivos: `Dominar la ${f.nombre} en situación real (${s.nombre})`,
   descripcion: unir(s.desc, "Técnica a usar:", f.tec, "Primero sin oposición (5 por lado), después con el defensor real. Se cuentan canastas por serie de 10."),
   correcciones: "Leer al defensor antes del último bote · Proteger el balón con el cuerpo y el brazo libre · Terminar arriba y suave, a tabla si hay ángulo · Seguir la jugada al rebote si falla",
-  etiquetas: ["finalización", f.clave, s.clave], video: yt(f.ing), montaje: { at: s.at, df: s.df, defensa: "ninguna", balon: "1", pasos: rematar(s.pasos, s.quien, f.clave) },
+  etiquetas: ["finalización", f.clave, s.clave], video: yt(f.ing), montaje: { at: s.at, df: s.df, defensa: "ninguna", balon: "1", pasos: rematar(s.pasos, s.quien, f.clave, s.at) },
 }));
 
 // ============================================================================
@@ -594,11 +621,10 @@ const SHELL: Shell[] = [
     f5: { at: A5, balon: "1", pasos: [{ m: [bota("1", [20.4, 10.6]), corre("2", [21.4, 11.6])] }, { mano: ["1", "2"] }, { m: [bota("2", [23.2, 9.8])] }] } },
 ];
 const shell: EjercicioSemilla[] = [];
-for (const s of SHELL) for (const fmt of [{ c: "4c4", j: 8, jg: s.f4 }, { c: "5c5", j: 10, jg: s.f5 }])
-  for (const fase of [{ suf: "a medio ritmo", d: "Primero a medio ritmo, el entrenador para el juego para corregir posiciones." }, { suf: "en vivo", d: "En vivo: tras 4 pases el ataque puede atacar y se juega hasta canasta o rebote defensivo." }]) {
+for (const s of SHELL) for (const fmt of [{ c: "4c4", j: 8, jg: s.f4 }, { c: "5c5", j: 10, jg: s.f5 }]) {
     shell.push(ej({
-      titulo: `Shell ${fmt.c}: ${s.nombre} (${fase.suf})`, categoria: "Defensa", edades: ADULTOS, duracion: 12, jugadores: fmt.j, material: "1 balón",
-      objetivos: `Defensa de equipo: ${s.nombre}`, descripcion: unir(`${fmt.c} en media pista.`, s.desc, fase.d),
+      titulo: `Shell ${fmt.c}: ${s.nombre}`, categoria: "Defensa", edades: ADULTOS, duracion: 12, jugadores: fmt.j, material: "1 balón",
+      objetivos: `Defensa de equipo: ${s.nombre}`, descripcion: unir(`${fmt.c} en media pista.`, s.desc, "Primero a medio ritmo, con el entrenador parando para corregir posiciones; después en vivo: tras 4 pases el ataque puede atacar y se juega hasta canasta o rebote defensivo."),
       correcciones: s.corr, etiquetas: ["shell", "defensa de equipo", s.clave, fmt.c, "rotaciones"], video: yt(s.ing),
       montaje: { at: fmt.jg.at, defensa: "individual", balon: fmt.jg.balon, pasos: fmt.jg.pasos },
     }));
@@ -617,7 +643,7 @@ const CIERRES: { t: string; d: string; j: number; m: Montaje }[] = [
   { t: "Cierres en cadena (rueda de 4)", d: "Cuatro atacantes en el arco y dos defensores dentro: con cada pase cierra el defensor más cercano al receptor y el otro vuelve a la ayuda, sin parar.", j: 6,
     m: { at: { "1": S.alaI, "2": S.cabeza, "3": S.alaD, "4": S.esqD }, df: { "1": [23.4, 4.6], "2": [23.4, 10.4] }, defensa: "zonaLibre", balon: "1", pasos: [{ pase: ["1", "2"] }, { pase: ["2", "3"] }, { pase: ["3", "4"] }] } },
 ];
-for (const c of CIERRES) for (const v of [{ s: "", e: "" }, { s: " (con penalización por falta)", e: "Si el defensor hace falta o salta al tirador, vuelve a la pintura y repite." }]) shell.push(ej({
+for (const c of CIERRES) for (const v of [{ s: "", e: "Si el defensor hace falta o salta al tirador, vuelve a empezar." }]) shell.push(ej({
   titulo: c.t + v.s, categoria: "Defensa", edades: MAYORES, duracion: 10, jugadores: c.j, material: "2 balones",
   objetivos: "Cerrar al tirador sin ser superado · Pasos cortos y mano arriba",
   descripcion: unir(c.d, v.e, "Series de 6 cierres por jugador."),
@@ -851,10 +877,12 @@ const DEF_ZONA: DefZona[] = [
 ];
 for (const z of ZONAS) for (const s of DEF_ZONA) zona.push(ej({
   titulo: `Defensa en zona ${z.n}: ${s.n}`, categoria: "Defensa", edades: MAYORES, duracion: 12, jugadores: 10, material: "1 balón",
-  objetivos: `Zona ${z.n}: ${s.n}`, descripcion: unir(`5c5 media pista, la defensa en zona ${z.n}; el ataque se coloca contra ella (${z.impar ? "frente impar 1-3-1" : "frente par 2-1-2"}).`, s.d[z.c], "Primero sin tirar, a medio ritmo y con el entrenador parando para corregir; luego en vivo."),
+  objetivos: `Zona ${z.n}: ${s.n}`, descripcion: unir(`5c5 media pista, la defensa en zona ${z.n}; el ataque se coloca contra ella (${z.impar ? "frente impar 1-3-1" : "frente par 2-1-2"}).`, z.c === "match" && "Para empezar, el 5 corta del poste alto a la esquina corta: su defensor le sigue y los demás se reemparejan.", s.d[z.c], "Primero sin tirar, a medio ritmo y con el entrenador parando para corregir; luego en vivo."),
   correcciones: "Manos arriba y activas · Moverse mientras el balón está en el aire · Hablar en cada pase · Cerrar el rebote buscando al más cercano",
   etiquetas: ["defensa en zona", z.c, s.c], video: yt(`${z.c === "match" ? "match up" : z.n} zone defense drill`),
-  montaje: { at: z.impar ? IMPAR : PAR, defensa: z.c, balon: "1", pasos: z.impar ? s.impar : s.par },
+  montaje: { at: z.impar ? IMPAR : PAR, defensa: z.c, balon: "1",
+    // En la match-up, el 5 corta del poste alto a la esquina corta y su defensor le sigue (no se queda en su sitio)
+    pasos: z.impar ? s.impar : z.c === "match" ? [{ m: [corre("5", [24.6, 9.0], [26.8, 11.8])] }, ...s.par.map((p) => ({ ...p, m: p.m?.filter(([k]) => k !== "5") }))] : s.par },
 }));
 
 // ============================================================================
@@ -1082,11 +1110,11 @@ const DEF_IND_BAL: { c: string; n: string; d: string; m: (ayuda: boolean) => Mon
     m: (ay) => ({ at: { "1": S.alaD }, df: { "1": [22.0, 11.6], ...(ay ? { "4": [24.4, 6.6] } : {}) }, entrenador: S.cabeza, balon: "1", defensa: "ninguna", pasos: [{ pase: ["1", "e"], dm: [["1", [21.6, 10.6]]] }, { m: [corre("1", [23.0, 11.6], [25.6, 9.4])], dm: [["1", [23.6, 10.0]]] }] }) },
 ];
 const defensa: EjercicioSemilla[] = [];
-for (const d of DEF_IND_BAL) for (const v of [{ s: "", e: "", j: 2, ay: false }, { s: " (con ayuda)", e: "Se añade un compañero de ayuda en el lado débil: si el defensor es superado, la ayuda llega y hay que recuperar.", j: 4, ay: true }, { s: " (competición)", e: "Se cuentan paradas defensivas: el que más consiga en 5 intentos gana.", j: 2, ay: false }]) {
+for (const d of DEF_IND_BAL) for (const v of [{ s: "", e: "", j: 2, ay: false }, { s: " (con ayuda)", e: "Se añade un compañero de ayuda en el lado débil: si el defensor es superado, la ayuda llega y hay que recuperar.", j: 4, ay: true }, ]) {
   if (v.ay && (d.c === "zigzag" || d.c === "parar")) continue;
   defensa.push(ej({
     titulo: `Defensa: ${d.n}${v.s}`, categoria: "Defensa", edades: MAYORES, duracion: 10, jugadores: v.j, material: "1 balón",
-    objetivos: "Defensa individual del balón y del jugador sin balón", descripcion: unir(d.d, v.e),
+    objetivos: "Defensa individual del balón y del jugador sin balón", descripcion: unir(d.d, v.e, "En competición: se cuentan paradas defensivas en 5 intentos."),
     correcciones: "Posición baja, pies más anchos que los hombros · No cruzar los pies · Mano activa en el balón sin buscar el robo · Cabeza por delante del atacante",
     etiquetas: ["defensa individual", d.c], video: yt(`${d.c === "poste" ? "post defense" : d.c === "corte" ? "jump to the ball" : "on ball defense"} drill`),
     montaje: d.m(v.ay),
@@ -1188,9 +1216,203 @@ const reboteExt = REB_EXT.flatMap((r) => [{ s: "", e: "" }, { s: " (competición
   etiquetas: ["rebote", "rebote ofensivo"], video: yt("rebounding drills basketball"), montaje: r.m,
 })));
 
+// ============================================================================
+// R) EJERCICIOS DE EQUIPO QUE COMPARTEN ENTRENADORES (redes, clínics y bibliotecas de ejercicios):
+//    muchas filas, varios balones y todos los jugadores activos. Redactados para el club.
+// ============================================================================
+type Equipo = { t: string; cat: string; j: number; bal: string; d: string; corr: string; obj: string; et: string[]; video: string; ed?: string[]; m: Montaje };
+const EQUIPO: Equipo[] = [
+  // ---------------------------------------------------------------- TIRO
+  { t: "Tiro Maryland: 3 filas, 4 balones y por minutos", cat: "Tiro", j: 10, bal: "4 balones", video: "Maryland shooting drill basketball", et: ["tiro", "3 filas", "competición", "por minutos"],
+    obj: "Mucho volumen de tiro con pase, rebote y comunicación · Tirar con cansancio y con prisa",
+    d: "Tres filas: una en la cabeza (con dos balones), otra en la esquina derecha y otra en el ala izquierda (con dos balones). La cabeza pasa a la esquina, que tira; ese tirador sube corriendo a la parte alta del arco y recibe un segundo balón del ala izquierda para volver a tirar. Cada uno coge su rebote y se va a la fila que toca sin que el entrenador lo diga (tienen que organizarse hablando). Un minuto por posición: minuto 1 esquina y arriba, minuto 2 las dos alas, minuto 3 esquina contraria; luego se cambia de canasta. Canastas de 2 y de 3 puntúan; se apunta el total de cada minuto para batir el récord. Idea de Mike Neighbors (Maryland / Arkansas).",
+    corr: "Pase al bolsillo de tiro y en el momento en que el tirador llega · Pies preparados antes del balón · Rebote propio sin dejar que bote dos veces · Hablar: nombre del receptor en cada pase",
+    m: { at: { "1": S.cabeza, "4": [17.8, 7.5], "2": S.esqD, "5": [27.4, 14.6], "3": S.alaI, "6": [19.8, 1.4] }, balones: ["1", "3"],
+      pasos: [{ pase: ["1", "2"] }, { tiro: "2" }, { m: [corre("2", [24.6, 12.4], [20.0, 9.6]), corre("1", [26.2, 13.6])] }, { pase: ["3", "2"] }, { tiro: "2" }] } },
+  { t: "Tiro Hurricanes: pase a la esquina corta y skip a la otra ala", cat: "Tiro", j: 9, bal: "3 balones", video: "Miami Hurricanes shooting drill skip pass", et: ["tiro", "skip pass", "dos filas"],
+    obj: "Tiro tras pase interior-exterior y tras pase por encima · Recepción con los pies preparados",
+    d: "Dos pasadores arriba (con balón), uno en la esquina corta derecha y dos filas de tiradores, una en cada ala. Un pasador de arriba pasa al ala derecha, que se la entrega al de la esquina corta; este hace un pase cruzado por encima al ala izquierda mientras el otro pasador de arriba vuelve a dar balón al ala derecha. Tiran los dos aleros a la vez, cogen su rebote y cambian de fila. Cada fila tiene que llegar a un número de canastas (por ejemplo 15) antes que la otra. Inspirado en el ejercicio de tiro de los Miami Hurricanes.",
+    corr: "El del ala derecha pasa y se recoloca (paso atrás) para volver a recibir · Pase cruzado tenso, a la altura del pecho · Recibir con el pie interior adelantado",
+    m: { at: { "1": [19.2, 8.6], "4": [19.2, 6.4], "5": [26.4, 11.8], "2": S.alaD, "7": [19.8, 13.6], "3": S.alaI, "6": [19.8, 1.4] }, balones: ["1", "4"],
+      pasos: [{ pase: ["1", "2"] }, { pase: ["2", "5"], m: [corre("2", [20.6, 12.8])] }, { pases: [["5", "3"], ["4", "2"]] }, { tiros: ["2", "3"] }, { m: [corre("2", [19.8, 1.4]), corre("3", [19.8, 13.6])] }] } },
+  { t: "Tiro en las 4 esquinas con bloqueos (curl, abrirse, puerta atrás)", cat: "Tiro", j: 10, bal: "4 balones", video: "4 corner shooting drill screens", et: ["tiro", "bloqueos", "lectura", "4 filas"],
+    obj: "Leer el bloqueo indirecto a velocidad de partido y anunciar el corte · Tirar tras curl, salida abierta o puerta atrás",
+    d: "Dos pasadores arriba con balón (uno a cada lado) y en cada lado un bloqueador en el ala y un cortador en la esquina corta. A la vez en los dos lados: el bloqueador baja a bloquear y el cortador elige y grita su salida: rodear hacia el codo (curl), abrirse a la esquina (fade) o salir recto. Recibe del pasador de su lado y tira. Rotación: el tirador coge el rebote y va a la fila de pasadores, el pasador pasa a bloquear y el bloqueador a cortar. Cada vuelta se cambia la salida obligatoria.",
+    corr: "El cortador lleva a su defensor imaginario hacia abajo antes de salir · Grita la salida antes de usar el bloqueo · El bloqueador se gira hacia el balón tras el contacto · Pase cuando el cortador sale del bloqueo, no antes",
+    m: { at: { "1": [19.6, 9.4], "4": [19.6, 5.6], "2": [22.4, 11.8], "3": [26.4, 11.4], "5": [22.4, 3.2], "6": [26.4, 3.6] }, balones: ["1", "4"],
+      pasos: [{ m: [bloq("2", [24.0, 10.8]), bloq("5", [24.0, 4.2])] }, { m: [corre("3", [24.8, 10.2], [22.6, 9.0]), corre("6", [25.8, 3.0], [26.8, 1.4])] }, { pases: [["1", "3"], ["4", "6"]] }, { tiros: ["3", "6"] }] } },
+  { t: "Tiro IU: tres pasadores bajo el aro, de la esquina al ala", cat: "Tiro", j: 9, bal: "3 balones", video: "IU shooting drill basketball", et: ["tiro", "3 filas", "rueda"],
+    obj: "Tiro con ritmo alto y rotación continua · Pase extra de la esquina al ala",
+    d: "Tres jugadores bajo el aro con un balón cada uno, una fila en la esquina y otra en el ala del mismo lado. El primero de abajo pasa a la esquina, la esquina pasa al ala y el ala tira. El tirador coge su rebote y se queda bajo el aro como pasador; el de la esquina sube a la fila del ala y el pasador va a la esquina. Por tiempo o por canastas en cada uno de los 5 puntos (esquina, ala y cabeza de cada lado).",
+    corr: "El de la esquina recibe y pasa sin botar · El tirador espera el pase con las manos arriba · Rebote rápido y pase al siguiente",
+    m: { at: { "1": [27.2, 6.8], "4": [27.2, 7.8], "7": [27.2, 8.8], "2": S.esqD, "5": [27.6, 14.6], "3": S.alaD, "6": [19.8, 13.6] }, balones: ["1", "4", "7"],
+      pasos: [{ pase: ["1", "2"] }, { pase: ["2", "3"] }, { tiro: "3" }, { m: [corre("3", [26.6, 9.6]), corre("2", [21.4, 13.0]), corre("1", [26.8, 13.6])] }, { pase: ["4", "5"] }] } },
+  { t: "Tiro con penetración y relleno: esquina y ala (12 minutos)", cat: "Tiro", j: 8, bal: "4 balones", video: "drive and fill shooting drill", et: ["tiro", "drive and kick", "relleno", "por tiempo"],
+    obj: "Tirar tras el pase de la penetración y rellenar el espacio correcto · Volumen alto de tiro",
+    d: "Un pasador bajo el aro con balones, una fila en la esquina y otra en el ala. Primer balón: tiro de la esquina. Segundo balón: el de la esquina penetra por la línea de fondo y el del ala se desliza hasta la esquina (rellena por detrás, sin atajar) para recibir y tirar. Cada 2-3 minutos cambian las posiciones (ala y cabeza, cabeza y ala contraria, esquina contraria) hasta completar 12 minutos. Se puede añadir un cierre en cada tiro.",
+    corr: "Rellenar hasta la esquina del todo (no quedarse a medio camino) · El que penetra fija la ayuda antes de pasar · Pase al lado de la mano de tiro",
+    m: { at: { "5": [26.6, 8.8], "8": [26.6, 7.6], "2": S.esqD, "4": [27.6, 14.6], "3": S.alaD, "6": [19.8, 13.6] }, balones: ["5", "8"],
+      pasos: [{ pase: ["5", "2"] }, { tiro: "2" }, { pase: ["8", "4"], m: [corre("4", [26.8, 13.8])] }, { m: [bota("4", [26.0, 11.2]), corre("3", [24.0, 13.6], [26.8, 14.0])] }, { pase: ["4", "3"] }, { tiro: "3" }] } },
+  { t: "Tiro con cortes desde la línea de fondo (dos filas cruzadas)", cat: "Tiro", j: 8, bal: "4 balones", video: "endline cutter shooting drill", et: ["tiro", "cortes", "dos filas"],
+    obj: "Recibir en movimiento tras cortar · Pies de tiro en la recepción (paso interior)",
+    d: "Dos filas en la línea de fondo, a los lados de la zona, con balón todos menos el primero de una fila. El primero cruza la zona y sale al codo contrario, recibe del primero de la otra fila y tira en suspensión. En cuanto pasa, el pasador corta en sentido contrario hacia el otro codo y recibe del siguiente. Sin botar. Cada uno coge su rebote y va a la fila contraria. Se empieza cerca del aro, luego desde los codos y al final desde el arco.",
+    corr: "Corte en ángulo y bajo, con el pie interior para frenar · Pedir el balón con las manos · El pase llega al bolsillo de tiro, no a los pies",
+    m: { at: { "2": [27.4, 9.8], "4": [27.4, 11.0], "1": [27.4, 5.2], "3": [27.4, 4.0] }, balones: ["1", "4"],
+      pasos: [{ m: [corre("2", [25.0, 8.6], [22.8, 5.8])] }, { pase: ["1", "2"] }, { tiro: "2", m: [corre("1", [25.0, 6.4], [22.8, 9.2])] }, { pase: ["4", "1"] }, { tiro: "1" }] } },
+  { t: "Tiro desde las alas con corte en V (dos filas, rebotador)", cat: "Tiro", j: 9, bal: "4 balones", video: "sideline v cut shooting drill", et: ["tiro", "corte en V", "dos filas"],
+    obj: "Ganar la recepción con un corte en V y tirar equilibrado",
+    d: "Dos filas en las alas (a la altura de la prolongación del tiro libre) y un rebotador bajo el aro. El primero de una fila hace un corte en V hacia la otra fila, recibe del primero de esa fila y tira. El que ha pasado es el siguiente en cortar hacia el lado contrario. El rebotador coge el balón y lo lleva botando con la mano débil a la fila de la que salió el pase. Se tira y se queda (no se sigue el tiro), como en partido.",
+    corr: "Llevar al defensor hacia el aro y salir con cambio de ritmo · Pivotar sobre el pie interior · Caer en el mismo sitio del salto",
+    m: { at: { "1": S.alaI, "3": [19.8, 1.4], "2": S.alaD, "4": [19.8, 13.6], "5": [26.6, 7.5] }, balones: ["1", "3"],
+      pasos: [{ m: [corre("2", [23.4, 11.0], [20.6, 9.4])] }, { pase: ["1", "2"] }, { tiro: "2", m: [corre("1", [23.4, 4.0], [20.6, 5.6])] }, { pase: ["3", "1"], rebote: "5" }, { tiro: "1" }] } },
+  { t: "Entradas en 3 filas con puerta atrás (rebotador y 3 balones)", cat: "Tiro", j: 10, bal: "3 balones", video: "3 line backdoor layup drill", et: ["finalización", "puerta atrás", "3 filas", "calentamiento"],
+    obj: "Puerta atrás leyendo el bote del compañero · Finalizar con las dos manos en carrera",
+    d: "Tres filas (ala izquierda con balones, cabeza y ala derecha) y un rebotador bajo el aro. El ala izquierda pasa a la cabeza, que bota uno o dos veces hacia el ala derecha; el del ala derecha amaga subir y corta por la espalda (puerta atrás), recibe y finaliza. El rebotador coge y pasa a la fila del balón. Rotación: cada uno a la fila siguiente y el que finaliza pasa a rebotear. Variantes: pase bombeado en el segundo pase, defensor pasivo y el mismo trabajo por la izquierda.",
+    corr: "El que bota hacia el ala es la señal para cortar · Amago creíble hacia arriba y corte explosivo · Pase picado al lado del aro",
+    m: { at: { "3": S.alaI, "6": [19.8, 1.4], "1": S.cabeza, "7": [17.8, 7.5], "2": S.alaD, "8": [19.8, 13.6], "4": [27.0, 8.6] }, balones: ["3", "6"],
+      pasos: [{ pase: ["3", "1"] }, { m: [bota("1", [20.0, 9.8]), corre("2", [20.4, 13.0], [25.4, 9.2])] }, { pase: ["1", "2"] }, { tiro: "2" }, { rebote: "4" }, { pase: ["4", "6"] }] } },
+  { t: "Tiro 45: nueve puntos, triple y media distancia (contra un récord)", cat: "Tiro", j: 8, bal: "2 balones por canasta", video: "45 point shooting drill basketball", et: ["tiro", "competición", "9 puntos"],
+    obj: "Tiro de 3 y tiro tras finta en 9 puntos · Competir contra una marca",
+    d: "Medio equipo en cada canasta. En cada uno de los 9 puntos del arco (desde una esquina hasta la otra): un triple y, tras finta de tiro, un bote hacia dentro y tiro de media distancia. El rebotador coge el triple y le pasa; tras la media distancia, el tirador pasa a rebotear para el siguiente. Triple = 3 puntos, media = 2 (máximo 45). Quien no llega a la marca del equipo hace una penalización breve.",
+    corr: "La finta vende el tiro (balón arriba y mirada al aro) · Un solo bote fuerte · Mismo gesto de tiro en los 9 puntos",
+    m: { conos: [[26.6, 1.4], [23.4, 1.8], [21.2, 3.4], [19.9, 5.4], [19.6, 7.5], [19.9, 9.6], [21.2, 11.6], [23.4, 13.2], [26.6, 13.6]], at: { "1": [26.6, 1.4], "2": [26.4, 6.4], "3": [24.4, 2.6] }, balon: "2",
+      pasos: [{ pase: ["2", "1"] }, { tiro: "1" }, { rebote: "2" }, { pase: ["2", "1"] }, { m: [bota("1", [25.2, 3.0])] }, { tiro: "1" }] } },
+  { t: "Tiro Knicks: dos triples, sprint a medio campo y triple cansado", cat: "Tiro", j: 12, bal: "2 balones por grupo", video: "Knicks shooting drill sprint", et: ["tiro", "fatiga", "transición"],
+    obj: "Tirar de 3 cansado y en transición, como en los finales de cuarto",
+    d: "Grupos de tres por canasta (un tirador y dos pasadores con balón bajo el aro). El tirador tira dos triples seguidos desde la esquina; tras el segundo, sprint hasta el medio campo y vuelta a la esquina para recibir y tirar otro triple, y así hasta cinco triples por puesto. Luego pasa al ala y repite. Se cuentan canastas; se rota el tirador. Con 4 grupos (dos por canasta) trabaja todo el equipo.",
+    corr: "Volver a la esquina pisando la línea y frenar antes de recibir · Mismos pies de tiro aunque llegues cansado · Pases puntuales para no romper el ritmo",
+    m: { at: { "1": S.esqD, "2": [26.4, 8.6], "3": [26.4, 9.8] }, balones: ["2", "3"],
+      pasos: [{ pase: ["2", "1"] }, { tiro: "1" }, { pase: ["3", "1"] }, { tiro: "1" }, { m: [corre("1", [14.6, 13.6], [26.8, 13.8])], rebote: "2" }, { pase: ["2", "1"] }, { tiro: "1" }] } },
+  { t: "Tiro en transición: 3 carriles, esquinas y trailer", cat: "Tiro", j: 10, bal: "3 balones", video: "full court transition shooting drill trailer", et: ["tiro", "transición", "toda la pista", "trailer"],
+    obj: "Correr los carriles y tirar en transición desde la esquina y como trailer",
+    d: "Cuatro filas en un fondo: el base en el centro con balón, dos aleros en las bandas y el trailer detrás. Los aleros corren hasta las esquinas del otro lado, el base sube botando y pasa a una esquina para tirar de 3; el trailer llega por detrás a la cabeza y recibe un segundo balón de un pasador que espera bajo el aro. Los tiradores cogen su rebote y vuelven por las bandas a la fila contraria. Continuo durante 4-5 minutos.",
+    corr: "Los aleros llegan a la esquina antes que el balón · El trailer llega a la cabeza en el momento del primer tiro · El base pasa sin parar el bote",
+    m: { vista: "completa", at: { "1": [3, 7.5], "2": [3, 2], "3": [3, 13], "4": [1, 9.6], "5": [26.6, 8.6] }, balones: ["1", "5"],
+      pasos: [{ m: [bota("1", [18, 7.5]), corre("2", [18, 1.4], [27, 1]), corre("3", [18, 13.6], [27, 14]), corre("4", [14, 9.6])] }, { pase: ["1", "2"] }, { tiro: "2", m: [corre("4", [19.8, 8.4])] }, { pase: ["5", "4"] }, { tiro: "4" }] } },
+  { t: "Tiro tras bloqueo directo en 3 filas (base, bloqueador y esquina)", cat: "Tiro", j: 9, bal: "3 balones", video: "pick and roll shooting drill 3 lines", et: ["tiro", "bloqueo directo", "3 filas", "lectura"],
+    obj: "Las tres lecturas del directo sin defensa y a máxima velocidad: tiro tras bote, abrirse (pop) y pase a la esquina",
+    d: "Tres filas: bases en la cabeza (con balón), bloqueadores en el codo y tiradores en la esquina del lado contrario. El bloqueador pone el directo y el base sale botando hacia el codo; el entrenador grita la lectura: tiro tras bote, pase al bloqueador que se abre a la línea de 3 o pase a la esquina (que se desliza a la línea de visión). Cada uno coge su rebote y pasa a la fila siguiente (base → bloqueador → esquina → base).",
+    corr: "El base espera a que el bloqueo esté puesto · Salir pegado al bloqueador · El que se abre lo hace detrás de la línea, con los pies preparados · La esquina se desplaza a la vista del pasador",
+    m: { at: { "1": S.cabeza, "4": [17.8, 7.5], "5": [22.4, 9.6], "8": [22.6, 11.0], "3": S.esqI, "6": [27.6, 0.4] }, balones: ["1", "4"],
+      pasos: [{ m: [bloq("5", [20.4, 8.4])] }, { m: [bota("1", [21.0, 10.0], [22.8, 10.6]), corre("5", [19.8, 5.4]), corre("3", [25.4, 1.4])] }, { pase: ["1", "3"] }, { tiro: "3" }] } },
+  { t: "Tiro en rueda de mano a mano (DHO en cadena)", cat: "Tiro", j: 8, bal: "2 balones", video: "dribble handoff shooting drill", et: ["tiro", "mano a mano", "rueda"],
+    obj: "Recibir la entrega pegado al que entrega y tirar o atacar · Encadenar entregas",
+    d: "Filas en la cabeza (con balón), en las dos alas y un rebotador. La cabeza bota hacia el ala derecha y entrega en mano a mano; el receptor sale pegado y tira tras bote o finaliza. El que entrega se queda en el ala y el siguiente de la cabeza va hacia el otro lado. Rebote del tirador, pase al siguiente de la cabeza y a la fila del ala contraria. Variante: el receptor rechaza la entrega y corta por la espalda.",
+    corr: "Entregar a la altura de la cadera y bloquear con el cuerpo · El receptor sale rozando el hombro del que entrega · Leer: si su defensor pasa por debajo, tiro",
+    m: { at: { "1": S.cabeza, "4": [17.8, 7.5], "2": S.alaD, "6": [19.8, 13.6], "3": S.alaI, "5": [26.6, 7.5] }, balones: ["1", "4"],
+      pasos: [{ m: [bota("1", [20.4, 10.6]), corre("2", [21.6, 11.8])] }, { mano: ["1", "2"] }, { m: [bota("2", [22.8, 10.0])] }, { tiro: "2", m: [bota("4", [20.4, 4.4]), corre("3", [21.6, 3.2])] }, { mano: ["4", "3"] }] } },
+  { t: "Tiro con cierre en 3 filas (el pasador cierra al tirador)", cat: "Tiro", j: 9, bal: "4 balones", video: "shooting closeout drill 3 lines", et: ["tiro", "cierres", "3 filas"],
+    obj: "Tirar con un cierre encima y cerrar bien: dos trabajos en uno",
+    d: "Una fila de pasadores bajo el aro con balón y dos filas de tiradores en las alas. Dos pasadores pasan a la vez, uno a cada ala, y salen a cerrarles con la mano arriba (sin tocar ni saltar). Los aleros tiran por encima del cierre o, si el cierre llega encima, finta y un bote de ataque. Rotación: el pasador pasa a la fila de tiradores, el tirador coge su rebote y va a la fila de pasadores.",
+    corr: "Cierre: sprint y pasos cortos al final, mano arriba al lado del tiro · Tirador: no mirar al defensor, mirar el aro · Si el cierre llega muy encima, finta y bote",
+    m: { at: { "1": [26.4, 8.4], "4": [26.4, 6.6], "7": [27.4, 7.5], "2": S.alaD, "5": [19.8, 13.6], "3": S.alaI, "6": [19.8, 1.4] }, balones: ["1", "4"],
+      pasos: [{ pases: [["1", "2"], ["4", "3"]], m: [corre("1", [22.2, 11.4]), corre("4", [22.2, 3.6])] }, { tiros: ["2", "3"] }] } },
+  { t: "Tiro en estrella con 5 filas y 2 balones (pasa y sigue)", cat: "Tiro", j: 10, bal: "2 balones", video: "5 spot passing shooting drill", et: ["tiro", "5 filas", "calentamiento"],
+    obj: "Tiro de 3 desde los 5 puntos con todos moviéndose",
+    d: "Una fila en cada uno de los 5 puntos (esquinas, alas y cabeza) y dos balones. Dos pases a la vez al punto siguiente (en sentido contrario al reloj): el receptor tira, coge su rebote y se va a la fila siguiente; el pasador sigue su pase y ocupa el sitio del tirador. Cuando se llega a 10 canastas, cambia el sentido.",
+    corr: "Pase y carrera inmediata · Recibir girado hacia el aro · Rebote sin que el balón toque dos veces el suelo",
+    m: { at: { "1": S.esqI, "2": S.alaI, "3": S.cabeza, "4": S.alaD, "5": S.esqD, "6": [27.6, 0.4], "8": [17.8, 7.5], "10": [27.6, 14.6] }, balones: ["1", "3"],
+      pasos: [{ pases: [["1", "2"], ["3", "4"]] }, { tiros: ["2", "4"], m: [corre("1", [21.4, 2.2]), corre("3", [21.4, 12.8])] }] } },
+  { t: "Penetrar y doblar en cadena con 4 filas (dos lados a la vez)", cat: "Tiro", j: 8, bal: "2 balones", video: "drive and kick shooting drill 4 lines", et: ["tiro", "drive and kick", "4 filas"],
+    obj: "Penetrar por la línea de fondo, ver al que se desplaza y tirar tras el pase de la penetración",
+    d: "Cuatro filas: alas y esquinas de los dos lados, con balón en las alas. A la vez en los dos lados, el ala penetra por la línea de fondo y el de la esquina sube unos pasos (se desplaza a la línea de visión) para recibir y tirar. El tirador coge el rebote y va a la fila del ala, el que penetra a la esquina. Variante: el de la esquina corta por detrás hacia el aro en vez de subir.",
+    corr: "Penetrar con intención de anotar · Pase con una mano, sin recoger el balón · El de la esquina llega quieto antes del pase",
+    m: { at: { "1": S.alaD, "5": [19.8, 13.6], "2": S.esqD, "6": [27.6, 14.6], "3": S.alaI, "7": [19.8, 1.4], "4": S.esqI, "8": [27.6, 0.4] }, balones: ["1", "3"],
+      pasos: [{ m: [bota("1", [23.8, 11.2], [25.2, 10.4]), bota("3", [23.8, 3.8], [25.2, 4.6]), corre("2", [24.4, 13.8]), corre("4", [24.4, 1.2])] }, { pases: [["1", "2"], ["3", "4"]] }, { tiros: ["2", "4"] }] } },
+  // ---------------------------------------------------------------- DEFENSA
+  { t: "Sobrecarga 4c3: rotar con cada pase (scramble)", cat: "Defensa", j: 7, bal: "1 balón", video: "4 on 3 overload defense drill", et: ["defensa", "rotaciones", "inferioridad", "cierres"], ed: ADULTOS,
+    obj: "Defender en inferioridad: cerrar al balón, ayudar y rotar al más peligroso",
+    d: "Cuatro atacantes en el perímetro (dos alas y dos esquinas) contra tres defensores. Con cada pase, el defensor más cercano cierra al balón y los otros dos se colocan en ayuda; se permite el pase por encima (skip) y penetrar dentro del espacio de cada uno. Primero casi estático, después en vivo hasta parada o canasta. Progresión: el ataque se mueve, intercambia posiciones y bloquea; luego se añade un cuarto defensor (5c4).",
+    corr: "Moverse mientras el balón vuela · Cierre fuerte pero controlado · Hablar: quién va al balón y quién ayuda · El lado débil, siempre por debajo del balón",
+    m: { at: { "1": S.alaD, "2": S.esqD, "3": S.alaI, "4": S.esqI }, df: { "1": [22.4, 10.8], "2": [25.4, 9.6], "3": [23.6, 5.4] }, defensa: "zonaLibre", balon: "1",
+      pasos: [{ pase: ["1", "2"] }, { pase: ["2", "3"] }, { pase: ["3", "4"] }] } },
+  { t: "4c4 sin pintura (el ataque puntúa si toca la zona)", cat: "Defensa", j: 9, bal: "1 balón", video: "no paint defense drill", et: ["defensa", "contención", "ayudas"], ed: MAYORES,
+    obj: "Contener el bote y la línea de pase interior: que el balón no entre en la zona",
+    d: "4c4 con el entrenador arriba dando el primer pase. El ataque gana un punto cada vez que el balón entra en la pintura (botando o con un pase); cambia la posesión tras punto, pérdida o rebote defensivo. Primero a 3. Variantes: un punto extra si un triple toca el aro; punto para el ataque si el defensor para el bote con las manos en lugar de con los pies.",
+    corr: "Parar el bote con los pies, no con las manos · Ayudas por delante de la penetración · Negar el pase al poste por el lado del balón",
+    m: { at: { "1": S.baseI, "2": S.baseD, "3": S.esqI, "4": S.esqD }, entrenador: [17.6, 7.5], defensa: "individual", balon: "e",
+      pasos: [{ pase: ["e", "2"] }, { m: [bota("2", [22.6, 10.6], [23.8, 9.6])] }, { pase: ["2", "4"] }, { m: [bota("4", [26.4, 11.6])] }] } },
+  { t: "Cierre 1c1 en dos filas: el compañero pasa desde el aro", cat: "Defensa", j: 8, bal: "2 balones", video: "1 on 1 closeout drill two lines", et: ["defensa", "cierres", "1c1"], ed: MAYORES,
+    obj: "Cerrar, defender el 1c1 y cerrar el rebote",
+    d: "Dos defensores bajo el aro con balón y dos filas de atacantes en las alas. Uno de los defensores pasa al ala y su compañero cierra a ese atacante: sprint, mano arriba, cortar la penetración y, tras el tiro, cerrar el rebote. Progresión: primero el atacante no puede jugar hasta que el defensor le toca la mano; después juega en cuanto recibe. El que no consigue parar se queda defendiendo.",
+    corr: "Sprint los primeros pasos y frenar con pasos cortos · Mano arriba y pies orientados para cortar la penetración · Tras el tiro, contacto y rebote",
+    m: { at: { "1": S.alaD, "3": [19.8, 13.6], "2": S.alaI, "4": [19.8, 1.4] }, df: { "1": [26.4, 8.2], "2": [26.4, 6.8] }, balones: ["d2"], defensa: "ninguna",
+      pasos: [{ pase: ["d2", "1"], m: [corre("d1", [22.2, 11.6])] }, { m: [bota("1", [23.6, 12.8], [25.6, 10.8]), corre("d1", [24.4, 12.0], [25.8, 10.2])] }, { tiro: "1" }] } },
+  { t: "Hombre en el agujero: un defensor contra tres atacantes seguidos", cat: "Defensa", j: 8, bal: "1 balón por carril", video: "man in the hole defensive drill", et: ["defensa", "1c1", "toda la pista", "contención"], ed: MAYORES,
+    obj: "Contener el bote en toda la pista y recuperar cuando te superan",
+    d: "Pista dividida en 3-4 carriles. En cada carril, un defensor (el del agujero) y tres atacantes repartidos a lo largo. El primero ataca al defensor en toda la pista; al llegar donde está el segundo, le entrega el balón en mano a mano y este ataca de vuelta al defensor hacia el tercero. El defensor defiende tres veces seguidas y sale; entra el siguiente. Si le superan, se gira, corre a cortar el bote y vuelve a defender desde donde le ganaron.",
+    corr: "Parar el balón primero · Paso de empuje y sprint si te superan · No cruzar los pies en los cambios de dirección",
+    m: { vista: "completa", at: { "2": [1, 3], "4": [12, 3], "3": [24, 3] }, df: { "1": [2.4, 3.4] }, balon: "2", defensa: "ninguna",
+      pasos: [{ m: [bota("2", [6, 4.4], [11, 3.2]), corre("d1", [6.8, 4.0], [10.2, 3.0])] }, { mano: ["2", "4"] }, { m: [bota("4", [17, 1.8], [22.6, 3.4]), corre("d1", [17.6, 2.4], [21.6, 3.0])] }, { mano: ["4", "3"] }] } },
+  { t: "1c1 que se convierte en 3c3 en toda la pista", cat: "Defensa", j: 8, bal: "1 balón", video: "1 on 1 to 3 on 3 full court defense drill", et: ["defensa", "toda la pista", "3c3", "ayudas"], ed: MAYORES,
+    obj: "Contener el balón en toda la pista y defender la ventaja que llega al medio campo",
+    d: "Un atacante con balón y su defensor en un fondo; en el otro medio campo, dos parejas atacante-defensor. El atacante intenta superar a su defensor; al cruzar el medio campo se juega 3c3 en vivo. La defensa solo puede conceder un tiro y nunca una bandeja. Tras cada posesión cambian los papeles y el balón vuelve al fondo. Variante: los ganadores se quedan.",
+    corr: "El defensor del balón no deja ir en línea recta · Los del lado del balón niegan el pase · Ayudar y recuperar; ayuda desde el lado, no desde arriba",
+    m: { vista: "completa", at: { "2": [2, 7.5], "1": [20, 3], "3": [20, 12] }, df: { "2": [3.4, 7.5] }, balon: "2", defensa: "individual",
+      pasos: [{ m: [bota("2", [8, 4], [13, 10])], dm: [["2", [9, 5], [14, 9.4]]] }, { m: [bota("2", [19, 8]), corre("1", [22, 2.4]), corre("3", [22.6, 12.6])], dm: [["2", [20.2, 8.0]]] }, { pase: ["2", "3"] }] } },
+  { t: "Shell con intercambios: pasar y cambiar de sitio", cat: "Defensa", j: 8, bal: "1 balón", video: "shell drill interchange", et: ["defensa", "shell", "cortes", "saltar al balón"], ed: MAYORES,
+    obj: "Defender cortes e intercambios sin perder la posición de ayuda",
+    d: "Shell 4c4 en el perímetro. A la voz de 'intercambio', el que pasa corta hacia el aro y se va a la esquina contraria, y el de la esquina sube a ocupar su sitio. El defensor del que corta salta hacia el balón (no le deja pasar por delante) y le acompaña por debajo; el defensor del que sube niega la recepción. Después se juega en vivo.",
+    corr: "Saltar al balón en cuanto sale el pase · El cortador pasa por tu espalda, nunca por delante · Ver balón y jugador en todo momento",
+    m: { at: { "1": S.baseI, "2": S.baseD, "3": S.esqI, "4": S.esqD }, defensa: "individual", balon: "1",
+      pasos: [{ pase: ["1", "2"] }, { m: [corre("1", [24.4, 6.6], [26.8, 1.6]), corre("3", [24.4, 2.8], [19.8, 4.8])] }, { pase: ["2", "3"] }] } },
+  { t: "Shell: bloqueo hacia abajo en el lado débil (entrenador en el codo)", cat: "Defensa", j: 9, bal: "1 balón", video: "shell drill down screen defense", et: ["defensa", "shell", "bloqueo indirecto"], ed: ADULTOS,
+    obj: "Defender el bloqueo hacia abajo lejos del balón: perseguir y ayudar",
+    d: "Cuatro atacantes y cuatro defensores, el entrenador con el balón arriba. En el lado débil, el ala baja a bloquear al que está en el poste bajo, que sube al ala. El defensor del bloqueador se queda un instante en la línea del corte (ayuda) y el del cortador persigue pegado. El entrenador pasa al que sale del bloqueo y se juega en vivo cuando la defensa lo hace bien.",
+    corr: "Avisar el bloqueo ('¡bloqueo!') · Perseguir por el lado del balón · El defensor del bloqueador da un paso hacia el corte y vuelve",
+    m: { at: { "1": S.alaD, "2": S.esqD, "3": S.alaI, "4": [25.4, 5.0] }, entrenador: S.cabeza, defensa: "individual", balon: "e",
+      pasos: [{ m: [bloq("3", [24.2, 4.2])] }, { m: [corre("4", [24.8, 3.4], [21.2, 2.6])] }, { pase: ["e", "4"] }] } },
+  { t: "Shell: bloqueo de espaldas con 'portero' (proteger el aro)", cat: "Defensa", j: 9, bal: "1 balón", video: "shell drill back screen defense", et: ["defensa", "shell", "bloqueo de espaldas"], ed: ADULTOS,
+    obj: "Defender el bloqueo de espaldas: que el corte no llegue al aro",
+    d: "Cuatro atacantes y cuatro defensores; el entrenador recibe en el codo. El del poste bajo del lado débil sube a poner un bloqueo de espaldas al del codo contrario, que corta hacia el aro. El defensor más bajo del lado débil hace de 'portero': protege el aro hasta que el defensor del cortador se recupera y luego cierra a su jugador, que se ha abierto.",
+    corr: "El defensor del cortador se pone del lado del balón antes del bloqueo · El portero, en la línea del corte · Recuperar y cerrar en cuanto el cortador está cubierto",
+    m: { at: { "1": S.alaD, "2": S.alaI, "3": [25.6, 5.4], "4": S.codoI }, entrenador: S.codoD, defensa: "individual", balon: "e",
+      pasos: [{ m: [bloq("3", [23.6, 6.2])] }, { m: [corre("4", [24.4, 6.8], [26.0, 7.4]), corre("3", [23.0, 4.4])], dm: [["2", [25.6, 6.8]]] }, { pase: ["e", "3"], dm: [["2", [22.0, 3.4]]] }] } },
+  { t: "2 sprints, 2 amagos y en vivo (2c2 con el entrenador)", cat: "Defensa", j: 6, bal: "1 balón", video: "2 sprints 2 stunts defensive drill", et: ["defensa", "cierres", "stunt", "2c2"], ed: MAYORES,
+    obj: "Cerrar y volver a la ayuda con cada pase · Amagar ayuda (stunt) y recuperar",
+    d: "2c2 con el entrenador arriba. El entrenador pasa a un ala: su defensor cierra ('¡balón!') y el otro corre a la ayuda ('¡ayuda!'). Pase al otro ala: se invierten los papeles. Después, el que tiene el balón bota hacia el defensor de ayuda, que amaga salir (stunt) y vuelve cuando sale el pase. Tras cuatro pases bien defendidos se juega 2c2 en vivo. Si la defensa para, sigue defendiendo; si no habla, no corre o le anotan, sale.",
+    corr: "Hablar en cada pase · Sprint a la ayuda, no andar · Amago corto (un paso) y volver con las manos arriba",
+    m: { at: { "1": S.alaD, "2": S.alaI }, df: { "1": [24.0, 8.6], "2": [24.0, 6.4] }, entrenador: S.cabeza, defensa: "ninguna", balon: "e",
+      pasos: [{ pase: ["e", "1"], m: [corre("d1", [22.0, 11.6]), corre("d2", [23.6, 6.8])] }, { pase: ["1", "2"], m: [corre("d2", [22.0, 3.4]), corre("d1", [23.6, 8.2])] }, { m: [bota("2", [21.6, 5.2]), corre("d1", [22.6, 7.0])] }, { pase: ["2", "1"], m: [corre("d1", [22.0, 11.6]), corre("d2", [23.6, 6.8])] }] } },
+  { t: "Cierres a la posición de ayuda (3c3 sin bote)", cat: "Defensa", j: 6, bal: "1 balón", video: "3 line closeout help position drill", et: ["defensa", "posición de ayuda", "cierres", "3c3"], ed: MAYORES,
+    obj: "Que cada defensor cierre al sitio correcto aunque su jugador no reciba",
+    d: "Los tres defensores empiezan bajo el aro. El ataque se pasa el balón sin botar entre la cabeza y las alas; con cada pase, cada defensor sprinta al sitio que le toca: el del balón, encima; el que está a un pase, negando; el del lado débil, en la línea media. Se rota para que todos pasen por todos los puestos. Después se permite botar y se juega en vivo.",
+    corr: "Sprint y pasos cortos al final, también hacia la ayuda · La ayuda, en la línea media (entre el balón y el aro) · Hablar: '¡balón!', '¡ayuda!'",
+    m: { at: { "1": S.cabeza, "2": S.alaD, "3": S.alaI }, df: { "1": [26.6, 7.5], "2": [26.6, 8.6], "3": [26.6, 6.4] }, defensa: "individual", balon: "2",
+      pasos: [{ pase: ["2", "1"] }, { pase: ["1", "3"] }] } },
+  { t: "Cierres en cadena y en vivo (3c3, defensores bajo el aro)", cat: "Defensa", j: 6, bal: "1 balón", video: "Arico closeout drill 3 on 3", et: ["defensa", "cierres", "3c3", "competición"], ed: MAYORES,
+    obj: "Encadenar cierres con cada pase y pasar a jugar sin pausa",
+    d: "Tres atacantes en la cabeza y las alas; tres defensores bajo el aro. El primer defensor da el balón a la cabeza y cierra; la cabeza pasa a un ala y el mismo defensor vuelve a cerrar; el balón vuelve a la cabeza y cierra el segundo defensor, y así hasta que los tres están emparejados: entonces 3c3 en vivo hasta canasta o parada. Por equipos, 5-7 posesiones cada uno; el que pierde paga.",
+    corr: "Cerrar al balón y volver a la ayuda sin pararse · Pasos cortos al final de cada cierre · Comunicar quién se queda con quién",
+    m: { at: { "1": S.cabeza, "2": S.alaD, "3": S.alaI }, df: { "1": [26.4, 7.5], "2": [26.6, 8.8], "3": [26.6, 6.2] }, balones: ["d1"], defensa: "ninguna",
+      pasos: [{ pase: ["d1", "1"], m: [corre("d1", [20.6, 7.5])] }, { pase: ["1", "2"], m: [corre("d1", [22.0, 11.6])] }, { pase: ["2", "1"], m: [corre("d2", [20.6, 7.8])] }, { pase: ["1", "3"], m: [corre("d3", [22.0, 3.4]), corre("d1", [23.4, 9.0])] }] } },
+  { t: "4c3+1: cierre, ayuda en la línea de fondo y rotación", cat: "Defensa", j: 8, bal: "1 balón", video: "Bartzokas close out rotation drill", et: ["defensa", "rotaciones", "línea de fondo", "inferioridad"], ed: ADULTOS,
+    obj: "Cierre que manda a la línea de fondo, ayuda que para la penetración y rotación del tercero",
+    d: "Cuatro atacantes (cabeza, dos alas y una esquina) contra tres defensores más un cuarto que entra. Pase a la cabeza y luego al ala: su defensor cierra y le manda a la línea de fondo, el defensor bajo sale a parar la penetración y el de la cabeza baja a colocarse entre la esquina y el ala contraria (ayuda al que ayuda). Si el balón sale a la esquina, rota él. Tras dos transiciones se cambian los papeles. Idea del entrenador griego Giorgos Bartzokas.",
+    corr: "El cierre manda hacia la línea de fondo, donde está la ayuda · La ayuda llega antes que el atacante, fuera de la zona · El tercero rota al más cercano al aro",
+    m: { at: { "1": S.cabeza, "3": S.alaD, "4": S.esqD, "2": S.alaI }, df: { "2": [23.6, 6.0], "3": [24.4, 8.8], "1": [22.6, 7.8] }, balones: ["d2"], defensa: "ninguna",
+      pasos: [{ pase: ["d2", "1"], m: [corre("d2", [20.6, 7.2])] }, { pase: ["1", "3"], m: [corre("d3", [22.0, 11.4]), corre("d2", [22.0, 5.2])] }, { m: [bota("3", [24.0, 13.2], [25.6, 12.2]), corre("d3", [24.6, 12.6]), corre("d1", [25.8, 10.6])] }, { pase: ["3", "4"], m: [corre("d1", [26.4, 12.8]), corre("d2", [25.0, 8.6])] }] } },
+  { t: "Triple cierre: un defensor contra tres pases", cat: "Defensa", j: 4, bal: "1 balón", video: "triple closeout drill", et: ["defensa", "cierres", "condición"], ed: MAYORES,
+    obj: "Cierres repetidos con buena técnica aunque llegue el cansancio",
+    d: "Tres atacantes (ala, cabeza y ala) y un defensor bajo el aro. El balón va de un ala a la cabeza y de la cabeza al otro ala; el defensor cierra al receptor en cada pase. Al tercer cierre, el atacante juega 1c1 en vivo. El defensor repite tres veces y rota.",
+    corr: "Cada cierre igual que el primero: sprint, pasos cortos, mano arriba · No adelantarse al pase · En el 1c1 final, sin falta",
+    m: { at: { "1": S.alaI, "2": S.cabeza, "3": S.alaD }, df: { "1": [25.8, 7.5] }, defensa: "zonaLibre", balon: "1",
+      pasos: [{ pase: ["1", "2"] }, { pase: ["2", "3"] }, { m: [bota("3", [23.6, 12.6], [25.6, 10.6])] }] } },
+  { t: "3c3 negación y puerta atrás (sin bote)", cat: "Defensa", j: 6, bal: "1 balón", video: "deny defense backdoor drill 3 on 3", et: ["defensa", "negación", "puerta atrás", "3c3"], ed: MAYORES,
+    obj: "Negar la línea de pase sin que te ganen la espalda",
+    d: "3c3 sin bote: el ataque solo puede pasar y cortar. La defensa niega todos los pases cercanos (brazo y pie en la línea); cuando el atacante corta por la espalda, el defensor gira la cabeza hacia el balón, abre y le acompaña. Canasta tras puerta atrás vale doble para el ataque; cada intercepción, un punto para la defensa.",
+    corr: "Ver balón y jugador (no darle la espalda al balón) · Si corta por detrás, girar hacia el balón y seguirle · No negar tan lejos que te gane la espalda",
+    m: { at: { "1": S.cabeza, "2": S.alaD, "3": S.alaI }, defensa: "individual", balon: "1",
+      pasos: [{ m: [corre("2", [20.4, 12.0], [25.4, 9.4])] }, { pase: ["1", "2"] }, { tiro: "2" }] } },
+];
+const equipo: EjercicioSemilla[] = EQUIPO.map((x) => ej({
+  titulo: x.t, categoria: x.cat, edades: x.ed ?? MAYORES, duracion: 12, jugadores: x.j, material: x.bal, objetivos: x.obj,
+  descripcion: x.d, correcciones: x.corr, etiquetas: x.et, video: yt(x.video), montaje: x.m,
+}));
+
 export const GENERADOS: EjercicioSemilla[] = (() => {
   const todos = [...juegoReducido, ...pnr, ...indirectos, ...tiroMov, ...finalizaciones, ...shell, ...rebote, ...transicion, ...presion, ...zona, ...interior, ...unoContraUno, ...pase, ...fisico, ...calentamiento,
-    ...bote, ...defensa, ...pasesEsp, ...tiroLibre, ...reboteExt];
+    ...bote, ...defensa, ...pasesEsp, ...tiroLibre, ...reboteExt, ...equipo];
   const vistos = new Set<string>();
   return todos.filter((e) => !vistos.has(e.titulo) && vistos.add(e.titulo));
 })();
