@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, BarChart3, FileVideo, ScanSearch, SkipForward, FastForward, Flag, ListVideo, Rewind, Users, Loader2, Pause, Play, Repeat, Square, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { PREGUNTA_ESTADISTICA, analisisPista, enPista, esNegativa, esTiro, mmss, pctTiro, statVacia, sumarStat, teclasDe, valoracion, type Categoria, type Clip, type EventoVideo, type StatVideo } from "@/lib/video";
 import { archivoDe, recordarArchivo, tamanoGB } from "@/lib/archivo-local";
+import { emparejarActa } from "@/lib/acta-video";
 import { actualizarClip, borrarClip, borrarEventoVideo, crearClip, crearEventoVideo, guardarMinutosPeriodo } from "../actions";
 
 type Jugador = { id: string; nombre: string; apellidos: string | null; dorsal: number | null };
@@ -32,7 +33,7 @@ const PERIODOS = [1, 2, 3, 4, 5];
 const nombrePeriodo = (p: number) => (p === 5 ? "Pró." : `${p}º`);
 
 type Pregunta = { id: string; cat: Categoria; jugador?: string | null; resultado?: "bien" | "mal" | null; reanudar: boolean; paso?: "asistencia"; tirador?: string | null; pista: string[]; todos?: boolean; sugerido?: string | null; deteccion?: "bien" | "mal" | null };
-type JugadaFCBQ = { pts: number; dorsal: number | null; nombre: string | null };
+type JugadaFCBQ = { pts: number; dorsal: number | null; nombre: string | null; t?: number | null };
 const VELOCIDADES = [1, 1.5, 2];
 
 export default function Analizador({ videoId, youtubeId, archivo, categorias, clipsIniciales, jugadores, clipInicial, eventosIniciales, minutosPeriodo, jugadasFCBQ }: {
@@ -282,15 +283,14 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
   // Canasta o fallo por descarte con el acta: de los tiros detectados por revisar, tantos como canastas del
   // acta quedan por emparejar son canastas (los que el detector ve más claro como canasta); el resto, fallos.
   const prediccionActa = useMemo(() => {
-    const m = new Map<string, "canasta" | "fallo">();
-    if (!jugadasFCBQ?.length) return m;
-    const confirmadas = clips.filter((x) => x.estado !== "pendiente" && x.resultado === "bien" && esTiro(cat(x.categoria_id)?.estadistica)).length;
-    const restantes = Math.max(0, jugadasFCBQ.length - confirmadas);
+    if (!jugadasFCBQ?.length) return new Map<string, "canasta" | "fallo">();
+    const momento = (x: Clip) => x.fin - (cat(x.categoria_id)?.despues ?? 3);
+    // Canastas ya confirmadas (referencias de tiempo) y tiros detectados por revisar
+    const anclas = clips.filter((x) => x.estado !== "pendiente" && x.resultado === "bien" && esTiro(cat(x.categoria_id)?.estadistica))
+      .map(momento).sort((a, b) => a - b);
     const nota = (x: Clip) => (x.resultado === "bien" ? 2 : x.resultado === "mal" ? 0 : 1) + (x.confianza ?? 0.5) * 0.5;
-    [...clips].filter((x) => x.estado === "pendiente" && !x.nota?.includes("RIVAL"))
-      .sort((a, b) => nota(b) - nota(a))
-      .forEach((x, i) => m.set(x.id, i < restantes ? "canasta" : "fallo"));
-    return m;
+    const pend = clips.filter((x) => x.estado === "pendiente" && !x.nota?.includes("RIVAL")).map((x) => ({ id: x.id, t: momento(x), nota: nota(x) }));
+    return emparejarActa(jugadasFCBQ, anclas, pend);
   }, [clips, jugadasFCBQ, cat]);
 
   const clasificar = (c: Clip, k: Categoria) => {

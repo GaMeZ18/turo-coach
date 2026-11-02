@@ -27,14 +27,14 @@ export default async function VerVideo({ params, searchParams }: { params: Promi
   const partido = v.partidos as unknown as { id: string; fecha: string; rival: string; local: boolean; fcbq_stats_id: string | null } | null;
 
   // Canastas de la FCBQ (jugada a jugada) en orden, para proponer quién anota
-  let jugadasFCBQ: { pts: number; dorsal: number | null; nombre: string | null }[] | null = null;
+  let jugadasFCBQ: { pts: number; dorsal: number | null; nombre: string | null; t: number | null }[] | null = null;
   if (partido?.fcbq_stats_id) {
     const { data: st } = await supabase.from("fcbq_stats").select("datos").eq("equipo_id", v.equipo_id).eq("stats_id", partido.fcbq_stats_id).maybeSingle();
-    const d = st?.datos as { local?: { nombre?: string }; visitante?: { nombre?: string }; jugadas?: [number, number, number | null, string | null][] } | undefined;
+    const d = st?.datos as { local?: { nombre?: string }; visitante?: { nombre?: string }; jugadas?: [number, number, number | null, string | null, number?][] } | undefined;
     if (d?.jugadas?.length) {
       const turo = (x?: string) => /TURO/.test((x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase());
       const lado = turo(d.local?.nombre) ? 0 : turo(d.visitante?.nombre) ? 1 : partido.local ? 0 : 1;
-      jugadasFCBQ = d.jugadas.filter((j) => j[0] === lado).map((j) => ({ pts: j[1], dorsal: j[2], nombre: j[3] }));
+      jugadasFCBQ = d.jugadas.filter((j) => j[0] === lado).map((j) => ({ pts: j[1], dorsal: j[2], nombre: j[3], t: typeof j[4] === "number" ? j[4] : null }));
     }
   }
 
