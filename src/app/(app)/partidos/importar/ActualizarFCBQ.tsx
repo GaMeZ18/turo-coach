@@ -1,5 +1,7 @@
 "use client";
 
+const VERSION_EXTENSION = "1.6.3";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -79,6 +81,9 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
   const [informe, setInforme] = useState<string>("");
   const [copiado, setCopiado] = useState(false);
   const equipoDeStats = useRef(new Map<string, string>());
+  // Versión de la extensión instalada (la responde al saludar): si es antigua, se avisa
+  const versionExt = useRef<string | null>(null);
+  const [versionVieja, setVersionVieja] = useState<string | null>(null);
   const equiposRef = useRef(equipos);
   equiposRef.current = equipos;
 
@@ -164,11 +169,16 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
 
     const alRecibir = (e: MessageEvent) => {
       if (e.source !== window || !e.data || typeof e.data.tipo !== "string" || !e.data.tipo.startsWith("turo-fcbq-")) return;
-      const d = e.data as { tipo: string; texto?: string; paginas?: Pagina[]; avisos?: string[]; stats?: Record<string, unknown>; pendientes?: number };
+      const d = e.data as { tipo: string; texto?: string; paginas?: Pagina[]; avisos?: string[]; stats?: Record<string, unknown>; pendientes?: number; version?: string };
       if (d.tipo === "turo-fcbq-stats") { recibido = true; guardarStatsRef.current(d.stats ?? {}, d.pendientes ?? 0); }
       if (d.tipo === "turo-fcbq-pong") {
         if (!respondio && /[?&]auto=1/.test(location.search) && !autoLanzado.current) { autoLanzado.current = true; setTimeout(() => actualizarRef.current(), 300); }
         respondio = true; setInstalada(true);
+        if (d.version) {
+          versionExt.current = d.version;
+          const num = (v: string) => v.split(".").map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
+          setVersionVieja(num(d.version) < num(VERSION_EXTENSION) ? d.version : null);
+        }
       }
       if (d.tipo === "turo-fcbq-progreso") setTexto(d.texto ?? "");
       if (d.tipo === "turo-fcbq-error") {
@@ -191,7 +201,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         const enlacesEquipo = d.paginas.filter((pg) => tipo(pg.url) === "equipo").slice(0, 2)
           .map((pg) => `${pg.url}\n  ` + [...new Set([...pg.html.matchAll(/href="([^"#]+)"/g)].map((m) => m[1]).filter((h) => /competici|resultat|classific|calendari|partit/i.test(h)))].slice(0, 25).join("\n  "));
         setInforme([
-          `Coach Manager CBTuró · informe FCBQ ${new Date().toLocaleString("es-ES")}`,
+          `Coach Manager CBTuró · informe FCBQ ${new Date().toLocaleString("es-ES")} · extensión ${versionExt.current ?? "?"}`,
           `Páginas: ${Object.entries(cuenta).map(([k, v]) => `${k} ${v}`).join(", ")}`,
           `Partidos del Turó leídos: ${l.partidos.length} · con marcador: ${l.partidos.filter((x) => x.pf !== null).length}`,
           `Ligas: ${l.ligas.map((x) => `${x.nuestro} (${x.resultados.length} partidos, ${x.resultados.filter((r) => r.statsId).length} con stats, clasif. ${x.clasificacion ? "sí" : "no"})`).join("; ") || "ninguna"}`,
@@ -245,6 +255,12 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
 
   return (
     <div className="space-y-2">
+      {versionVieja && (
+        <p className="max-w-xl rounded-lg bg-oro/30 p-2 text-sm">
+          Tu navegador sigue usando la extensión <strong>{versionVieja}</strong> y la última es la <strong>{VERSION_EXTENSION}</strong>.
+          Descárgala abajo, sustituye la carpeta y pulsa recargar en la página de extensiones (o quítala y vuelve a cargarla).
+        </p>
+      )}
       <button type="button" onClick={actualizar} disabled={estado === "trabajando" || instalada === null} className="btn-primario">
         {estado === "trabajando" ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Actualizar desde la FCBQ
       </button>
