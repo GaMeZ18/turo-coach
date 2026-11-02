@@ -175,7 +175,7 @@ async function pedirStats(plantilla, idBase, ids) {
 
 // Se ejecuta DENTRO de la pestaña de basquetcatala.cat: pide un token a /jwt.php (como hace la web)
 // y descarga las estadísticas del servicio de la FCBQ
-async function apiStats(ids) {
+async function apiStats(ids, plantillaPbp, idBase) {
   const res = {};
   const txt = await fetch("/jwt.php", { credentials: "include", cache: "no-store" }).then((r) => r.text()).catch(() => "");
   const token = (txt.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/) || [])[0];
@@ -212,13 +212,17 @@ async function apiStats(ids) {
       try {
         // Primero la que viene con las estadísticas; si no, /pbp o /moves (a veces viene vacía)
         let q = pbpIncluida.length ? { ok: true, status: "incluida" } : null, pj = pbpIncluida.length ? pbpIncluida : null, ev = pbpIncluida;
-        for (const ruta of ev.length ? [] : ["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"]) {
-          q = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/${ruta}`, {
+        const rutas = [
+          ...(plantillaPbp && idBase ? [plantillaPbp.split(idBase).join(id)] : []), // la que usa la propia web
+          ...["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"].map((r) => `https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/${r}`),
+        ];
+        for (const url of ev.length ? [] : rutas) {
+          q = await fetch(url, {
             headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
           }).catch(() => null);
           if (!q || !q.ok) continue;
           pj = await q.json().catch(() => null);
-          ev = !pj ? [] : Array.isArray(pj) ? pj : pj.playByPlay || pj.events || pj.data || pj.moves || [];
+          ev = aplanar(!pj ? [] : Array.isArray(pj) ? pj : pj.playByPlay ?? pj.events ?? pj.data ?? pj.moves ?? pj);
           if (ev.length) break;
         }
         if (q && q.ok && pj) {
@@ -251,16 +255,44 @@ async function apiStats(ids) {
   return res;
 }
 
+/**
+ * Abre la pestaña de jugadas de la página de estadísticas (si la hay), espera y devuelve todas las
+ * peticiones de datos que ha hecho la página. Entre ellas está la de la jugada a jugada.
+ */
+async function descubrirPbp(tabId, avisar) {
+  avisar("Buscando la jugada a jugada en la web de la FCBQ…");
+  await chrome.scripting.executeScript({
+    target: { tabId }, world: "MAIN",
+    func: () => {
+      const es = [...document.querySelectorAll("a, button, li, [role=tab], .nav-link, .tab")];
+      for (const e of es) if (/jugad|play.?by|moviment|cronol|pbp|minut a minut/i.test(e.textContent || "")) { try { e.click(); } catch {} }
+    },
+  }).catch(() => {});
+  await esperar(4000);
+  const peticiones = await chrome.scripting.executeScript({
+    target: { tabId }, world: "MAIN", func: () => window.__turoPeticiones || [],
+  }).then((x) => x[0]?.result || []).catch(() => []);
+  // La de la jugada a jugada: una lista larga de jugadas con marcador / minuto / periodo
+  const buena = peticiones.find((p) => p.estado === 200 && p.resumen?.lista?.n >= 10 && !/\/stats\b/.test(p.url) &&
+    p.resumen.lista.campos.some((c) => /score|minute|time|period|marcador/i.test(c)));
+  return { peticiones, plantilla: buena?.url || null };
+}
+
 async function bajarEstadisticas(tabId, ids, avisar) {
   const stats = {};
+  // 0) De dónde saca la página la jugada a jugada (la pestaña ya está abierta en el primer partido)
+  const descubierto = await descubrirPbp(tabId, avisar).catch(() => ({ peticiones: [], plantilla: null }));
   // 1) Servicio de estadísticas de la FCBQ con el token de la web (lo más rápido)
   for (let i = 0; i < ids.length; i += 20) {
     avisar(`Estadísticas: ${Math.min(i + 20, ids.length)} de ${ids.length} partidos…`);
-    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20)] })
+    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla, ids[0]] })
       .then((x) => x[0]?.result || {}).catch(() => ({}));
     if (r.error) break;
+    if (r.__muestra && i === 0) r.__muestra.peticiones = descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves }));
+    if (r.__muestra) stats.__muestra = stats.__muestra ?? r.__muestra;
+    delete r.__muestra; delete r.__muestraOk;
     for (const [id, j] of Object.entries(r)) if (!j.error) stats[id] = j;
-    if (i === 0 && !Object.keys(stats).length) break;
+    if (i === 0 && !Object.keys(stats).filter((k) => k !== "__muestra").length) break;
   }
   if (ids.every((id) => stats[id])) return stats;
 
