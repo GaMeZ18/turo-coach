@@ -264,28 +264,48 @@ async function descubrirPbp(tabId, avisar) {
   await chrome.scripting.executeScript({
     target: { tabId }, world: "MAIN",
     func: () => {
-      const es = [...document.querySelectorAll("a, button, li, [role=tab], .nav-link, .tab")];
-      for (const e of es) if (/jugad|play.?by|moviment|cronol|pbp|minut a minut/i.test(e.textContent || "")) { try { e.click(); } catch {} }
+      const es = [...document.querySelectorAll("a, button, li, [role=tab], .nav-link, .tab, span, div")]
+        .filter((e) => e.children.length <= 2 && (e.textContent || "").trim().length < 40);
+      for (const e of es) if (/jugad|play.?by|moviment|cronol|pbp|minut a minut|joc a joc|accions|pas a pas|directe/i.test(e.textContent || "")) { try { e.click(); } catch {} }
     },
   }).catch(() => {});
   await esperar(4000);
-  const peticiones = await chrome.scripting.executeScript({
-    target: { tabId }, world: "MAIN", func: () => window.__turoPeticiones || [],
-  }).then((x) => x[0]?.result || []).catch(() => []);
+  const [peticiones, pestanas] = await chrome.scripting.executeScript({
+    target: { tabId }, world: "MAIN",
+    func: () => [window.__turoPeticiones || [],
+      [...new Set([...document.querySelectorAll("a, button, [role=tab], .nav-link, li")].map((e) => (e.textContent || "").trim().replace(/\s+/g, " ")).filter((t) => t && t.length < 30))].slice(0, 40)],
+  }).then((x) => x[0]?.result || [[], []]).catch(() => [[], []]);
   // La de la jugada a jugada: una lista larga de jugadas con marcador / minuto / periodo
   const buena = peticiones.find((p) => p.estado === 200 && p.resumen?.lista?.n >= 10 && !/\/stats\b/.test(p.url) &&
     p.resumen.lista.campos.some((c) => /score|minute|time|period|marcador/i.test(c)));
-  return { peticiones, plantilla: buena?.url || null };
+  return { peticiones, pestanas, plantilla: buena?.url || null };
 }
 
 async function bajarEstadisticas(tabId, ids, avisar) {
   const stats = {};
-  // 0) De dónde saca la página la jugada a jugada (la pestaña ya está abierta en el primer partido)
-  const descubierto = await descubrirPbp(tabId, avisar).catch(() => ({ peticiones: [], plantilla: null }));
+  // 0) De dónde saca la página la jugada a jugada: la pestaña ya está abierta en el primer partido;
+  //    si ahí no aparece, se prueba con los dos siguientes
+  let descubierto = { peticiones: [], pestanas: [], plantilla: null };
+  let enPagina = ids[0];
+  for (let k = 0; k < Math.min(3, ids.length) && !descubierto.plantilla; k++) {
+    if (k) { await abrirYEsperar(tabId, `${FCBQ}/estadistica/partit/${ids[k]}`, avisar).catch(() => {}); enPagina = ids[k]; }
+    const d = await descubrirPbp(tabId, avisar).catch(() => null);
+    if (d) descubierto = { peticiones: [...descubierto.peticiones, ...d.peticiones], pestanas: d.pestanas, plantilla: d.plantilla ? { url: d.plantilla, id: ids[k] } : null };
+  }
+  const diagnostico = () => {
+    stats.__muestra = {
+      version: chrome.runtime.getManifest().version,
+      descubierta: descubierto.plantilla?.url ?? null,
+      pestanas: descubierto.pestanas,
+      ...(stats.__muestra || {}),
+      peticiones: descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves })),
+    };
+    return stats;
+  };
   // 1) Servicio de estadísticas de la FCBQ con el token de la web (lo más rápido)
   for (let i = 0; i < ids.length; i += 20) {
     avisar(`Estadísticas: ${Math.min(i + 20, ids.length)} de ${ids.length} partidos…`);
-    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla, ids[0]] })
+    const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla?.url ?? null, descubierto.plantilla?.id ?? null] })
       .then((x) => x[0]?.result || {}).catch(() => ({}));
     if (r.error) break;
     if (r.__muestra) stats.__muestra = stats.__muestra ?? r.__muestra;
@@ -293,13 +313,14 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     for (const [id, j] of Object.entries(r)) if (!j.error) stats[id] = j;
     if (i === 0 && !Object.keys(stats).filter((k) => k !== "__muestra").length) break;
   }
-  if (ids.every((id) => stats[id])) return stats;
+  if (ids.every((id) => stats[id])) return diagnostico();
 
   // 2) Si no, lo que carga la propia página de estadísticas
   ids = ids.filter((id) => !stats[id]);
+  if (enPagina !== ids[0]) await abrirYEsperar(tabId, `${FCBQ}/estadistica/partit/${ids[0]}`, avisar).catch(() => {});
   const primero = await capturado(tabId, ids[0]);
   if (!primero) {
-    if (Object.keys(stats).length) return stats;
+    if (Object.keys(stats).length) return diagnostico();
     throw new Error("No he podido leer las estadísticas de la FCBQ (la página no las ha cargado).");
   }
   try { const j = JSON.parse(primero.texto); stats[ids[0]] = j; } catch {}
@@ -325,14 +346,7 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     if (c) { try { const j = JSON.parse(c.texto); stats[faltan[k]] = j; } catch {} }
   }
   for (const id of Object.keys(stats)) if (stats[id]?.error) delete stats[id];
-  // Diagnóstico siempre: versión de la extensión y peticiones de datos que hizo la web de la FCBQ
-  stats.__muestra = {
-    version: chrome.runtime.getManifest().version,
-    descubierta: descubierto.plantilla,
-    ...(stats.__muestra || {}),
-    peticiones: descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves })),
-  };
-  return stats;
+  return diagnostico();
 }
 
 // Se ejecuta en la extensión o DENTRO de la pestaña de basquetcatala.cat (con su sesión).
