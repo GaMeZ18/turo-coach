@@ -288,7 +288,6 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     const r = await chrome.scripting.executeScript({ target: { tabId }, func: apiStats, args: [ids.slice(i, i + 20), descubierto.plantilla, ids[0]] })
       .then((x) => x[0]?.result || {}).catch(() => ({}));
     if (r.error) break;
-    if (r.__muestra && i === 0) r.__muestra.peticiones = descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves }));
     if (r.__muestra) stats.__muestra = stats.__muestra ?? r.__muestra;
     delete r.__muestra; delete r.__muestraOk;
     for (const [id, j] of Object.entries(r)) if (!j.error) stats[id] = j;
@@ -326,6 +325,13 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     if (c) { try { const j = JSON.parse(c.texto); stats[faltan[k]] = j; } catch {} }
   }
   for (const id of Object.keys(stats)) if (stats[id]?.error) delete stats[id];
+  // Diagnóstico siempre: versión de la extensión y peticiones de datos que hizo la web de la FCBQ
+  stats.__muestra = {
+    version: chrome.runtime.getManifest().version,
+    descubierta: descubierto.plantilla,
+    ...(stats.__muestra || {}),
+    peticiones: descubierto.peticiones.map((p) => ({ url: p.url.slice(0, 160), estado: p.estado, lista: p.resumen?.lista, claves: p.resumen?.claves })),
+  };
   return stats;
 }
 

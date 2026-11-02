@@ -142,10 +142,8 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
       for (const [eq, lista] of porEquipo) for (let i = 0; i < lista.length; i += 25) n += await guardarStatsFCBQ(eq, lista.slice(i, i + 25));
       setNumStats(n);
       // Si no ha llegado la jugada a jugada, lo explicamos en el detalle (para poder arreglarlo)
-      if (n && !conJugada) {
-        setAvisos((a) => [...a, "La FCBQ no ha publicado la jugada a jugada de estos partidos: las sinergias se estiman con los minutos y el +/- oficial."]);
-        setInforme((t) => `${t}\nJugada a jugada: ${JSON.stringify(muestra ?? "sin muestra").slice(0, 6000)}`);
-      }
+      if (n && !conJugada) setAvisos((a) => [...a, "La FCBQ no ha publicado la jugada a jugada de estos partidos: las sinergias se estiman con los minutos y el +/- oficial."]);
+      setInforme((t) => `${t}\nEstadísticas guardadas: ${n} · con jugada a jugada: ${conJugada}\nJugada a jugada: ${JSON.stringify(muestra ?? "sin muestra").slice(0, 8000)}`);
       if (pendientesFCBQ > 0) setAvisos((a) => [...a, `Quedan ${pendientesFCBQ} partidos por descargar: vuelve a pulsar Actualizar.`]);
     } catch (e) {
       setAvisos((a) => [...a, e instanceof Error ? e.message : "No se han podido guardar las estadísticas."]);
