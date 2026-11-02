@@ -44,7 +44,7 @@ export interface StatsPartido {
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 9;
+export const VERSION_STATS = 10;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };

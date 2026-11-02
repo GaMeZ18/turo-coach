@@ -261,26 +261,40 @@ async function apiStats(ids, plantillaPbp, idBase) {
  */
 async function descubrirPbp(tabId, avisar) {
   avisar("Buscando la jugada a jugada en la web de la FCBQ…");
-  // En todos los marcos (las estadísticas pueden estar dentro de un recuadro incrustado)
-  await chrome.scripting.executeScript({
-    target: { tabId, allFrames: true }, world: "MAIN",
-    func: () => {
-      const es = [...document.querySelectorAll("a, button, li, [role=tab], .nav-link, .tab, span, div")]
-        .filter((e) => e.children.length <= 2 && (e.textContent || "").trim().length < 40);
-      for (const e of es) if (/jugad|play.?by|moviment|cronol|pbp|minut a minut|joc a joc|accions|pas a pas|directe/i.test(e.textContent || "")) { try { e.click(); } catch {} }
-    },
-  }).catch(() => {});
-  await esperar(4000);
-  const marcos = await chrome.scripting.executeScript({
+  const leer = () => chrome.scripting.executeScript({
     target: { tabId, allFrames: true }, world: "MAIN",
     func: () => ({
       marco: location.href.slice(0, 160),
       peticiones: window.__turoPeticiones || [],
       iframes: [...document.querySelectorAll("iframe")].map((f) => (f.src || "(sin src)").slice(0, 160)),
-      pestanas: [...new Set([...document.querySelectorAll("a, button, [role=tab], .nav-link, li")].map((e) => (e.textContent || "").trim().replace(/\s+/g, " ")).filter((t) => t && t.length < 30))].slice(-30),
+      // Textos cortos de pestañas/botones de la zona de estadísticas (no el menú de la federación)
+      pestanas: [...new Set([...document.querySelectorAll("main button, main [role=tab], main .nav-link, main li, app-root button, app-root [role=tab], app-root a, [class*=tab] a, [class*=tab] button, [class*=Tab]")]
+        .map((e) => (e.textContent || "").trim().replace(/\s+/g, " ")).filter((t) => t && t.length < 30))].slice(0, 40),
     }),
   }).then((x) => x.map((r) => r.result).filter(Boolean)).catch(() => []);
-  const peticiones = marcos.flatMap((m) => m.peticiones);
+  // 1) Lo que ya ha pedido la página de estadísticas al cargarse
+  await esperar(2500);
+  const antes = await leer();
+  // 2) Pulsar solo la pestaña de jugadas (sin seguir enlaces que cambien de página)
+  await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true }, world: "MAIN",
+    func: () => {
+      const objetivo = /jugada a jugada|play.?by.?play|moviments|cronolog|minut a minut|joc a joc|pas a pas/i;
+      for (const e of document.querySelectorAll("button, [role=tab], .nav-link, li, a, span")) {
+        const t = (e.textContent || "").trim();
+        if (t.length > 40 || !objetivo.test(t) || /jugador/i.test(t)) continue;
+        const a = e.closest("a");
+        const href = a?.getAttribute("href") || "";
+        if (a && href && !href.startsWith("#") && !href.startsWith("javascript")) continue; // enlace a otra página
+        try { e.click(); } catch {}
+      }
+    },
+  }).catch(() => {});
+  await esperar(3500);
+  const despues = await leer();
+  const marcos = despues.length ? despues : antes;
+  const vistas = new Set();
+  const peticiones = [...antes, ...despues].flatMap((m) => m.peticiones).filter((p) => !vistas.has(p.url) && vistas.add(p.url));
   // La de la jugada a jugada: una lista larga de jugadas con marcador / minuto / periodo
   const buena = peticiones.find((p) => p.estado === 200 && p.resumen?.lista?.n >= 10 && !/\/stats\b/.test(p.url) &&
     p.resumen.lista.campos.some((c) => /score|minute|time|period|marcador/i.test(c)));
