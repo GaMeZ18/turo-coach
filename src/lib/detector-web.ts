@@ -6,7 +6,10 @@ import {
 } from "./detector";
 
 export type Control = { parar: boolean; corregir: boolean };
-export type Avisos = { progreso?: (p: number) => void; tiros?: (n: number, restoSeg: number | null) => void };
+export type Diagnostico = { velocidad: number; fpsReal: number; msPorFotograma: number; vistoPct: number; saturadoPct: number; trayectorias: number };
+export type Avisos = { progreso?: (p: number) => void; tiros?: (n: number, restoSeg: number | null) => void; diagnostico?: (d: Diagnostico) => void };
+/** Lo que mide «recorrer» mientras reproduce (para el diagnóstico en pantalla) */
+export const medidas = { velocidad: 0, fpsReal: 0, msPorFotograma: 0 };
 
 export const MINUTOS_BUSQUEDA = 6;
 export const FPS_BUSQUEDA = 10;
@@ -51,13 +54,20 @@ export async function recorrer(v: HTMLVideoElement, desde: number, hasta: number
     v.addEventListener("ended", fin);
     const fotograma = (t: number) => {
       if (ctl.parar || ctl.corregir || t >= hasta) { fin(); return; }
-      if (t - ultimo >= 1 / fps - 0.004) { ultimo = t; cada(t); ventanaN++; }
+      if (t - ultimo >= 1 / fps - 0.004) {
+        ultimo = t;
+        const t0 = performance.now();
+        cada(t);
+        medidas.msPorFotograma = medidas.msPorFotograma * 0.9 + (performance.now() - t0) * 0.1;
+        ventanaN++;
+      }
       avance?.(t);
       if (t - ventanaT > 4) {
         const real = ventanaN / (t - ventanaT);
         if (real < fps * 0.85 && velocidad > 1) velocidad = Math.max(1, velocidad * 0.75);
         else if (real >= fps * 0.97 && velocidad < 8) velocidad = Math.min(8, velocidad * 1.2);
         v.playbackRate = velocidad;
+        medidas.velocidad = velocidad; medidas.fpsReal = real;
         ventanaT = t; ventanaN = 0;
       }
     };
@@ -149,6 +159,13 @@ export async function buscarTiros(v: HTMLVideoElement, aros: Aro[], ctl: Control
     const p = t / dur;
     av.progreso?.(p);
     av.tiros?.(segs.reduce((a, s) => a + s.eventos.length, 0), p > 0.02 ? ((ahora - t0) / 1000) * (1 / p - 1) : null);
+    const cuadros = Math.max(1, segs.reduce((a, s) => a + s.cuadros, 0));
+    av.diagnostico?.({
+      velocidad: medidas.velocidad, fpsReal: medidas.fpsReal, msPorFotograma: medidas.msPorFotograma,
+      vistoPct: (100 * segs.reduce((a, s) => a + s.conCandidatos, 0)) / cuadros,
+      saturadoPct: (100 * segs.reduce((a, s) => a + s.saturados, 0)) / cuadros,
+      trayectorias: segs.reduce((a, s) => a + s.trayectorias, 0),
+    });
   });
   if (ctl.corregir) return null;
   segs.forEach((s) => s.cerrar());

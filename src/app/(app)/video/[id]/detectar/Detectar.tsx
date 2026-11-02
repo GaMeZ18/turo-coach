@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Crosshair, FileVideo, Loader2, ScanSearch, Square, TriangleAlert } from "lucide-react";
 import { esPropio, estimarDescanso, type Aro, type Evento } from "@/lib/detector";
-import { alteracionLectura, buscarCanastas, buscarTiros, type Control } from "@/lib/detector-web";
+import { alteracionLectura, buscarCanastas, buscarTiros, type Control, type Diagnostico } from "@/lib/detector-web";
 import { importarDetecciones } from "../../actions";
 import { archivoDe, recordarArchivo } from "@/lib/archivo-local";
 import { mmss } from "@/lib/video";
@@ -38,6 +38,7 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado, equi
   const [progreso, setProgreso] = useState(0);
   const [resto, setResto] = useState<number | null>(null);
   const [tiros, setTiros] = useState(0);
+  const [diag, setDiag] = useState<Diagnostico | null>(null);
   const [aros, setAros] = useState<Aro[]>([]);
   const [oculto, setOculto] = useState(false);
   const [resultado, setResultado] = useState<{ nuevos: number; repetidos: number; total: number; rival?: number } | null>(null);
@@ -119,7 +120,7 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado, equi
     const v = videoRef.current!;
     ctl.current.corregir = false;
     setFase("tiros"); setProgreso(0); setTiros(0); setResto(null);
-    const eventos = await buscarTiros(v, lista, ctl.current, { progreso: setProgreso, tiros: (n, r) => { setTiros(n); setResto(r); } });
+    const eventos = await buscarTiros(v, lista, ctl.current, { progreso: setProgreso, tiros: (n, r) => { setTiros(n); setResto(r); }, diagnostico: setDiag });
     if (!eventos) return; // se ha pedido marcar los aros a mano: se vuelve a empezar al marcarlos
     if (lista.length === 2 && eventos.length) {
       // Último paso: cuáles son del equipo propio (canasta de la 1ª parte y descanso)
@@ -235,6 +236,13 @@ export default function Detectar({ videoId, titulo, local, archivoEsperado, equi
           </div>
           <div className="mt-3 h-3 overflow-hidden rounded-full bg-suave"><div className="h-full rounded-full bg-azul transition-all" style={{ width: `${pct}%` }} /></div>
           <p className="mt-1 text-right text-xs text-tinta/50">{pct} %</p>
+          {fase === "tiros" && diag && (
+            <p className="mt-1 text-[11px] text-tinta/50">
+              Diagnóstico: velocidad ×{diag.velocidad.toFixed(1)} · {diag.fpsReal.toFixed(0)} fotogramas/s analizados (ideal 15) · {diag.msPorFotograma.toFixed(0)} ms por fotograma ·
+              algo del tamaño del balón en el {diag.vistoPct.toFixed(0)} % · demasiado movimiento en el {diag.saturadoPct.toFixed(0)} % · {diag.trayectorias} trayectorias
+              {diag.fpsReal > 0 && diag.fpsReal < 9 && <strong className="ml-1 text-red-700">El ordenador no llega: cierra otras pestañas y programas.</strong>}
+            </p>
+          )}
           {oculto && (
             <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-oro/30 p-2 text-sm"><TriangleAlert size={16} /> Vuelve a esta pestaña: con la pestaña escondida el navegador para el vídeo.</p>
           )}

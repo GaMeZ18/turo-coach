@@ -99,6 +99,7 @@ export class SeguidorAro {
   eventos: Evento[] = [];
   finUltimo = -1e9;
   cuadros = 0; ruido = 0;
+  conCandidatos = 0; saturados = 0; trayectorias = 0; // para el diagnóstico
   private fondo: Fondo;
 
   constructor(public aro: Aro, ancho: number, alto: number, public fps: number) {
@@ -159,7 +160,8 @@ export class SeguidorAro {
 
   procesar(t: number, zona: Uint8Array) {
     let cands = this.candidatos(zona);
-    if (cands.length > 6) cands = [];
+    if (cands.length) this.conCandidatos++;
+    if (cands.length > 6) { cands = []; this.saturados++; }
     const usados = new Set<number>();
     const orden = [...this.pistas].sort((a, b) => b.length - a.length);
     for (const pista of orden) {
@@ -192,6 +194,7 @@ export class SeguidorAro {
 
   evaluar(obs: Obs[]) {
     if (obs.length < 3 || obs[obs.length - 1][0] - obs[0][0] < 0.12) return;
+    this.trayectorias++;
     let recorrido = 0;
     for (let i = 1; i < obs.length; i++) recorrido += Math.hypot(obs[i][1] - obs[i - 1][1], obs[i][2] - obs[i - 1][2]);
     if (recorrido < 1.5) return;
