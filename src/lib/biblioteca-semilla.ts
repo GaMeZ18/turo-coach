@@ -6,6 +6,7 @@ import { EDADES } from "./edades";
 import { SEMILLA_2 } from "./biblioteca-semilla-2";
 import { SISTEMAS } from "./biblioteca-sistemas";
 import { GENERADOS } from "./biblioteca-generada";
+import { jugada } from "./biblioteca-jugada";
 
 type P = [number, number];
 type Paso = {
@@ -13,6 +14,7 @@ type Paso = {
   pase?: [string, string];           // [de, a]
   tiro?: string;                     // quien tira
   mano?: [string, string];           // mano a mano
+  rebote?: string;                   // quien coge el rebote del último tiro
 };
 type Montaje = {
   vista?: Vista;
@@ -48,6 +50,7 @@ export function montar(m: Montaje): Pizarra {
   // Pasos → fotogramas, siguiendo quién tiene cada balón
   const pos: Record<string, P> = Object.fromEntries(Object.entries(inicial).map(([k, v]) => [k, [v.x, v.y] as P]));
   const tiene = { ...poseedor };
+  let ultimoTiro: string | null = null;
   const id = (k: string) => (pos[`a${k}`] ? `a${k}` : pos[`d${k}`] ? `d${k}` : k);
   const fotogramas: Fotograma[] = (m.pasos ?? []).map((paso) => {
     const movimientos: Movimiento[] = (paso.m ?? []).map(([quien, tipo, ...pts]) => {
@@ -67,7 +70,11 @@ export function montar(m: Montaje): Pizarra {
     if (paso.tiro) {
       const b = balonDe(id(paso.tiro));
       const aro = (m.vista ?? "ofensiva") === "defensiva" ? AROS[0] : AROS[1];
-      if (b) { balon.push({ balon: b, tipo: "tiro", de: id(paso.tiro), destino: aro }); tiene[b] = null; }
+      if (b) { balon.push({ balon: b, tipo: "tiro", de: id(paso.tiro), destino: aro }); tiene[b] = null; ultimoTiro = b; }
+    }
+    if (paso.rebote && ultimoTiro && tiene[ultimoTiro] === null) {
+      balon.push({ balon: ultimoTiro, tipo: "coger", a: id(paso.rebote), rebote: true });
+      tiene[ultimoTiro] = id(paso.rebote);
     }
     return { movimientos, balon };
   });
@@ -119,13 +126,6 @@ const SEMILLA_1: EjercicioSemilla[] = [
     etiquetas: ["pase", "calentamiento"],
     montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I }, balon: "1", pasos: [{ pase: ["1", "2"], m: [["1", "correr", [20.5, 11.8]]] }, { pase: ["2", "3"], m: [["2", "correr", [21, 3.2]]] }] },
   },
-  {
-    titulo: "Movilidad y bote en conos", categoria: "Calentamiento", edades: FORMACION, duracion: 8, jugadores: 6, material: "1 balón por jugador, 6 conos",
-    descripcion: "Circuito de conos en zigzag. Cada jugador lo recorre botando: cambio por delante en cada cono a la ida y por detrás de la espalda a la vuelta. Al final, entrada a canasta.",
-    correcciones: "Cabeza arriba · Bote bajo al cambiar de dirección · Proteger con el cuerpo y el brazo libre",
-    etiquetas: ["bote", "conos", "coordinación"],
-    montaje: { conos: [[16.5, 4], [18.5, 7], [20.5, 4], [22.5, 7]], at: { "1": [14.8, 6.5] }, balon: "1", pasos: [{ m: [["1", "botar", [16.5, 5.2], [18.5, 5.8], [20.5, 5.2], [22.5, 5.8], [25.5, 6.6]]], tiro: "1" }] },
-  },
 
   // ---------- Fundamentos / bote ----------
   {
@@ -134,13 +134,6 @@ const SEMILLA_1: EjercicioSemilla[] = [
     correcciones: "Atacante: cambio con el cuerpo entre balón y defensor · Defensor: no cruzar pies, mantener distancia de un brazo",
     etiquetas: ["bote", "cambio de mano", "defensa individual"],
     montaje: { vista: "completa", at: { "1": [2, 2] }, df: { "1": [3.2, 3] }, balon: "1", pasos: [{ m: [["1", "botar", [6, 12], [10, 3], [14, 12]], ["1", "correr", [7, 11], [11, 4], [15, 11]]] }] },
-  },
-  {
-    titulo: "Cambios de ritmo y de dirección (1c0)", categoria: "Bote", edades: TODAS, duracion: 8, jugadores: 8, material: "1 balón por jugador, conos",
-    descripcion: "Fila en medio campo. Bote hasta el cono a media velocidad, cambio de ritmo explosivo (2 botes rápidos), cambio de dirección (por delante, entre piernas o reverso según nivel) y entrada o tiro tras bote.",
-    correcciones: "Bajar el centro de gravedad antes del cambio · Primer bote tras el cambio largo y hacia delante · Vender el cambio con hombros y mirada",
-    etiquetas: ["bote", "cambio de ritmo", "1c0"],
-    montaje: { conos: [[20.5, 9]], at: { "1": [15, 11] }, balon: "1", pasos: [{ m: [["1", "botar", [20, 9.6]]] }, { m: [["1", "botar", [22.5, 7.5], [25.6, 6.8]]], tiro: "1" }] },
   },
   {
     titulo: "Paradas en uno y dos tiempos", categoria: "Fundamentos", edades: ["Mini", "Infantil"], duracion: 8, jugadores: 8, material: "1 balón por jugador",
@@ -666,4 +659,6 @@ const SEMILLA_1: EjercicioSemilla[] = [
 ];
 
 /** Todos los ejercicios iniciales de la biblioteca (63 + 100 + sistemas + ampliación grande por familias) */
-export const SEMILLA: EjercicioSemilla[] = [...SEMILLA_1, ...SEMILLA_2, ...SISTEMAS, ...GENERADOS];
+/** Los sistemas de la primera biblioteca, también con su defensa (individual) para ver los espacios */
+const conDefensa = (e: EjercicioSemilla): EjercicioSemilla => e.tipo === "sistema" ? { ...e, montaje: jugada({ ...e.montaje, defensa: "individual" }) } : e;
+export const SEMILLA: EjercicioSemilla[] = [...SEMILLA_1.map(conDefensa), ...SEMILLA_2.map(conDefensa), ...SISTEMAS, ...GENERADOS];

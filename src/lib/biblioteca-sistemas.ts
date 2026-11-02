@@ -1,6 +1,7 @@
 // Biblioteca del CB Turó · sistemas (NBA, ACB, Euroliga y NCAA): media pista, saques de fondo y de banda,
 // ataque a zona y salida de presión. Cada uno con su pizarra y un enlace a vídeos que lo explican.
 import type { EjercicioSemilla } from "./biblioteca-semilla";
+import { jugada, type MontajeJ } from "./biblioteca-jugada";
 
 type P = [number, number];
 const BASE: P = [19.2, 7.5], ALA_I: P = [21, 2.6], ALA_D: P = [21, 12.4], ESQ_I: P = [27, 1], ESQ_D: P = [27, 14];
@@ -14,8 +15,10 @@ const MAYORES = ["Cadete", "Junior", "Sénior"];
 /** Enlace a la búsqueda en YouTube (siempre funciona y saca varios vídeos de entrenadores explicándolo) */
 export const yt = (q: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 
-type Sis = Omit<EjercicioSemilla, "tipo" | "categoria" | "jugadores" | "material"> & { jugadores?: number };
-const sis = (s: Sis): EjercicioSemilla => ({ tipo: "sistema", categoria: "Sistema de juego", jugadores: 5, material: "1 balón", ...s });
+type Sis = Omit<EjercicioSemilla, "tipo" | "categoria" | "jugadores" | "material" | "montaje"> & { jugadores?: number; montaje: MontajeJ };
+/** Todos los sistemas con su defensa (individual salvo que se diga otra cosa), para ver los espacios */
+const sis = (s: Sis): EjercicioSemilla => ({ tipo: "sistema", categoria: "Sistema de juego", jugadores: 5, material: "1 balón", ...s,
+  montaje: jugada({ ...s.montaje, defensa: s.montaje.defensa ?? "individual" }) });
 
 export const SISTEMAS: EjercicioSemilla[] = [
   // =====================================================================
@@ -347,8 +350,8 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "Posiciones en los huecos entre defensores (no delante de ellos) · Pasar rápido, sin botar · El poste bajo sella al defensor que sale a la esquina · Fintas de pase para mover la zona",
     etiquetas: ["ataque a zona", "2-3", "sobrecarga", "overload"],
     video: yt("overload offense vs 2-3 zone"),
-    montaje: { at: { "1": BASE_D, "2": ALA_D, "3": ESQ_D, "5": POSTE_D, "4": CODO_I }, df: { "1": [21.2, 6.2], "2": [21.2, 8.8], "3": [24.4, 4.6], "4": [24.4, 10.4], "5": [25, 7.5] }, balon: "1", pasos: [
-      { pase: ["1", "2"] }, { pase: ["2", "3"], m: [["d4", "correr", [26, 12.6]]] }, { pase: ["3", "5"] }, { tiro: "5" },
+    montaje: { at: { "1": BASE_D, "2": ALA_D, "3": ESQ_D, "5": POSTE_D, "4": CODO_I }, defensa: "23", balon: "1", pasos: [
+      { pase: ["1", "2"] }, { pase: ["2", "3"] }, { pase: ["3", "5"] }, { tiro: "5" },
     ] },
   }),
   sis({
@@ -358,8 +361,8 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "El poste alto recibe encarado (pivotar al recibir) · El poste corto se esconde detrás del defensor bajo · Pase al poste alto desde la cabeza o el ala · Los exteriores en los huecos de la zona",
     etiquetas: ["ataque a zona", "2-3", "poste alto", "poste corto"],
     video: yt("attack 2-3 zone high post short corner"),
-    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": TL, "4": [27.2, 11.2] }, df: { "1": [21.2, 6.2], "2": [21.2, 8.8], "3": [24.4, 4.6], "4": [24.4, 10.4], "5": [25, 7.5] }, balon: "1", pasos: [
-      { pase: ["1", "5"] }, { m: [["d5", "correr", [23.4, 7.5]]] }, { pase: ["5", "4"] }, { tiro: "4" },
+    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": TL, "4": [27.2, 11.2] }, defensa: "23", balon: "1", pasos: [
+      { pase: ["1", "5"] }, { pase: ["5", "4"] }, { tiro: "4" },
     ] },
   }),
   sis({
@@ -369,7 +372,7 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "El corredor llega a la esquina a la vez que el balón al ala · Pases por encima de la 1-3-1 (alta y larga) · El poste alto se mueve a los huecos entre las líneas · Atacar la esquina que la zona deja libre",
     etiquetas: ["ataque a zona", "1-3-1", "baseline runner", "esquinas"],
     video: yt("attack 1-3-1 zone baseline runner"),
-    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": TL, "4": [27.4, 6] }, df: { "1": [20.4, 7.5], "2": [22.6, 3.6], "3": [22.6, 11.4], "5": [23.4, 7.5], "4": [26, 7.5] }, balon: "1", pasos: [
+    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": TL, "4": [27.4, 6] }, defensa: "131", balon: "1", pasos: [
       { pase: ["1", "2"], m: [["4", "correr", [27.6, 10.4], [27, 14]]] }, { pase: ["2", "4"] }, { tiro: "4" },
     ] },
   }),
@@ -380,7 +383,7 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "Bloquear al defensor que tiene que salir a tapar al tirador · Pase de lado a lado rápido o por encima · El tirador se coloca en la línea de visión del pasador · Sincronizar el bloqueo con el pase",
     etiquetas: ["ataque a zona", "bloqueo a la zona", "skip", "tiro de 3"],
     video: yt("screen the zone offense basketball"),
-    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": POSTE_I, "4": POSTE_D }, df: { "1": [21.2, 6.2], "2": [21.2, 8.8], "3": [24.4, 4.6], "4": [24.4, 10.4], "5": [25, 7.5] }, balon: "2", pasos: [
+    montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I, "5": POSTE_I, "4": POSTE_D }, defensa: "23", balon: "2", pasos: [
       { m: [["5", "bloqueo", [23.8, 4.4]]] }, { pase: ["2", "3"] }, { tiro: "3" },
     ] },
   }),
@@ -391,8 +394,8 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "Penetrar al hueco, no al defensor · Parar con un tiempo y pivotar para pasar · Los compañeros se recolocan en la línea de pase · No penetrar sin plan: fijar y pasar",
     etiquetas: ["ataque a zona", "penetrar el hueco", "fijar", "pase extra"],
     video: yt("gap attack zone offense drill"),
-    montaje: { at: { "1": BASE_I, "2": BASE_D, "3": ALA_I, "4": ALA_D, "5": POSTE_D }, df: { "1": [21.2, 6.2], "2": [21.2, 8.8], "3": [24.4, 4.6], "4": [24.4, 10.4], "5": [25, 7.5] }, balon: "2", pasos: [
-      { m: [["2", "botar", [21.4, 7.6]], ["d1", "correr", [21.6, 7]], ["d2", "correr", [21.8, 8.2]]] }, { pase: ["2", "3"] }, { tiro: "3" },
+    montaje: { at: { "1": BASE_I, "2": BASE_D, "3": ALA_I, "4": ALA_D, "5": POSTE_D }, defensa: "23", balon: "2", pasos: [
+      { m: [["2", "botar", [21.4, 7.6]]] }, { pase: ["2", "3"] }, { tiro: "3" },
     ] },
   }),
   // =====================================================================
@@ -416,8 +419,8 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "Pasar antes de que se cierre la trampa (no botar dentro de ella) · El centro se mueve a la vista del balón · Pase por encima, con fuerza · Tras superar la presión, atacar sin parar",
     etiquetas: ["salida de presión", "1-2-1-1", "trampa", "diamante"],
     video: yt("break 1-2-1-1 press diamond"),
-    montaje: { vista: "completa", at: { "4": [0.2, 6], "1": [3, 12], "3": [7, 7.5], "2": [10, 2], "5": [18, 7.5] }, df: { "1": [2, 7.5], "2": [4.6, 11], "3": [8.4, 9.4] }, balon: "4", pasos: [
-      { pase: ["4", "1"] }, { m: [["d1", "correr", [3, 10.8]]] }, { pase: ["1", "3"] }, { pase: ["3", "5"] }, { tiro: "5" },
+    montaje: { vista: "completa", at: { "4": [0.2, 6], "1": [3, 12], "3": [7, 7.5], "2": [10, 2], "5": [18, 7.5] }, df: { "1": [1.6, 7.2], "2": [5, 3.4], "3": [5, 11.6], "4": [10.8, 7.5], "5": [21, 7.5] }, defensa: "ninguna", balon: "4", pasos: [
+      { pase: ["4", "1"] }, { m: [["d1", "correr", [2.4, 11.0]], ["d3", "correr", [4.0, 12.8]], ["d4", "correr", [7.4, 9.6]], ["d2", "correr", [4.6, 7.8]], ["d5", "correr", [18.6, 8.4]]] }, { pase: ["1", "3"] }, { pase: ["3", "5"] }, { tiro: "5" },
     ] },
   }),
   // =====================================================================
@@ -476,7 +479,7 @@ export const SISTEMAS: EjercicioSemilla[] = [
     correcciones: "Bloquear al defensor que tiene que salir a la esquina · El tirador ya preparado en la esquina · El sacador lee primero el sello del interior · Seguridad arriba siempre",
     etiquetas: ["saque de fondo", "BLOB", "contra zona", "esquina"],
     video: yt("baseline out of bounds play vs zone"),
-    montaje: { at: { "1": FONDO, "2": ESQ_D, "5": POSTE_D, "4": CODO_I, "3": BASE }, df: { "4": [24.6, 11], "5": [25.2, 7.5] }, balon: "1", pasos: [
+    montaje: { at: { "1": FONDO, "2": ESQ_D, "5": POSTE_D, "4": CODO_I, "3": BASE }, defensa: "23", balon: "1", pasos: [
       { m: [["5", "bloqueo", [24.8, 11.4]]] }, { pase: ["1", "2"] }, { tiro: "2" },
     ] },
   }),

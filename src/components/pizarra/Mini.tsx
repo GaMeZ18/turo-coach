@@ -69,12 +69,16 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
     return q.join(" ");
   };
   const r = vista === "completa" ? 0.45 : 0.5;
+  const tipoDe = new Map(p.elementos.map((e) => [e.id, e.tipo]));
 
   return (
     <svg viewBox={caja} className={className} role="img" aria-label="Pizarra">
       <defs>
         <marker id="fl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#1f2937" />
+        </marker>
+        <marker id="flr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#ca010c" />
         </marker>
       </defs>
       {/* Pista igual que la de la pizarra: parquet, zona azul, líneas blancas y escudo */}
@@ -92,10 +96,12 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
             const fin = T({ x: m.puntos[n - 2], y: m.puntos[n - 1] });
             const prev = T({ x: m.puntos[n - 4], y: m.puntos[n - 3] });
             const ang = Math.atan2(fin[1] - prev[1], fin[0] - prev[0]);
+            // Los defensores, en rojo y más finos: así se distingue la jugada del ataque de cómo se mueve la defensa
+            const def = tipoDe.get(m.elementoId) === "defensor";
             return (
-              <g key={i}>
-                <polyline points={linea(m.puntos)} fill="none" stroke="#1f2937" strokeWidth="0.09"
-                  strokeDasharray={m.tipo === "botar" ? "0.18 0.14" : undefined} markerEnd={m.tipo === "bloqueo" ? undefined : "url(#fl)"} />
+              <g key={i} opacity={def ? 0.75 : 1}>
+                <polyline points={linea(m.puntos)} fill="none" stroke={def ? "#ca010c" : "#1f2937"} strokeWidth={def ? "0.06" : "0.09"}
+                  strokeDasharray={m.tipo === "botar" ? "0.18 0.14" : undefined} markerEnd={m.tipo === "bloqueo" ? undefined : def ? "url(#flr)" : "url(#fl)"} />
                 {m.tipo === "bloqueo" && (
                   <line x1={fin[0] - 0.4 * Math.sin(ang)} y1={fin[1] + 0.4 * Math.cos(ang)} x2={fin[0] + 0.4 * Math.sin(ang)} y2={fin[1] - 0.4 * Math.cos(ang)} stroke="#1f2937" strokeWidth="0.12" />
                 )}

@@ -768,28 +768,12 @@ export const SEMILLA_2: EjercicioSemilla[] = [
   // CALENTAMIENTO, FUNDAMENTOS, BOTE Y FÍSICO (10)
   // =====================================================================
   {
-    titulo: "Calentamiento dinámico con balón (activación)", categoria: "Calentamiento", edades: TODAS, duracion: 8, jugadores: 10, material: "1 balón por jugador",
-    objetivos: "Activar el cuerpo y el manejo de balón · Preparar las articulaciones",
-    descripcion: "Ida y vuelta por el campo botando: rodillas arriba, talones al glúteo, desplazamiento lateral, skipping y zancadas con bote por debajo de la pierna. Termina con 2 sprints de bote.",
-    correcciones: "Cabeza arriba siempre · Movimientos amplios y controlados · Aumentar la intensidad poco a poco",
-    etiquetas: ["calentamiento", "activación", "bote"],
-    montaje: { vista: "completa", at: { "1": [1.5, 3], "2": [1.5, 7.5], "3": [1.5, 12] }, balones: ["1", "2", "3"], pasos: [{ m: [["1", "botar", [14, 3]], ["2", "botar", [14, 7.5]], ["3", "botar", [14, 12]]] }] },
-  },
-  {
     titulo: "Rueda de tiro de calentamiento (3 filas)", categoria: "Calentamiento", edades: TODAS, duracion: 8, jugadores: 9, material: "3 balones",
     objetivos: "Calentar el tiro de forma progresiva · Movimiento continuo",
     descripcion: "Tres filas (dos alas y frontal). El primero de cada fila pasa al de la fila de la derecha y sale a recibir para tirar de media distancia; luego rebote y a otra fila. Distancia progresiva.",
     correcciones: "Empezar cerca y alejarse · Pies preparados al recibir · Pase tenso a la mano de tiro",
     etiquetas: ["tiro", "calentamiento", "rueda"],
     montaje: { at: { "1": BASE, "2": ALA_D, "3": ALA_I }, balones: ["1", "2"], pasos: [{ pase: ["1", "3"] }, { tiro: "3" }] },
-  },
-  {
-    titulo: "Manejo de dos balones (estático y en movimiento)", categoria: "Bote", edades: TODAS, duracion: 8, jugadores: 10, material: "2 balones por jugador",
-    objetivos: "Mejorar la mano débil · Coordinación y control del bote",
-    descripcion: "Cada jugador con 2 balones: bote simultáneo, alterno, uno alto y otro bajo, cruces. Después en movimiento hasta medio campo y vuelta. Los mayores añaden cambios de ritmo.",
-    correcciones: "No mirar los balones · Bote fuerte y con la yema de los dedos · Rodillas flexionadas",
-    etiquetas: ["bote", "dos balones", "mano débil"],
-    montaje: { vista: "completa", at: { "1": [2, 4], "2": [2, 11] }, balones: ["1", "2"], pasos: [{ m: [["1", "botar", [13, 4]], ["2", "botar", [13, 11]]] }] },
   },
   {
     titulo: "Bote contra presión: proteger y salir (1c1 en caja)", categoria: "Bote", edades: MAYORES, duracion: 8, jugadores: 6, material: "1 balón por pareja, 4 conos",

@@ -89,7 +89,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
           {total > 0 && <p className="mt-3 text-sm text-tinta/60">{total} {total === 1 ? "resultado" : "resultados"}{paginas > 1 ? ` · página ${pagina} de ${paginas}` : ""}</p>}
 
           {esCoord && !filtrando && (
-            <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten (hay ${SEMILLA.length} entre ejercicios y sistemas; no se duplican).` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
+            <CargarBiblioteca texto={lista.length ? `Añade los ejercicios iniciales del club que falten y pone al día los ya cargados (pizarras, textos y vídeos). Hay ${SEMILLA.length} entre ejercicios y sistemas; no se duplican.` : `La biblioteca está vacía. Carga los ${SEMILLA.length} ejercicios iniciales del club (con pizarra) para empezar.`} />
           )}
 
           {/* Una sola rejilla de 3 columnas (ordenada por categoría) para que no queden huecos */}

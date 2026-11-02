@@ -118,63 +118,67 @@ export async function alternarBiblioteca(formData: FormData) {
 }
 
 /** Carga la biblioteca inicial del club (solo el coordinador). No duplica los que ya estén. */
-export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; quedan?: number; error?: string }> {
+/** JSON con las claves ordenadas (jsonb no guarda el orden de las claves) para comparar contenidos */
+const estable = (v: unknown): string => Array.isArray(v) ? `[${v.map(estable).join(",")}]`
+  : v && typeof v === "object" ? `{${Object.keys(v as object).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined).map((k) => `${JSON.stringify(k)}:${estable((v as Record<string, unknown>)[k])}`).join(",")}}`
+  : JSON.stringify(v ?? null);
+
+export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; actualizados?: number; quitados?: number; quedan?: number; error?: string }> {
   try {
     const { SEMILLA, montar } = await import("@/lib/biblioteca-semilla");
+    const { RETIRADOS, RENOMBRADOS } = await import("@/lib/biblioteca-retirados");
     const { todas } = await import("@/lib/db");
     const supabase = await createClient();
-    // Todos los títulos ya cargados (más de 1000: hay que paginar o se duplicarían)
-    const { data: ya, error } = await todas<{ titulo: string; id: string; video_url: string | null }>((d, h) =>
-      supabase.from("ejercicios").select("id, titulo, video_url").eq("en_biblioteca", true).order("id").range(d, h));
+    // 1) Renombrados y retirados de la biblioteca inicial
+    for (const [viejo, nuevo] of RENOMBRADOS) await supabase.from("ejercicios").update({ titulo: nuevo }).eq("en_biblioteca", true).eq("titulo", viejo);
+    let quitados = 0;
+    for (let i = 0; i < RETIRADOS.length; i += 50) {
+      const { data: q } = await supabase.from("ejercicios").delete().eq("en_biblioteca", true).in("titulo", RETIRADOS.slice(i, i + 50)).select("id");
+      quitados += q?.length ?? 0;
+    }
+    // Todos los ya cargados (más de 1000: hay que paginar o se duplicarían)
+    type Fila = { id: string; titulo: string; descripcion: string | null; correcciones: string | null; objetivos: string | null; categoria: string | null; etiquetas: string[] | null;
+      jugadores_min: number | null; duracion: number | null; material: string | null; edades: string[] | null; pizarra: unknown; video_url: string | null };
+    const { data: ya, error } = await todas<Fila>((d, h) =>
+      supabase.from("ejercicios").select("id, titulo, descripcion, correcciones, objetivos, categoria, etiquetas, jugadores_min, duracion, material, edades, pizarra, video_url").eq("en_biblioteca", true).order("id").range(d, h));
     if (error) return { nuevos: 0, error: faltaSQL(error.message) };
-    const titulos = new Set(ya.map((x) => x.titulo));
-    // Por llamada, como mucho 300 (el servidor tiene un tiempo límite); el botón avisa si quedan más
-    const pendientes = SEMILLA.filter((e) => !titulos.has(e.titulo));
-    const LIMITE = 300;
-    const nuevos = pendientes.slice(0, LIMITE).map((e) => ({
-      tipo: e.tipo ?? "ejercicio",
-      titulo: e.titulo,
-      descripcion: e.descripcion,
-      correcciones: e.correcciones,
-      categoria: e.categoria,
-      etiquetas: e.etiquetas,
-      jugadores_min: e.jugadores,
-      duracion: e.duracion,
-      material: e.material ?? null,
-      objetivos: e.objetivos ?? null,
-      edades: e.edades,
-      pizarra: montar(e.montaje),
-      video_url: e.video ?? null,
-      visibilidad: "club",
-      en_biblioteca: true,
-    }));
-    // Por tandas, para que un fallo no deje todo a medias
+    const fila = (e: (typeof SEMILLA)[number]) => ({
+      titulo: e.titulo, descripcion: e.descripcion, correcciones: e.correcciones, categoria: e.categoria, etiquetas: e.etiquetas,
+      jugadores_min: e.jugadores, duracion: e.duracion, material: e.material ?? null, objetivos: e.objetivos ?? null, edades: e.edades,
+      pizarra: montar(e.montaje), video_url: e.video ?? null,
+    });
+    const porTitulo = new Map(ya.map((x) => [x.titulo, x]));
+    // 2) Nuevos: por llamada, como mucho 300 (el servidor tiene un tiempo límite); el botón vuelve a llamar si quedan
+    const pendientes = SEMILLA.filter((e) => !porTitulo.has(e.titulo));
+    const nuevos = pendientes.slice(0, 300).map((e) => ({ tipo: e.tipo ?? "ejercicio", ...fila(e), visibilidad: "club", en_biblioteca: true }));
     let n = 0;
-    let conObjetivos = true;
     for (let i = 0; i < nuevos.length; i += 50) {
       const tanda = nuevos.slice(i, i + 50);
-      let { error: e2 } = await supabase.from("ejercicios").insert(conObjetivos ? tanda : tanda.map(({ objetivos: _o, ...r }) => r));
-      if (e2 && /objetivos/.test(e2.message)) { conObjetivos = false; ({ error: e2 } = await supabase.from("ejercicios").insert(tanda.map(({ objetivos: _o, ...r }) => r))); }
-      if (e2) return { nuevos: n, error: faltaSQL(e2.message) };
-      n += Math.min(50, nuevos.length - i);
+      const { error: e2 } = await supabase.from("ejercicios").insert(tanda);
+      if (e2) return { nuevos: n, quitados, error: faltaSQL(e2.message) };
+      n += tanda.length;
     }
-    // Completar los objetivos de los que ya estaban cargados sin ellos
-    if (conObjetivos) {
-      const { data: sinObj } = await supabase.from("ejercicios").select("id, titulo").eq("en_biblioteca", true).is("objetivos", null);
-      const porTitulo = new Map(SEMILLA.filter((e) => e.objetivos).map((e) => [e.titulo, e.objetivos!]));
-      for (const x of sinObj ?? []) {
-        const o = porTitulo.get(x.titulo);
-        if (o) await supabase.from("ejercicios").update({ objetivos: o }).eq("id", x.id);
-      }
+    // 3) Los ya cargados cuyo contenido ha cambiado (pizarra con defensa, descripción, vídeo…): se actualizan
+    const cambiados: { id: string; datos: ReturnType<typeof fila> }[] = [];
+    for (const e of SEMILLA) {
+      const x = porTitulo.get(e.titulo);
+      if (!x) continue;
+      const nueva = fila(e);
+      const { id: _id, ...actual } = x;
+      if (estable(actual) !== estable(nueva)) cambiados.push({ id: x.id, datos: nueva });
     }
-    // Enlaces de vídeo para los que ya estaban cargados sin él
-    const videoPorTitulo = new Map(SEMILLA.filter((e) => e.video).map((e) => [e.titulo, e.video!]));
-    for (const x of ya.filter((x) => !x.video_url && videoPorTitulo.has(x.titulo)).slice(0, 100)) {
-      await supabase.from("ejercicios").update({ video_url: videoPorTitulo.get(x.titulo) }).eq("id", x.id);
+    const LOTE = 150;
+    let actualizados = 0;
+    const lote = cambiados.slice(0, LOTE);
+    for (let i = 0; i < lote.length; i += 10) {
+      const res = await Promise.all(lote.slice(i, i + 10).map((c) => supabase.from("ejercicios").update(c.datos).eq("id", c.id)));
+      const fallo = res.find((r) => r.error);
+      if (fallo?.error) return { nuevos: n, actualizados, quitados, error: faltaSQL(fallo.error.message) };
+      actualizados += res.length;
     }
     revalidatePath("/biblioteca");
     revalidatePath("/ejercicios");
-    return { nuevos: n, quedan: Math.max(0, pendientes.length - n) };
+    return { nuevos: n, actualizados, quitados, quedan: Math.max(0, pendientes.length - n) + Math.max(0, cambiados.length - actualizados) };
   } catch (e) {
     return { nuevos: 0, error: e instanceof Error ? e.message : String(e) };
   }
