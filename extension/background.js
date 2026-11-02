@@ -395,6 +395,7 @@ async function pbpDesdeLaWeb(tabId, stats, avisar) {
     .sort((a, b) => String(stats[b]?.header?.date ?? "").localeCompare(String(stats[a]?.header?.date ?? ""))) // los más recientes primero
     .slice(0, 80);
   let conseguidas = 0;
+  const detalle = [];
   for (let k = 0; k < faltan.length; k++) {
     const id = faltan[k];
     avisar(`Jugada a jugada desde la web de la FCBQ: ${k + 1} de ${faltan.length}…`);
@@ -412,12 +413,13 @@ async function pbpDesdeLaWeb(tabId, stats, avisar) {
       const pj = texto ? JSON.parse(texto) : null;
       const lista = pj?.playByPlay ?? pj;
       if (Array.isArray(lista) && lista.length) { stats[id].playByPlay = lista; conseguidas++; }
-    } catch {}
-    // Si la web tampoco la tiene en los 5 primeros, no insistir (esta temporada no se publica)
-    if (k === 4 && !conseguidas) break;
+      if (detalle.length < 12) detalle.push(`${stats[id]?.header?.localTeam?.name ?? "?"} - ${stats[id]?.header?.visitorTeam?.name ?? "?"}: ${texto ? (Array.isArray(lista) ? lista.length + " jugadas" : "formato raro") : "la página no la ha pedido"}`);
+    } catch { if (detalle.length < 12) detalle.push(`${id}: respuesta no válida`); }
+    // Si la web tampoco la tiene en los 8 primeros, no insistir
+    if (k === 7 && !conseguidas) break;
   }
-  if (stats.__muestra) stats.__muestra.desdeLaWeb = { probados: faltan.length, conseguidas };
-  else stats.__muestra = { desdeLaWeb: { probados: faltan.length, conseguidas } };
+  if (stats.__muestra) stats.__muestra.desdeLaWeb = { probados: faltan.length, conseguidas, detalle };
+  else stats.__muestra = { desdeLaWeb: { probados: faltan.length, conseguidas, detalle } };
 }
 
 // Se ejecuta en la extensión o DENTRO de la pestaña de basquetcatala.cat (con su sesión).
