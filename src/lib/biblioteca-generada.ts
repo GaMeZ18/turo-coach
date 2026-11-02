@@ -500,7 +500,7 @@ for (const z of ZONAS) for (const c of CONCEPTOS_ZONA) zona.push(ej({
   objetivos: `Superar la zona ${z.n} con ${c.n}`, descripcion: unir(`5c5 media pista contra zona ${z.n}.`, c.d, "Primero contra la zona a medio ritmo, luego en vivo: 5 posesiones por equipo, contando tiros de calidad."),
   correcciones: "Colocarse en los huecos de la zona, no delante de los defensores · Pasar rápido y fintar antes de pasar · Recibir preparados para tirar · Rebote ofensivo desde el lado débil",
   etiquetas: ["ataque a zona", z.c, c.c], video: yt(`attack ${z.n.split(" ")[0]} zone ${c.c === "hueco" ? "gap" : c.c === "skip" ? "skip pass" : c.c}`),
-  montaje: { at: { "1": S.baseI, "2": S.baseD, "3": S.alaI, "4": S.alaD, "5": S.posteD }, df: z.df as Record<string, P>, balon: "1", pasos: [{ pase: ["1", "2"] }, { pase: ["2", "4"] }, { tiro: "4" }] },
+  montaje: { at: { "1": S.baseI, "2": S.baseD, "3": S.alaI, "4": S.alaD, "5": S.posteD }, df: z.df as unknown as Record<string, P>, balon: "1", pasos: [{ pase: ["1", "2"] }, { pase: ["2", "4"] }, { tiro: "4" }] },
 }));
 for (const z of ZONAS) for (const s of [
   { c: "despl", n: "desplazamientos con cada pase", d: "El ataque pasa alrededor sin tirar; cada defensor ajusta su posición con cada pase y se corrigen huecos." },
@@ -512,7 +512,7 @@ for (const z of ZONAS) for (const s of [
   objetivos: `Zona ${z.n}: ${s.n}`, descripcion: unir(`5c5 media pista, la defensa en zona ${z.n}.`, s.d, "Primero sin tirar, luego en vivo."),
   correcciones: "Manos arriba y activas · Moverse mientras el balón está en el aire · Hablar en cada pase · Cerrar el rebote buscando al más cercano",
   etiquetas: ["defensa en zona", z.c, s.c], video: yt(`${z.n.split(" ")[0]} zone defense drill`),
-  montaje: { at: { "1": S.baseI, "2": S.baseD, "3": S.alaI, "4": S.alaD, "5": S.posteD }, df: z.df as Record<string, P>, balon: "1", pasos: [{ pase: ["1", "3"] }, { pase: ["3", "5"] }] },
+  montaje: { at: { "1": S.baseI, "2": S.baseD, "3": S.alaI, "4": S.alaD, "5": S.posteD }, df: z.df as unknown as Record<string, P>, balon: "1", pasos: [{ pase: ["1", "3"] }, { pase: ["3", "5"] }] },
 }));
 
 // ============================================================================
