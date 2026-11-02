@@ -5,8 +5,9 @@
 // la jugada a jugada.
 (() => {
   const guardar = (url, texto) => {
-    if (!/\/matches\/[^/?#]+\/stats\b/.test(url)) return;
-    (window.__turoStats = window.__turoStats || {})[url] = texto;
+    if (/\/matches\/[^/?#]+\/stats\b/.test(url)) (window.__turoStats = window.__turoStats || {})[url] = texto;
+    // La jugada a jugada tal como la recibe la web
+    if (/\/matches\/[^/?#]+\/(pbp|moves)\b/.test(url)) (window.__turoPbp = window.__turoPbp || {})[url] = texto;
   };
   /** Forma de una respuesta JSON: la lista más larga que contiene y los campos de sus elementos */
   const resumir = (texto) => {

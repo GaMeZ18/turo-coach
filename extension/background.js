@@ -219,10 +219,8 @@ async function apiStats(ids, plantillaPbp, idBase, cabWeb) {
           ...(plantillaPbp && idBase ? [plantillaPbp.split(idBase).join(id)] : []), // la que usa la propia web
           ...["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"].map((r) => `https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/${r}`),
         ];
-        for (const url of ev.length ? [] : rutas) {
-          q = await fetch(url, {
-            headers: cab,
-          }).catch(() => null);
+        for (const url of ev.length ? [] : rutas.flatMap((u) => [[u, "include"], [u, "omit"]])) {
+          q = await fetch(url[0], { headers: cab, credentials: url[1], mode: "cors" }).catch(() => null);
           if (!q || !q.ok) continue;
           pj = await q.json().catch(() => null);
           ev = aplanar(!pj ? [] : Array.isArray(pj) ? pj : pj.playByPlay ?? pj.events ?? pj.data ?? pj.moves ?? pj);
@@ -248,6 +246,7 @@ async function apiStats(ids, plantillaPbp, idBase, cabWeb) {
           if (!res.__muestra || (!res.__muestra.eventos && ev.length)) res.__muestra = {
             estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length,
             primeros: ev.filter((e) => e.localScore !== undefined || e.visitorScore !== undefined).slice(0, 4),
+            crudo: JSON.stringify(pj).slice(0, 200),
             tiros: Array.isArray(j.shotChart) ? { n: j.shotChart.length, primeros: j.shotChart.slice(0, 3) } : j.shotChart ? { claves: Object.keys(j.shotChart), muestra: JSON.stringify(j.shotChart).slice(0, 600) } : null,
             jugador: (j.boxscore?.[0]?.local?.players || [])[0] ? Object.keys(j.boxscore[0].local.players[0]) : null,
           };
@@ -349,7 +348,7 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     for (const [id, j] of Object.entries(r)) if (!j.error) stats[id] = j;
     if (i === 0 && !Object.keys(stats).filter((k) => k !== "__muestra").length) break;
   }
-  if (ids.every((id) => stats[id])) return diagnostico();
+  if (ids.every((id) => stats[id])) { await pbpDesdeLaWeb(tabId, stats, avisar); return diagnostico(); }
 
   // 2) Si no, lo que carga la propia página de estadísticas
   ids = ids.filter((id) => !stats[id]);
@@ -382,7 +381,43 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     if (c) { try { const j = JSON.parse(c.texto); stats[faltan[k]] = j; } catch {} }
   }
   for (const id of Object.keys(stats)) if (stats[id]?.error) delete stats[id];
+  await pbpDesdeLaWeb(tabId, stats, avisar);
   return diagnostico();
+}
+
+/**
+ * Para los partidos del Turó que han llegado sin jugada a jugada, abre su página de estadísticas y copia
+ * la que recibe la propia web (a nosotros la FCBQ nos la da vacía).
+ */
+async function pbpDesdeLaWeb(tabId, stats, avisar) {
+  const turo = (j) => /TUR[OÓ]/i.test(`${j?.header?.localTeam?.name ?? ""} ${j?.header?.visitorTeam?.name ?? ""}`);
+  const faltan = Object.keys(stats).filter((id) => id !== "__muestra" && turo(stats[id]) && !(stats[id].pbp?.length) && !(stats[id].playByPlay?.length))
+    .sort((a, b) => String(stats[b]?.header?.date ?? "").localeCompare(String(stats[a]?.header?.date ?? ""))) // los más recientes primero
+    .slice(0, 80);
+  let conseguidas = 0;
+  for (let k = 0; k < faltan.length; k++) {
+    const id = faltan[k];
+    avisar(`Jugada a jugada desde la web de la FCBQ: ${k + 1} de ${faltan.length}…`);
+    await abrirYEsperar(tabId, `${FCBQ}/estadistica/partit/${id}`, avisar).catch(() => {});
+    let texto = null;
+    for (let i = 0; i < 16 && !texto; i++) {
+      texto = await chrome.scripting.executeScript({
+        target: { tabId }, world: "MAIN",
+        func: (id) => { const m = window.__turoPbp || {}; const u = Object.keys(m).find((x) => x.includes(id)); return u ? m[u] : null; },
+        args: [id],
+      }).then((x) => x[0]?.result).catch(() => null);
+      if (!texto) await esperar(500);
+    }
+    try {
+      const pj = texto ? JSON.parse(texto) : null;
+      const lista = pj?.playByPlay ?? pj;
+      if (Array.isArray(lista) && lista.length) { stats[id].playByPlay = lista; conseguidas++; }
+    } catch {}
+    // Si la web tampoco la tiene en los 5 primeros, no insistir (esta temporada no se publica)
+    if (k === 4 && !conseguidas) break;
+  }
+  if (stats.__muestra) stats.__muestra.desdeLaWeb = { probados: faltan.length, conseguidas };
+  else stats.__muestra = { desdeLaWeb: { probados: faltan.length, conseguidas } };
 }
 
 // Se ejecuta en la extensión o DENTRO de la pestaña de basquetcatala.cat (con su sesión).
