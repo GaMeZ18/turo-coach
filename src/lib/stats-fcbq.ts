@@ -40,11 +40,11 @@ export interface StatsPartido {
   visitante: EquipoStats;
   v?: number;                       // 3 = con tramos en pista y marcador a lo largo del partido
   marcador?: [number, number, number][]; // [segundo de partido, puntos local, puntos visitante] en cada cambio
-  jugadas?: [0 | 1, number, number | null, string | null][]; // canastas en orden: [0 local / 1 visitante, puntos, dorsal, nombre]
+  jugadas?: [0 | 1, number, number | null, string | null, number?][]; // canastas en orden: [0 local / 1 visitante, puntos, dorsal, nombre, segundo de partido]
 }
 
 /** Versión de los datos guardados: si es menor, se vuelven a descargar */
-export const VERSION_STATS = 5;
+export const VERSION_STATS = 6;
 
 type Acum = { pts?: number; t2m?: number; t3m?: number; ftm?: number; fta?: number; fc?: number };
 type JugFCBQ = { dorsal?: string; name?: string; uuid?: string; starting?: boolean; accumulated?: Acum; computed?: { seconds?: number; onCourtPlusMinus?: number } };
@@ -52,12 +52,69 @@ type EqFCBQ = { name?: string; accumulated?: Acum; players?: JugFCBQ[] };
 type Stint = { startSeconds?: number; endSeconds?: number; computed?: { onCourtPlusMinus?: number } };
 type FCBQ = {
   stints?: { local?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[]; visitor?: { uuid?: string; actorName?: string; dorsal?: string; stints?: Stint[] }[] };
-  pbp?: { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null; x?: Record<string, string | number | boolean> }[];
+  pbp?: Pbp[];
+  playByPlay?: unknown;
   header?: { date?: string; matchDayNum?: number; localTeam?: { name?: string }; visitorTeam?: { name?: string }; score?: { local?: number; visitor?: number }; periods?: { period: number; local: number; visitor: number }[] };
   boxscore?: { period: number; local?: EqFCBQ; visitor?: EqFCBQ }[];
 };
 
 const n = (x: unknown) => (typeof x === "number" && isFinite(x) ? x : Number(x) || 0);
+
+type Pbp = { c?: string; p?: number; m?: number; s?: number; l?: number | null; v?: number | null; x?: Record<string, string | number | boolean> };
+
+/**
+ * Jugada a jugada tal como viene dentro de las estadísticas de la FCBQ («playByPlay»): lista de jugadas o
+ * separada por cuartos. Se aplana y se pasa al formato corto (igual que hace la extensión con /pbp).
+ */
+export function pbpDesdeCrudo(raw: unknown): Pbp[] {
+  type O = Record<string, unknown>;
+  const lista: O[] = [];
+  const aplanar = (x: unknown, periodo?: number) => {
+    if (Array.isArray(x)) {
+      x.forEach((it, i) => {
+        if (!it || typeof it !== "object" || Array.isArray(it)) return;
+        const o = it as O;
+        const hijos = Object.values(o).filter((v) => Array.isArray(v) && v.some((q) => q && typeof q === "object"));
+        const pareceJugada = Object.keys(o).some((k) => /score|minute|second|time|type|code|actor|player/i.test(k));
+        if (hijos.length && !pareceJugada) {
+          const p = Number(o.period ?? o.periodNumber ?? o.quarter ?? o.number ?? i + 1);
+          hijos.forEach((h) => aplanar(h, p));
+        } else lista.push(periodo !== undefined && o.period === undefined && o.p === undefined ? { ...o, period: periodo } : o);
+      });
+    } else if (x && typeof x === "object") {
+      for (const [k, v] of Object.entries(x as O)) if (Array.isArray(v)) aplanar(v, /^\d+$/.test(k) ? Number(k) : periodo);
+    }
+  };
+  aplanar(raw);
+  const num = (...xs: unknown[]) => { for (const x of xs) if (x !== undefined && x !== null && x !== "" && !isNaN(Number(x))) return Number(x); return undefined; };
+  const plano = (o: O) => {
+    const out: Record<string, string | number | boolean> = {};
+    const meter = (pref: string, q: O) => {
+      for (const [k, v] of Object.entries(q)) {
+        if (Object.keys(out).length > 30) return;
+        if (v === null || v === undefined) continue;
+        if (typeof v === "object" && !Array.isArray(v) && !pref) meter(k + ".", v as O);
+        else if (["string", "number", "boolean"].includes(typeof v) && String(v).length < 60) out[pref + k] = v as string | number | boolean;
+      }
+    };
+    meter("", o);
+    return out;
+  };
+  return lista.map((e) => {
+    const t = e.time ?? e.clock;
+    const reloj = typeof t === "string" ? t.split(":") : null;
+    const sc = (e.score ?? {}) as O;
+    return {
+      c: (e.c ?? e.eventTypeCode ?? e.moveType ?? e.type ?? e.code) as string | undefined,
+      p: num(e.p, e.period, e.periodNumber, e.quarter, e.per),
+      m: num(e.m, e.minute, e.min, reloj?.[0]),
+      s: num(e.s, e.second, e.sec, reloj?.[1]),
+      l: num(e.l, e.localScore, e.scoreLocal, e.homeScore, sc.local) ?? null,
+      v: num(e.v, e.visitorScore, e.scoreVisitor, e.awayScore, sc.visitor) ?? null,
+      x: plano(e),
+    };
+  });
+}
 
 export function compactarStats(id: string, j: unknown): StatsPartido | null {
   const d = j as FCBQ;
@@ -105,18 +162,23 @@ export function compactarStats(id: string, j: unknown): StatsPartido | null {
     local: equipo("local"),
     visitante: equipo("visitor"),
     ...(() => {
-      const m = d.pbp?.length ? lineaMarcador(d.pbp) : [];
+      // La original de la FCBQ si ha llegado (mejor leída aquí); si no, la ya convertida por la extensión
+      const crudo = d.playByPlay ? pbpDesdeCrudo(d.playByPlay) : [];
+      const conMarcador = (l: Pbp[]) => l.some((e) => e.l !== null && e.l !== undefined);
+      const pbp = conMarcador(crudo) ? crudo : d.pbp ?? [];
+      const m = pbp.length ? lineaMarcador(pbp) : [];
       // Con marcador (jugada a jugada) o, si no lo hay, con los tramos en pista y su +/- (sinergias estimadas)
       const conTramos = (d.stints?.local?.length ?? 0) > 0;
-      const jugadas = d.pbp?.length ? canastas(d.pbp) : [];
+      const jugadas = pbp.length ? canastas(pbp) : [];
       return m.length > 1 ? { v: VERSION_STATS, marcador: m, ...(jugadas.length ? { jugadas } : {}) } : { v: conTramos ? VERSION_STATS : 1 };
     })(),
   };
 }
 
 /** Canastas en orden con quién las hace (dorsal y nombre, si la FCBQ los da en la jugada a jugada) */
-function canastas(pbp: NonNullable<FCBQ["pbp"]>): [0 | 1, number, number | null, string | null][] {
-  const out: [0 | 1, number, number | null, string | null][] = [];
+function canastas(pbp: Pbp[]): [0 | 1, number, number | null, string | null, number?][] {
+  const out: [0 | 1, number, number | null, string | null, number?][] = [];
+  const seg = segundoDePartido(pbp);
   let l = 0, v = 0;
   const dorsalDe = (x?: Record<string, string | number | boolean>) => {
     if (!x) return null;
@@ -136,23 +198,30 @@ function canastas(pbp: NonNullable<FCBQ["pbp"]>): [0 | 1, number, number | null,
   for (const e of pbp) {
     if (e.l === undefined || e.l === null || e.v === undefined || e.v === null) continue;
     const dl = n(e.l) - l, dv = n(e.v) - v;
-    if (dl > 0 && dl <= 3) out.push([0, dl, dorsalDe(e.x), nombreDe(e.x)]);
-    else if (dv > 0 && dv <= 3) out.push([1, dv, dorsalDe(e.x), nombreDe(e.x)]);
+    const t = seg(e);
+    if (dl > 0 && dl <= 3) out.push([0, dl, dorsalDe(e.x), nombreDe(e.x), ...(t !== null ? [t] : [])] as [0, number, number | null, string | null, number?]);
+    else if (dv > 0 && dv <= 3) out.push([1, dv, dorsalDe(e.x), nombreDe(e.x), ...(t !== null ? [t] : [])] as [1, number, number | null, string | null, number?]);
     l = n(e.l); v = n(e.v);
   }
   return out;
 }
 
-/** Marcador a lo largo del partido a partir de la jugada a jugada (reloj descendente por periodo) */
-function lineaMarcador(pbp: NonNullable<FCBQ["pbp"]>): [number, number, number][] {
+/** Segundo de partido (reloj de juego acumulado) de una jugada: reloj descendente por periodo */
+function segundoDePartido(pbp: Pbp[]) {
   // Duración de cada periodo: la del reloj al empezarlo (10:00, 5:00 en prórrogas…)
   const dur: Record<number, number> = {};
   for (const e of pbp) if (e.c === "INIPER" && e.p) dur[e.p] = n(e.m) * 60 + n(e.s);
   const inicio = (p: number) => { let t = 0; for (let i = 1; i < p; i++) t += dur[i] ?? (i > 4 ? 300 : 600); return t; };
+  return (e: Pbp): number | null => (e.p && e.m !== undefined ? inicio(e.p) + (dur[e.p] ?? (e.p > 4 ? 300 : 600)) - (n(e.m) * 60 + n(e.s)) : null);
+}
+
+/** Marcador a lo largo del partido a partir de la jugada a jugada (reloj descendente por periodo) */
+function lineaMarcador(pbp: Pbp[]): [number, number, number][] {
+  const seg = segundoDePartido(pbp);
   const res: [number, number, number][] = [[0, 0, 0]];
   for (const e of pbp) {
     if (!e.p || e.l === undefined || e.l === null || e.v === undefined || e.v === null) continue;
-    const t = inicio(e.p) + (dur[e.p] ?? (e.p > 4 ? 300 : 600)) - (n(e.m) * 60 + n(e.s));
+    const t = seg(e) ?? 0;
     const [, l, v] = res[res.length - 1];
     if (e.l !== l || e.v !== v) res.push([t, n(e.l), n(e.v)]);
   }

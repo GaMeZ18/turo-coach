@@ -166,7 +166,6 @@ async function pedirStats(plantilla, idBase, ids) {
       const r = await fetch(plantilla.split(idBase).join(id));
       if (!r.ok) { res[id] = { error: r.status }; continue; }
       const j = await r.json();
-      delete j.playByPlay;
       res[id] = j;
     } catch (e) { res[id] = { error: String(e?.message || e) }; }
     await new Promise((r) => setTimeout(r, 150));
@@ -188,12 +187,32 @@ async function apiStats(ids) {
       });
       if (!r.ok) { res[id] = { error: r.status }; continue; }
       const j = await r.json();
-      delete j.playByPlay;
-      // Jugada a jugada (marcador en cada momento): para quintetos, parejas y on/off
+      // La jugada a jugada suele venir ya dentro de las estadísticas («playByPlay»), a veces separada por
+      // cuartos: se aplana a una lista de jugadas, con el número de cuarto si viene del contenedor
+      const aplanar = (x, periodo, out = []) => {
+        if (Array.isArray(x)) {
+          x.forEach((it, i) => {
+            if (it && typeof it === "object" && !Array.isArray(it)) {
+              const hijos = Object.entries(it).filter(([, v]) => Array.isArray(v) && v.some((o) => o && typeof o === "object"));
+              const pareceJugada = Object.keys(it).some((k) => /score|minute|second|time|type|code|actor|player/i.test(k));
+              if (hijos.length && !pareceJugada) {
+                const p = it.period ?? it.periodNumber ?? it.quarter ?? it.number ?? i + 1;
+                for (const [, v] of hijos) aplanar(v, p, out);
+              } else out.push(periodo !== undefined && it.period === undefined && it.p === undefined ? { ...it, period: periodo } : it);
+            }
+          });
+        } else if (x && typeof x === "object") {
+          for (const [k, v] of Object.entries(x)) if (Array.isArray(v)) aplanar(v, /^\d+$/.test(k) ? Number(k) : periodo, out);
+        }
+        return out;
+      };
+      const pbpIncluida = aplanar(j.playByPlay);
+      // (se deja también la original: la app sabe leerla si los nombres de los campos no son los esperados)
+      // Jugada a jugada (marcador en cada momento): para quintetos, parejas, on/off y el vídeo
       try {
-        // La jugada a jugada puede estar en /pbp o en /moves (y a veces viene vacía)
-        let q = null, pj = null, ev = [];
-        for (const ruta of ["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"]) {
+        // Primero la que viene con las estadísticas; si no, /pbp o /moves (a veces viene vacía)
+        let q = pbpIncluida.length ? { ok: true, status: "incluida" } : null, pj = pbpIncluida.length ? pbpIncluida : null, ev = pbpIncluida;
+        for (const ruta of ev.length ? [] : ["pbp?currentSeason=true", "moves?currentSeason=true", "pbp"]) {
           q = await fetch(`https://msstats.optimalwayconsulting.com/v1/fcbq/matches/${id}/${ruta}`, {
             headers: { Authorization: `Bearer ${token}`, federation: "fcbq", Accept: "application/json, text/plain, */*" },
           }).catch(() => null);
@@ -220,6 +239,7 @@ async function apiStats(ids) {
           });
           // Muestra para diagnosticar si la FCBQ cambia el formato
           if (!res.__muestra) res.__muestra = { estado: q.status, claves: Object.keys(Array.isArray(pj) ? {} : pj), eventos: ev.length, primeros: ev.slice(0, 3) };
+          if (ev.length) res.__muestraOk = res.__muestraOk ?? { eventos: ev.length, primeros: ev.slice(0, 4) };
         } else if (!res.__muestra) {
           res.__muestra = { estado: q?.status ?? "sin respuesta" };
         }
@@ -251,7 +271,7 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     if (Object.keys(stats).length) return stats;
     throw new Error("No he podido leer las estadísticas de la FCBQ (la página no las ha cargado).");
   }
-  try { const j = JSON.parse(primero.texto); delete j.playByPlay; stats[ids[0]] = j; } catch {}
+  try { const j = JSON.parse(primero.texto); stats[ids[0]] = j; } catch {}
   const resto = ids.slice(1);
 
   // Rápido: misma dirección cambiando el id
@@ -271,7 +291,7 @@ async function bajarEstadisticas(tabId, ids, avisar) {
     avisar(`Estadísticas (una a una): ${k + 1} de ${faltan.length}…`);
     await abrirYEsperar(tabId, `${FCBQ}/estadistica/partit/${faltan[k]}`, avisar);
     const c = await capturado(tabId, faltan[k], 10);
-    if (c) { try { const j = JSON.parse(c.texto); delete j.playByPlay; stats[faltan[k]] = j; } catch {} }
+    if (c) { try { const j = JSON.parse(c.texto); stats[faltan[k]] = j; } catch {} }
   }
   for (const id of Object.keys(stats)) if (stats[id]?.error) delete stats[id];
   return stats;
