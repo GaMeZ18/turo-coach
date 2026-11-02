@@ -6,8 +6,8 @@ type P = [number, number];
 const BASE: P = [19.2, 7.5], ALA_I: P = [21, 2.6], ALA_D: P = [21, 12.4], ESQ_I: P = [27, 1], ESQ_D: P = [27, 14];
 const POSTE_I: P = [25.6, 5.4], POSTE_D: P = [25.6, 9.6], CODO_I: P = [22.6, 5.6], CODO_D: P = [22.6, 9.4];
 const TL: P = [22.2, 7.5], BASE_I: P = [19.6, 5], BASE_D: P = [19.6, 10];
-const FONDO: P = [27.9, 10.4];          // sacador de fondo (fuera, lado derecho del aro)
-const BANDA: P = [20, 15];              // sacador de banda (lado derecho)
+const FONDO: P = [27.5, 10.6];          // sacador de fondo (fuera, lado derecho del aro)
+const BANDA: P = [20, 14.5];              // sacador de banda (lado derecho)
 
 const ADULTOS = ["Junior", "Sénior"];
 const MAYORES = ["Cadete", "Junior", "Sénior"];
