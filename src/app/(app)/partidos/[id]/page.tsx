@@ -80,7 +80,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       <div className="mt-3 flex flex-wrap gap-2">
         <Link href={`/imprimir/partido/${p.id}`} className="btn-secundario"><FileText size={16} /> Informe PDF</Link>
         {esStaff && <Link href={`/scouting/equipo?nombre=${encodeURIComponent(p.rival)}`} className="btn-secundario"><Binoculars size={16} /> Scouting del rival</Link>}
-        {esStaff && <Link href={videoPartido ? `/video/${videoPartido.id}` : `/video?partido=${p.id}`} className="btn-secundario"><Clapperboard size={16} /> {videoPartido ? "Vídeo del partido" : "Añadir vídeo"}</Link>}
+        {perfil.rol === "coordinador" && <Link href={videoPartido ? `/video/${videoPartido.id}` : `/video?partido=${p.id}`} className="btn-secundario"><Clapperboard size={16} /> {videoPartido ? "Vídeo del partido" : "Añadir vídeo"}</Link>}
       </div>
 
       {/* Previa del partido (solo cuerpo técnico) */}

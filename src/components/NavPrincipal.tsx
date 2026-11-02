@@ -26,7 +26,11 @@ export default function NavPrincipal({ coordinador }: { coordinador: boolean }) 
 
   return (
     <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-1.5 text-sm [scrollbar-width:none]">
-      {items.map((n) => (
+      {items.map((n) => n.href === "/video" && !coordinador ? (
+        <span key={n.href} title="Próximamente" className="flex cursor-default items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium text-white/40">
+          {n.label}<span className="rounded bg-white/10 px-1 text-[9px] uppercase tracking-wide">Pronto</span>
+        </span>
+      ) : (
         <Link
           key={n.href}
           href={n.href}

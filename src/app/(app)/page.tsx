@@ -50,7 +50,7 @@ export default async function Inicio() {
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {[...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []), ...MODULOS].map(({ href, titulo, texto, icono: Icono }) => {
+        {[...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []), ...MODULOS.map((m) => (m.href === "/video" && perfil.rol !== "coordinador" ? { ...m, href: "" } : m))].map(({ href, titulo, texto, icono: Icono }) => {
           const contenido = (
             <>
               <span className={`flex h-11 w-11 items-center justify-center rounded-full ${href ? "bg-azul text-oro ring-2 ring-oro/60 ring-offset-2" : "bg-tinta/5 text-tinta/40"}`}>

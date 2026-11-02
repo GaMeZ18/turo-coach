@@ -13,7 +13,7 @@ const ESTADOS: Record<string, string> = {
 
 export default async function FichaJugador({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, perfil } = await requireUser();
   const equipo = await equipoActivo(supabase);
 
   const [{ data: j }, { data: rel }, { data: historial }] = await Promise.all([
@@ -70,7 +70,7 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
 
       <EstadisticasJugador supabase={supabase} jugador={{ id: j.id, nombre: j.nombre, apellidos: j.apellidos }} />
 
-      <VideoJugador supabase={supabase} jugadorId={j.id} />
+      {perfil.rol === "coordinador" && <VideoJugador supabase={supabase} jugadorId={j.id} />}
 
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Asistencia reciente</h2>
