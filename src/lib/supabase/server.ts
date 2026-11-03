@@ -32,7 +32,7 @@ export type Perfil = {
   id: string;
   nombre: string | null;
   email: string | null;
-  rol: "coordinador" | "entrenador";
+  rol: "coordinador" | "entrenador" | "gestor_mesas";
 };
 
 /** Devuelve el cliente, el usuario y su perfil. Redirige a /login si no hay sesión.

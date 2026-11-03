@@ -29,7 +29,7 @@ export async function crearPersona(_: ResultadoPersona, fd: FormData): Promise<R
   const supabase = await createClient();
   const nombre = String(fd.get("nombre") ?? "").trim();
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
-  const rol = fd.get("rol") === "coordinador" ? "coordinador" : "entrenador";
+  const rol = fd.get("rol") === "coordinador" ? "coordinador" : fd.get("rol") === "gestor_mesas" ? "gestor_mesas" : "entrenador";
   const modo = fd.get("modo") === "invitar" ? "invitar" : "password";
   if (!nombre || !/^\S+@\S+\.\S+$/.test(email)) return { error: "Escribe el nombre y un email válido." };
 

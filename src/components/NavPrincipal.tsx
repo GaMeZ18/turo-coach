@@ -19,10 +19,13 @@ const NAV = [
   { href: "/pizarra", label: "Pizarra" },
 ];
 
-export default function NavPrincipal({ coordinador }: { coordinador: boolean }) {
+export default function NavPrincipal({ rol }: { rol: "coordinador" | "entrenador" | "gestor_mesas" }) {
   const ruta = usePathname();
-  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, { href: "/club", label: "Club" }] : NAV;
-  const activo = (href: string) => (href === "/" ? ruta === "/" : ruta.startsWith(href));
+  const coordinador = rol === "coordinador";
+  // El gestor de mesas solo ve su apartado; el coordinador, todo (con Mesas incluido)
+  const items = rol === "gestor_mesas" ? [{ href: "/mesas", label: "Mesas" }, { href: "/mesas/pagos", label: "Pagos de mesas" }]
+    : coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, { href: "/mesas", label: "Mesas" }, { href: "/club", label: "Club" }] : NAV;
+  const activo = (href: string) => (href === "/" ? ruta === "/" : href === "/mesas" ? ruta === "/mesas" || (ruta.startsWith("/mesas") && !items.some((i) => i.href !== "/mesas" && ruta.startsWith(i.href))) : ruta.startsWith(href));
 
   return (
     <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-1.5 text-sm [scrollbar-width:none] lg:flex-wrap lg:gap-x-0.5 lg:gap-y-2 lg:overflow-visible">

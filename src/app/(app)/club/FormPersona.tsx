@@ -32,7 +32,7 @@ export function Credenciales({ r }: { r: NonNullable<ResultadoPersona> }) {
   );
 }
 
-export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir persona al staff" }: { equipos: { id: string; nombre: string }[]; rol?: "entrenador" | "coordinador"; titulo?: string }) {
+export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir persona al staff" }: { equipos: { id: string; nombre: string }[]; rol?: "entrenador" | "coordinador" | "gestor_mesas"; titulo?: string }) {
   const [r, accion] = useActionState(crearPersona, null);
   const [modo, setModo] = useState("password");
   const [origen, setOrigen] = useState("");
@@ -53,6 +53,7 @@ export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir pe
           <select name="rol" className="campo" defaultValue={rol}>
             <option value="entrenador">Staff (solo sus equipos)</option>
             <option value="coordinador">Coordinador (todo el club)</option>
+            <option value="gestor_mesas">Gestor de mesas (solo mesas y pagos)</option>
           </select>
         </div>
       </div>

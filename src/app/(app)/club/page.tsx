@@ -139,6 +139,7 @@ export default async function ClubPage() {
                       <select name="rol" defaultValue={p.rol} className="campo !w-auto !py-1 text-xs">
                         <option value="entrenador">Staff</option>
                         <option value="coordinador">Coordinador</option>
+                        <option value="gestor_mesas">Gestor de mesas</option>
                       </select>
                       <Enviar className="btn-secundario !px-2 !py-1 text-xs">OK</Enviar>
                     </form>
