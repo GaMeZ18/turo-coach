@@ -7,7 +7,7 @@ import { CAMPOS_EQUIPO, ETIQUETAS_JUGADOR, POSICIONES, esTuro, puedeVerScouting,
 import SinEquipo from "@/components/SinEquipo";
 import Enviar from "@/components/Enviar";
 import { guardarFichaJugador, guardarFichaRival } from "../actions";
-import { Lock, NotebookPen } from "lucide-react";
+import { FileText, Lock, NotebookPen } from "lucide-react";
 import Sinergias from "./Sinergias";
 import InformeRival from "@/components/InformeRival";
 
@@ -75,7 +75,10 @@ export default async function ScoutingEquipo({ searchParams }: { searchParams: P
   return (
     <div>
       <Link href="/scouting" className="text-sm text-tinta/60 hover:underline">← Scouting</Link>
-      <h1 className="mt-1 text-2xl font-semibold">{buscado}</h1>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold">{buscado}</h1>
+        {!nuestro && <Link href={`/imprimir/rival?nombre=${encodeURIComponent(buscado)}`} className="btn-primario"><FileText size={16} /> Informe en PDF</Link>}
+      </div>
       <p className="text-sm text-tinta/60">{nuestro ? "Nuestro equipo" : `Rival de ${equipo.nombre}`} · {jugados.length} partidos jugados · {r.pj} con estadísticas</p>
 
       <div className="mt-4"><InformeRival supabase={supabase} equipoId={equipo.id} nombre={buscado} /></div>

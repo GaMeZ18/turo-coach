@@ -7,7 +7,7 @@ import { esTuro, puedeVerScouting } from "@/lib/scouting";
 import { fechaCorta } from "@/lib/fechas";
 import SinEquipo from "@/components/SinEquipo";
 import ActualizarFCBQ from "../partidos/importar/ActualizarFCBQ";
-import { Binoculars, Lock, NotebookPen } from "lucide-react";
+import { Binoculars, Lock, NotebookPen, FileText } from "lucide-react";
 
 export default async function ScoutingPage() {
   const { supabase, user, perfil } = await requireUser();
@@ -67,14 +67,15 @@ export default async function ScoutingPage() {
       )}
 
       {proximo && (
-        <Link href={url(rivalProximo?.nombre ?? proximo.rival)} className="tarjeta mt-5 flex items-center gap-4 border-l-4 !border-l-rojo p-4 transition hover:shadow-md">
+        <div className="tarjeta mt-5 flex flex-wrap items-center gap-4 border-l-4 !border-l-rojo p-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-rojo">Próximo rival</div>
-          <div className="min-w-0 flex-1">
+          <Link href={url(rivalProximo?.nombre ?? proximo.rival)} className="min-w-0 flex-1 hover:underline">
             <div className="truncate font-semibold">{proximo.rival}</div>
             <div className="text-xs capitalize text-tinta/60">{fechaCorta(proximo.fecha)} · {proximo.local ? "en casa" : "fuera"}</div>
-          </div>
-          <span className="text-sm font-medium text-azul">Ver scouting →</span>
-        </Link>
+          </Link>
+          <Link href={`/imprimir/rival?nombre=${encodeURIComponent(rivalProximo?.nombre ?? proximo.rival)}`} className="btn-primario !py-1.5 text-sm"><FileText size={16} /> Informe PDF</Link>
+          <Link href={url(rivalProximo?.nombre ?? proximo.rival)} className="text-sm font-medium text-azul">Ver scouting →</Link>
+        </div>
       )}
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-tinta/60">Equipos de la liga</h2>
