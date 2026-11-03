@@ -1,7 +1,7 @@
 "use server";
 
 import { adminClient } from "@/lib/supabase/admin";
-import { normalizarTelefono, partidosDeCasa } from "@/lib/mesas";
+import { abierta, normalizarTelefono, partidosDeCasa } from "@/lib/mesas";
 
 export type MiMesa = { id: string; partido_id: string; estado: "candidato" | "confirmado" };
 type Res = { ok?: boolean; error?: string; mias?: MiMesa[]; nombre?: string };
@@ -35,9 +35,10 @@ export async function apuntarse(token: string, nombre: string, telefono: string,
   if (!nombre || tel.length < 9) return { error: "Escribe tu nombre y tu teléfono." };
   if (!partidos.length) return { error: "Marca al menos un partido." };
   // Solo partidos de casa, sin mesa federada y que aún no se han jugado
-  const validos = new Set((await partidosDeCasa(c.db, new Date().toISOString(), new Date(Date.now() + 60 * 864e5).toISOString())).filter((p) => !p.federada).map((p) => p.id));
+  // y con el plazo abierto (hasta el viernes de la semana del partido)
+  const validos = new Set((await partidosDeCasa(c.db, new Date().toISOString(), new Date(Date.now() + 60 * 864e5).toISOString())).filter((p) => !p.federada && abierta(p.fecha)).map((p) => p.id));
   const elegidos = partidos.filter((p) => validos.has(p));
-  if (!elegidos.length) return { error: "Esos partidos ya no admiten apuntarse." };
+  if (!elegidos.length) return { error: "El plazo para apuntarse a esos partidos ya está cerrado (se cierra el viernes)." };
 
   let { data: persona } = await c.db.from("mesa_personas").select("id, nombre").eq("telefono", tel).maybeSingle();
   if (!persona) {
@@ -61,6 +62,11 @@ export async function desapuntarse(token: string, telefono: string, asignacion: 
   const tel = normalizarTelefono(telefono);
   const { data: p } = await c.db.from("mesa_personas").select("id").eq("telefono", tel).maybeSingle();
   if (!p) return { error: "No te encuentro." };
-  await c.db.from("mesa_asignaciones").delete().eq("id", asignacion).eq("persona_id", p.id).eq("estado", "candidato");
+  // Después del viernes ya no se puede borrar uno mismo: solo el gestor, si hay una urgencia
+  const { data: a } = await c.db.from("mesa_asignaciones").select("id, partidos(fecha)").eq("id", asignacion).eq("persona_id", p.id).maybeSingle();
+  const fecha = (a?.partidos as unknown as { fecha: string } | null)?.fecha;
+  if (!a || !fecha) return misMesas(token, tel);
+  if (!abierta(fecha)) return { error: "El plazo ya está cerrado: si no puedes ir, avisa al gestor de mesas para que ponga a otra persona.", ...(await misMesas(token, tel)) };
+  await c.db.from("mesa_asignaciones").delete().eq("id", asignacion).eq("persona_id", p.id);
   return misMesas(token, tel);
 }

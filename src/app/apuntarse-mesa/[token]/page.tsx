@@ -1,5 +1,5 @@
 import { adminClient } from "@/lib/supabase/admin";
-import { partidosDeCasa, euros } from "@/lib/mesas";
+import { partidosDeCasa, euros, plazoMesa } from "@/lib/mesas";
 import Apuntarse from "./Apuntarse";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +25,8 @@ export default async function ApuntarseMesa({ params }: { params: Promise<{ toke
           <p className="text-sm text-tinta/60">CB Turó de la Peira · {euros(Number(cfg.importe))} por persona y partido</p>
         </div>
       </div>
-      <p className="mt-3 text-sm text-tinta/70">Marca los partidos en los que puedes hacer la mesa (cada mesa son 2 personas). Quedas <strong>pendiente</strong> hasta que el gestor de mesas te confirme.</p>
-      <Apuntarse token={token} partidos={partidos.map((p) => ({ id: p.id, fecha: p.fecha, equipo: p.equipo, rival: p.rival, lugar: p.lugar, confirmados: confirmados[p.id] ?? 0 }))} />
+      <p className="mt-3 text-sm text-tinta/70">Marca los partidos en los que puedes hacer la mesa (cada mesa son 2 personas). Quedas <strong>pendiente</strong> hasta que el gestor de mesas te confirme. Puedes apuntarte o borrarte <strong>hasta el viernes</strong> de la semana del partido; después, solo el gestor puede cambiar la mesa.</p>
+      <Apuntarse token={token} partidos={partidos.map((p) => ({ id: p.id, fecha: p.fecha, equipo: p.equipo, rival: p.rival, lugar: p.lugar, confirmados: confirmados[p.id] ?? 0, plazo: plazoMesa(p.fecha) }))} />
     </main>
   );
 }

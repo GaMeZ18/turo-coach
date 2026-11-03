@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Check, Clock, Loader2, X } from "lucide-react";
 import { apuntarse, desapuntarse, misMesas, type MiMesa } from "./actions";
 
-type P = { id: string; fecha: string; equipo: string; rival: string; lugar: string | null; confirmados: number };
+type P = { id: string; fecha: string; equipo: string; rival: string; lugar: string | null; confirmados: number; plazo: string };
 const TZ = "Europe/Madrid";
 const dia = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
 const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
@@ -35,7 +35,13 @@ export default function Apuntarse({ token, partidos }: { token: string; partidos
     setMias(r.mias ?? []); setMarcados(new Set());
     setMsg({ ok: true, t: "¡Apuntado! Te confirmará el gestor de mesas." });
   });
-  const quitar = (id: string) => start(async () => { const r = await desapuntarse(token, telefono, id); if (r.mias) setMias(r.mias); });
+  const quitar = (id: string) => start(async () => {
+    if (!confirm("¿Te borras de esta mesa?")) return;
+    const r = await desapuntarse(token, telefono, id);
+    if (r.mias) setMias(r.mias);
+    if (r.error) setMsg({ ok: false, t: r.error });
+  });
+  const ahora = new Date().toISOString();
 
   return (
     <div className="mt-4 space-y-4">
@@ -47,21 +53,22 @@ export default function Apuntarse({ token, partidos }: { token: string; partidos
       {partidos.length === 0 && <p className="tarjeta p-4 text-sm text-tinta/60">Ahora mismo no hay partidos de casa pendientes de mesa.</p>}
       <ul className="space-y-2">
         {partidos.map((p) => {
-          const m = mia(p.id), llena = p.confirmados >= 2;
+          const m = mia(p.id), llena = p.confirmados >= 2, cerrada = ahora >= p.plazo;
           return (
             <li key={p.id} className={`tarjeta flex items-center gap-3 p-3 ${marcados.has(p.id) ? "ring-2 ring-azul" : ""}`}>
               <div className="min-w-0 flex-1">
                 <p className="text-xs capitalize text-tinta/60">{dia(p.fecha)} · {hora(p.fecha)}</p>
                 <p className="font-semibold">{p.equipo} <span className="font-normal text-tinta/60">vs</span> {p.rival}</p>
                 {p.lugar && <p className="truncate text-xs text-tinta/50">{p.lugar}</p>}
+                <p className={`text-[11px] ${cerrada ? "text-red-700" : "text-tinta/50"}`}>{cerrada ? "Plazo cerrado" : `Puedes apuntarte o borrarte hasta el ${dia(p.plazo)} a las ${hora(p.plazo)}`}</p>
               </div>
               {m ? (
-                m.estado === "confirmado"
-                  ? <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800"><Check size={14} /> Confirmado</span>
-                  : <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800"><Clock size={14} /> Pendiente
-                      <button type="button" onClick={() => quitar(m.id)} title="Desapuntarme" className="ml-1"><X size={14} /></button></span>
-              ) : llena ? (
-                <span className="text-xs text-tinta/50">Completa</span>
+                <span className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${m.estado === "confirmado" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                  {m.estado === "confirmado" ? <Check size={14} /> : <Clock size={14} />} {m.estado === "confirmado" ? "Confirmado" : "Pendiente"}
+                  {!cerrada && <button type="button" onClick={() => quitar(m.id)} title="Borrarme" className="ml-1"><X size={14} /></button>}
+                </span>
+              ) : llena || cerrada ? (
+                <span className="text-xs text-tinta/50">{llena ? "Completa" : "Cerrado"}</span>
               ) : (
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input type="checkbox" className="h-5 w-5" checked={marcados.has(p.id)} onChange={(e) => setMarcados((s) => { const n = new Set(s); e.target.checked ? n.add(p.id) : n.delete(p.id); return n; })} />
@@ -79,7 +86,7 @@ export default function Apuntarse({ token, partidos }: { token: string; partidos
         </button>
       )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.t}</p>}
-      <p className="text-xs text-tinta/50">Si ya estás confirmado y no puedes ir, avisa al gestor de mesas para que busque a otra persona.</p>
+      <p className="text-xs text-tinta/50">Hasta el viernes te puedes borrar tú (también si ya estás confirmado). Después del viernes, si te surge una urgencia, avisa al gestor de mesas para que ponga a otra persona.</p>
     </div>
   );
 }

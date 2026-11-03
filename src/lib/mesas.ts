@@ -1,5 +1,6 @@
 // Mesas de los partidos de casa: quién está apuntado, quién confirmado y cuánto se debe.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { aISO } from "./fechas";
 
 export type PartidoMesa = { id: string; fecha: string; rival: string; lugar: string | null; equipo_id: string; equipo: string; federada: boolean };
 export type Asignacion = { id: string; partido_id: string; persona_id: string; estado: "candidato" | "confirmado"; importe: number; created_at: string; mesa_personas: { nombre: string; telefono: string | null } | null };
@@ -26,3 +27,17 @@ export const normalizarTelefono = (t: string) => {
   return d.startsWith("+34") ? d.slice(3) : d.startsWith("0034") ? d.slice(4) : d;
 };
 export const euros = (n: number) => `${n.toLocaleString("es-ES", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`;
+
+/**
+ * Hasta cuándo se puede uno apuntar o borrar sin cuenta: el viernes a las 23:59 de la semana del partido
+ * (o la hora del partido, si es antes). Después, solo el gestor puede cambiar la mesa.
+ */
+export function plazoMesa(fechaPartido: string): string {
+  const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(fechaPartido));
+  const d = new Date(`${dia}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 4); // viernes de esa semana
+  const viernes = d.toISOString().slice(0, 10);
+  const corte = aISO(viernes, "23:59");
+  return corte < fechaPartido ? corte : fechaPartido;
+}
+export const abierta = (fechaPartido: string, ahora = new Date().toISOString()) => ahora < plazoMesa(fechaPartido);
