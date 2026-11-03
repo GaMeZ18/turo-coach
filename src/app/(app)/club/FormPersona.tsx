@@ -32,14 +32,14 @@ export function Credenciales({ r }: { r: NonNullable<ResultadoPersona> }) {
   );
 }
 
-export function NuevaPersona({ equipos }: { equipos: { id: string; nombre: string }[] }) {
+export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir persona al staff" }: { equipos: { id: string; nombre: string }[]; rol?: "entrenador" | "coordinador"; titulo?: string }) {
   const [r, accion] = useActionState(crearPersona, null);
   const [modo, setModo] = useState("password");
   const [origen, setOrigen] = useState("");
   useEffect(() => setOrigen(location.origin), []);
   return (
     <form action={accion} className="tarjeta space-y-3 p-4" key={r?.ok ? r.email : "form"}>
-      <h2 className="flex items-center gap-2 font-semibold"><UserPlus size={18} className="text-azul" /> Añadir persona al staff</h2>
+      <h2 className="flex items-center gap-2 font-semibold"><UserPlus size={18} className="text-azul" /> {titulo}</h2>
       <input type="hidden" name="origen" value={origen} />
       <div className="grid gap-2 sm:grid-cols-2">
         <div><label className="etiqueta">Nombre y apellidos</label><input name="nombre" required className="campo" placeholder="Laura Martí" /></div>
@@ -50,7 +50,7 @@ export function NuevaPersona({ equipos }: { equipos: { id: string; nombre: strin
         </div>
         <div>
           <label className="etiqueta">Permisos</label>
-          <select name="rol" className="campo" defaultValue="entrenador">
+          <select name="rol" className="campo" defaultValue={rol}>
             <option value="entrenador">Staff (solo sus equipos)</option>
             <option value="coordinador">Coordinador (todo el club)</option>
           </select>

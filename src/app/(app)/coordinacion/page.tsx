@@ -6,6 +6,7 @@ import { equiposDeTemporada } from "@/lib/equipo-activo";
 import { colorEquipo } from "@/lib/colores";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
+import AltaRapida from "./AltaRapida";
 import { AlertTriangle, CalendarCheck, ClipboardList, Gauge, MapPin, Trophy, UserX, Users } from "lucide-react";
 
 type Ent = { id: string; equipo_id: string; fecha: string; duracion_prevista: number | null; lugar: string | null };
@@ -87,13 +88,21 @@ export default async function Coordinacion() {
 
   return (
     <div>
-      <h1 className="flex items-center gap-2 text-2xl font-semibold"><Gauge className="text-azul" /> Panel del coordinador</h1>
-      <p className="text-sm text-tinta/60">Temporada {temporada?.nombre ?? ""} · semana del {fechaCorta(iniSemana)} · {equipos.length} equipos</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold"><Gauge className="text-azul" /> Panel del coordinador</h1>
+          <p className="text-sm text-tinta/60">Temporada {temporada?.nombre ?? ""} · semana del {fechaCorta(iniSemana)} · {equipos.length} equipos</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/coordinacion/asistencia" className="btn-secundario"><Users size={16} /> Asistencia general</Link>
+          <AltaRapida equipos={equipos.map((e) => ({ id: e.id, nombre: e.nombre }))} />
+        </div>
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi icono={CalendarCheck} v={`${totalPlan}/${totalSem}`} t="Entrenos planificados" alerta={totalSem > 0 && totalPlan < totalSem / 2} />
         <Kpi icono={ClipboardList} v={sinLista.length} t="Sin pasar lista (14 d)" alerta={sinLista.length > 0} />
-        <Kpi icono={Users} v={asisMedia === null ? "–" : `${asisMedia}%`} t="Asistencia (30 d)" alerta={asisMedia !== null && asisMedia < 70} />
+        <Link href="/coordinacion/asistencia" className="block"><Kpi icono={Users} v={asisMedia === null ? "–" : `${asisMedia}%`} t="Asistencia (30 d) ›" alerta={asisMedia !== null && asisMedia < 70} /></Link>
         <Kpi icono={UserX} v={faltan.length} t="Jugadores que faltan" alerta={faltan.length > 0} />
         <Kpi icono={MapPin} v={choques.size} t="Choques de pista" alerta={choques.size > 0} />
         <Kpi icono={Trophy} v={proximos.length} t="Partidos (7 días)" />
