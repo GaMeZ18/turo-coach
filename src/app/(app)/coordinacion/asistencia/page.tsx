@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/supabase/server";
 import { todas } from "@/lib/db";
 import { equiposDeTemporada } from "@/lib/equipo-activo";
 import { colorEquipo } from "@/lib/colores";
-import { aISO, sumarDias, hoyLocal } from "@/lib/fechas";
+import { aISO, hoyLocal } from "@/lib/fechas";
+import { sumarDias } from "@/lib/pistas";
 import { ArrowLeft, Users } from "lucide-react";
 
 type Fila = { jugador_id: string; estado: string; entrenamiento_id: string; entrenamientos: { fecha: string; equipo_id: string }; jugadores: { nombre: string; apellidos: string | null } | null };
