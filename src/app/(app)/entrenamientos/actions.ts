@@ -104,6 +104,7 @@ export async function anadirActividad(formData: FormData) {
     ejercicio_id: ejercicioId,
     titulo,
     duracion,
+    notas: String(formData.get("notas") ?? "").trim() || null,
   }));
   revalidatePath(ruta(entreno));
 }

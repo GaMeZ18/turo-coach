@@ -38,6 +38,7 @@ export default function Actividades({
   const [abierta, setAbierta] = useState<string | null>(null);
   const [, start] = useTransition();
   const formAlta = useRef<HTMLFormElement>(null);
+  const [tipoAlta, setTipoAlta] = useState("ejercicio");
   useEffect(() => setLista(actividades), [actividades]);
 
   const total = lista.reduce((s, a) => s + (a.duracion || 0), 0);
@@ -88,6 +89,7 @@ export default function Actividades({
                 <button onClick={() => setAbierta(abierta === a.id ? null : a.id)} className="min-w-0 flex-1 text-left">
                   <span className={`mr-2 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${tipo.color}`}>{tipo.label}</span>
                   <span className="font-medium">{titulo}</span>
+                  {!a.ejercicio_id && a.notas && abierta !== a.id && <span className="mt-0.5 block truncate text-xs text-tinta/60">{a.notas}</span>}
                 </button>
                 <input
                   type="number" min={0} defaultValue={a.duracion} aria-label="Minutos"
@@ -135,21 +137,22 @@ export default function Actividades({
       </div>
       <form
         ref={formAlta}
-        action={async (fd) => { await anadirActividad(fd); formAlta.current?.reset(); }}
+        action={async (fd) => { await anadirActividad(fd); formAlta.current?.reset(); setTipoAlta("ejercicio"); }}
         className="tarjeta mt-2 space-y-2 p-3"
       >
         <input type="hidden" name="entrenamiento_id" value={entrenoId} />
-        <p className="text-xs font-medium text-tinta/60">Otra actividad (calentamiento, agua, nota…)</p>
+        <p className="text-xs font-medium text-tinta/60">Añadir rápido (sin pizarra): ejercicio, calentamiento, series, agua, nota…</p>
         <div className="flex flex-wrap gap-2">
-          <select name="tipo" className="campo !w-auto">
-            {Object.entries(TIPOS).filter(([k]) => k !== "ejercicio").map(([k, v]) => (
+          <select name="tipo" value={tipoAlta} onChange={(e) => setTipoAlta(e.target.value)} className="campo !w-auto">
+            {Object.entries(TIPOS).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-          <input name="titulo" placeholder="Título (opcional)" className="campo min-w-32 flex-1" />
+          <input name="titulo" required={tipoAlta === "ejercicio"} placeholder={tipoAlta === "ejercicio" ? "Título del ejercicio" : "Título (opcional)"} className="campo min-w-32 flex-1" />
           <input name="duracion" type="number" min={0} placeholder="Min" className="campo !w-20" />
           <Enviar className="btn-secundario shrink-0">Añadir</Enviar>
         </div>
+        <textarea name="notas" rows={tipoAlta === "ejercicio" ? 2 : 1} placeholder={tipoAlta === "ejercicio" ? "Breve descripción: organización, reglas, qué corregir… (opcional)" : "Descripción (opcional)"} className="campo text-sm" />
       </form>
       <Link
         href={`/ejercicios/nuevo?entreno=${entrenoId}`}
