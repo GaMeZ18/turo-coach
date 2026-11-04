@@ -33,7 +33,12 @@ export type Perfil = {
   nombre: string | null;
   email: string | null;
   rol: "coordinador" | "entrenador" | "gestor_mesas";
+  /** Permiso extra: gestiona las mesas de los partidos (además de su rol) */
+  gestor_mesas?: boolean;
 };
+
+/** ¿Puede entrar en Mesas? (coordinadores y quien tenga el permiso de gestor de mesas) */
+export const gestionaMesas = (p: Perfil) => p.rol === "coordinador" || p.rol === "gestor_mesas" || !!p.gestor_mesas;
 
 /** Devuelve el cliente, el usuario y su perfil. Redirige a /login si no hay sesión.
  *  Con cache(): layout y página comparten la misma consulta en cada petición. */
@@ -43,11 +48,13 @@ export const requireUser = cache(async () => {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data: perfil } = await supabase
+  let { data: perfil, error } = await supabase
     .from("perfiles")
-    .select("id, nombre, email, rol")
+    .select("id, nombre, email, rol, gestor_mesas")
     .eq("id", user.id)
     .single();
+  // Si aún no existe la columna gestor_mesas (migración 0024), se lee sin ella
+  if (error && /gestor_mesas/.test(error.message)) ({ data: perfil } = await supabase.from("perfiles").select("id, nombre, email, rol").eq("id", user.id).single());
   return {
     supabase,
     user,

@@ -6,7 +6,7 @@ import { equiposDeTemporada } from "@/lib/equipo-activo";
 import { colorEquipo } from "@/lib/colores";
 import Enviar from "@/components/Enviar";
 import { check } from "@/lib/db";
-import { alternarAcceso, asignarEquipo, cambiarRol, quitarEquipo } from "./actions";
+import { alternarAcceso, alternarGestorMesas, asignarEquipo, cambiarRol, quitarEquipo } from "./actions";
 import { BotonNuevaPassword, NuevaPersona } from "./FormPersona";
 import { FUNCIONES } from "@/lib/funciones";
 import { AlertTriangle, Ban, Shield, X } from "lucide-react";
@@ -36,7 +36,7 @@ export default async function ClubPage() {
   if (perfil.rol !== "coordinador") redirect("/");
 
   const [{ data: perfiles }, { data: temporadas }, { equipos }] = await Promise.all([
-    supabase.from("perfiles").select("id, nombre, email, rol").order("nombre"),
+    supabase.from("perfiles").select("*").order("nombre"),
     supabase.from("temporadas").select("id, nombre, actual").order("nombre", { ascending: false }),
     equiposDeTemporada(supabase),
   ]);
@@ -139,10 +139,18 @@ export default async function ClubPage() {
                       <select name="rol" defaultValue={p.rol} className="campo !w-auto !py-1 text-xs">
                         <option value="entrenador">Staff</option>
                         <option value="coordinador">Coordinador</option>
-                        <option value="gestor_mesas">Gestor de mesas</option>
                       </select>
                       <Enviar className="btn-secundario !px-2 !py-1 text-xs">OK</Enviar>
                     </form>
+                    {admin && (
+                      <form action={alternarGestorMesas}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="valor" value={(p as { gestor_mesas?: boolean }).gestor_mesas ? "0" : "1"} />
+                        <Enviar className={`!px-2 !py-1 text-xs ${(p as { gestor_mesas?: boolean }).gestor_mesas ? "btn-primario" : "btn-secundario"}`} title="Permiso para gestionar las mesas de los partidos">
+                          {(p as { gestor_mesas?: boolean }).gestor_mesas ? "✓ Gestor de mesas" : "+ Gestor de mesas"}
+                        </Enviar>
+                      </form>
+                    )}
                     {admin && <BotonNuevaPassword id={p.id} nombre={p.nombre ?? ""} />}
                     {admin && (
                       <form action={alternarAcceso}>

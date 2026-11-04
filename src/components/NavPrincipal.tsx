@@ -19,12 +19,12 @@ const NAV = [
   { href: "/pizarra", label: "Pizarra" },
 ];
 
-export default function NavPrincipal({ rol }: { rol: "coordinador" | "entrenador" | "gestor_mesas" }) {
+export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean }) {
   const ruta = usePathname();
   const coordinador = rol === "coordinador";
-  // El gestor de mesas solo ve su apartado; el coordinador, todo (con Mesas incluido)
-  const items = rol === "gestor_mesas" ? [{ href: "/mesas", label: "Mesas" }, { href: "/mesas/pagos", label: "Pagos de mesas" }]
-    : coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, { href: "/mesas", label: "Mesas" }, { href: "/club", label: "Club" }] : NAV;
+  // Mesas: para coordinadores y para quien tenga el permiso de gestor de mesas (que además es entrenador)
+  const conMesas = mesas || coordinador ? [{ href: "/mesas", label: "Mesas" }] : [];
+  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, { href: "/club", label: "Club" }] : [...NAV, ...conMesas];
   const activo = (href: string) => (href === "/" ? ruta === "/" : href === "/mesas" ? ruta === "/mesas" || (ruta.startsWith("/mesas") && !items.some((i) => i.href !== "/mesas" && ruta.startsWith(i.href))) : ruta.startsWith(href));
 
   return (

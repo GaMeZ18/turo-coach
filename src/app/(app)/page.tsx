@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge,
 } from "lucide-react";
@@ -24,7 +23,6 @@ const MODULOS = [
 
 export default async function Inicio() {
   const { supabase, perfil } = await requireUser();
-  if (perfil.rol === "gestor_mesas") redirect("/mesas");
   const activo = await equipoActivo(supabase);
 
   return (

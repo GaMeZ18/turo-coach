@@ -29,7 +29,8 @@ export async function crearPersona(_: ResultadoPersona, fd: FormData): Promise<R
   const supabase = await createClient();
   const nombre = String(fd.get("nombre") ?? "").trim();
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
-  const rol = fd.get("rol") === "coordinador" ? "coordinador" : fd.get("rol") === "gestor_mesas" ? "gestor_mesas" : "entrenador";
+  const rol = fd.get("rol") === "coordinador" ? "coordinador" : "entrenador";
+  const mesas = fd.get("gestor_mesas") === "on";
   const modo = fd.get("modo") === "invitar" ? "invitar" : "password";
   if (!nombre || !/^\S+@\S+\.\S+$/.test(email)) return { error: "Escribe el nombre y un email válido." };
 
@@ -50,6 +51,7 @@ export async function crearPersona(_: ResultadoPersona, fd: FormData): Promise<R
 
   // El perfil lo crea un disparador; ponemos nombre y rol
   await admin.from("perfiles").update({ nombre, rol }).eq("id", id);
+  if (mesas) await admin.from("perfiles").update({ gestor_mesas: true }).eq("id", id);
   // Equipos y función
   const equipos = fd.getAll("equipos").map(String).filter(Boolean);
   const funcion = String(fd.get("funcion") ?? "entrenador");
@@ -110,4 +112,14 @@ export async function quitarEquipo(fd: FormData) {
   check(await supabase.from("equipo_staff").delete().eq("equipo_id", String(fd.get("equipo_id"))).eq("perfil_id", String(fd.get("perfil_id"))));
   revalidatePath("/club");
   revalidatePath("/equipos");
+}
+
+/** Dar o quitar el permiso de gestor de mesas (se suma a su rol de staff o coordinador) */
+export async function alternarGestorMesas(fd: FormData) {
+  await soloCoordinador();
+  const admin = adminClient();
+  if (!admin) throw new Error(SIN_CLAVE);
+  const { error } = await admin.from("perfiles").update({ gestor_mesas: fd.get("valor") === "1" }).eq("id", String(fd.get("id")));
+  if (error) throw new Error(/gestor_mesas/.test(error.message) ? "Falta aplicar la migración 0024 en Supabase." : error.message);
+  revalidatePath("/club");
 }

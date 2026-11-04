@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/supabase/server";
+import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { partidosDeCasa, euros } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
@@ -18,7 +18,7 @@ const nombreMes = (mes: string) => new Date(`${mes}-15T12:00:00Z`).toLocaleDateS
 /** Recuento del mes: cuántas mesas ha hecho cada persona y cuánto se le debe */
 export default async function PagosMesas({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const { supabase, perfil } = await requireUser();
-  if (perfil.rol !== "coordinador" && perfil.rol !== "gestor_mesas") redirect("/");
+  if (!gestionaMesas(perfil)) redirect("/");
   const { mes: m } = await searchParams;
   const mes = m && /^\d{4}-\d{2}$/.test(m) ? m : hoyLocal().slice(0, 7);
   const desde = aISO(`${mes}-01`, "00:00"), hasta = aISO(`${sumarMes(mes, 1)}-01`, "00:00");

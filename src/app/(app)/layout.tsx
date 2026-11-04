@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/supabase/server";
+import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { equipoActivo, misEquipos } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </div>
-        <NavPrincipal rol={perfil.rol} />
+        <NavPrincipal rol={perfil.rol} mesas={gestionaMesas(perfil)} />
         <div className="filete" />
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>

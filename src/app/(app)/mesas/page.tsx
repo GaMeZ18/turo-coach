@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/supabase/server";
+import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
 import { partidosDeCasa, euros, POR_MESA, type Asignacion } from "@/lib/mesas";
@@ -12,7 +12,7 @@ import { ChevronLeft, ChevronRight, ClipboardCheck, Link2, Settings, Wallet, X, 
 
 export default async function Mesas({ searchParams }: { searchParams: Promise<{ semana?: string }> }) {
   const { supabase, perfil } = await requireUser();
-  if (perfil.rol !== "coordinador" && perfil.rol !== "gestor_mesas") redirect("/");
+  if (!gestionaMesas(perfil)) redirect("/");
   const { semana } = await searchParams;
   const lunes = lunesDe(semana && /^\d{4}-\d{2}-\d{2}$/.test(semana) ? semana : hoyLocal());
   const desde = aISO(lunes, "00:00"), hasta = aISO(sumarDias(lunes, 7), "00:00");

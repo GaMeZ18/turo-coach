@@ -34,8 +34,11 @@ export default async function Coordinacion() {
   ]);
   const entrenos = (entR ?? []) as Ent[];
   const semana = entrenos.filter((e) => e.fecha >= iniSemana);
-  const { data: actR } = semana.length ? await supabase.from("entreno_actividades").select("entrenamiento_id").in("entrenamiento_id", semana.map((e) => e.id)) : { data: [] };
-  const conActividades = new Set((actR ?? []).map((a) => a.entrenamiento_id as string));
+  // Entrenos recientes (14 días) y los de esta semana: qué se ha montado en cada uno
+  const recientes = entrenos.filter((e) => e.fecha >= hace14).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const { data: actR } = recientes.length ? await supabase.from("entreno_actividades").select("entrenamiento_id, titulo, duracion, orden").in("entrenamiento_id", recientes.map((e) => e.id)).order("orden") : { data: [] };
+  const actividades = (actR ?? []) as { entrenamiento_id: string; titulo: string | null; duracion: number | null }[];
+  const conActividades = new Set(actividades.map((a) => a.entrenamiento_id));
 
   const asis = (asisR ?? []) as unknown as { jugador_id: string; estado: string; entrenamiento_id: string; entrenamientos: { fecha: string; equipo_id: string }; jugadores: { nombre: string; apellidos: string | null } | null }[];
   const conLista = new Set(asis.map((a) => a.entrenamiento_id));
@@ -133,6 +136,57 @@ export default async function Coordinacion() {
         </table>
       </div>
       <p className="mt-1 text-[11px] text-tinta/50">Planificado = el entreno tiene ejercicios o actividades. Lista = se ha pasado asistencia.</p>
+
+      {/* Entrenos de cada equipo: qué se ha montado y asistencia, día a día */}
+      <section className="mt-5">
+        <h2 className="flex items-center gap-2 font-semibold"><ClipboardList size={17} className="text-azul" /> Entrenos de cada equipo (últimos 14 días y esta semana)</h2>
+        <div className="mt-2 grid gap-3 lg:grid-cols-2">
+          {equipos.map((eq) => {
+            const es = recientes.filter((e) => e.equipo_id === eq.id);
+            const pasados = es.filter((e) => e.fecha <= ahora);
+            const sinListaEq = pasados.filter((e) => !conLista.has(e.id)).length;
+            const sinMontar = es.filter((e) => !conActividades.has(e.id)).length;
+            const aEq = asis.filter((a) => a.entrenamientos.equipo_id === eq.id && a.entrenamientos.fecha >= hace14);
+            const pEq = pc(aEq.filter(presente).length, aEq.length);
+            return (
+              <details key={eq.id} className="tarjeta p-3" open={sinListaEq > 0 || sinMontar > 0}>
+                <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-semibold"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: colorEquipo(eq.id, equipos) }} />{eq.nombre}</span>
+                  <span className="text-xs text-tinta/60">{es.length} entrenos</span>
+                  {pEq !== null && <span className={`text-xs font-semibold ${pEq >= 80 ? "text-green-700" : pEq >= 65 ? "text-amber-700" : "text-red-700"}`}>asistencia {pEq}%</span>}
+                  {sinListaEq > 0 && <span className="rounded bg-red-50 px-1.5 text-[11px] font-semibold text-red-700">{sinListaEq} sin lista</span>}
+                  {sinMontar > 0 && <span className="rounded bg-amber-50 px-1.5 text-[11px] font-semibold text-amber-800">{sinMontar} sin montar</span>}
+                </summary>
+                {es.length === 0 ? <p className="mt-2 text-sm text-tinta/50">No tiene entrenos en estas fechas.</p> : (
+                  <ul className="mt-2 divide-y divide-linea text-sm">
+                    {es.map((e) => {
+                      const act = actividades.filter((a) => a.entrenamiento_id === e.id);
+                      const lista = asis.filter((a) => a.entrenamiento_id === e.id);
+                      const hecho = e.fecha <= ahora;
+                      const minutos = act.reduce((s2, a) => s2 + (a.duracion ?? 0), 0);
+                      return (
+                        <li key={e.id} className="flex gap-2 py-1.5">
+                          <Link href={`/entrenamientos/${e.id}`} className="w-24 shrink-0 text-xs capitalize text-tinta/60 hover:underline">{fechaCorta(e.fecha)}<br />{hora(e.fecha)}{e.lugar ? ` · ${e.lugar}` : ""}</Link>
+                          <div className="min-w-0 flex-1">
+                            {act.length ? (
+                              <p className="text-xs"><span className="text-tinta/50">{act.length} actividades{minutos ? ` · ${minutos}′` : ""}:</span> {act.slice(0, 4).map((a) => a.titulo).filter(Boolean).join(" · ")}{act.length > 4 ? ` y ${act.length - 4} más` : ""}</p>
+                            ) : <p className="text-xs font-semibold text-amber-800">Sin montar (no tiene ejercicios)</p>}
+                          </div>
+                          <div className="w-24 shrink-0 text-right text-xs">
+                            {!hecho ? <span className="text-tinta/40">Pendiente</span>
+                              : lista.length ? <span className="font-semibold">{lista.filter(presente).length}/{lista.length} <span className={pc(lista.filter(presente).length, lista.length)! >= 80 ? "text-green-700" : "text-amber-700"}>({pc(lista.filter(presente).length, lista.length)}%)</span></span>
+                              : <span className="font-semibold text-red-700">Sin lista</span>}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </details>
+            );
+          })}
+        </div>
+      </section>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <section className="tarjeta p-4">

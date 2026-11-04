@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, requireUser } from "@/lib/supabase/server";
+import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { normalizarTelefono, POR_MESA } from "@/lib/mesas";
 
 async function gestor() {
   const { perfil } = await requireUser();
-  if (perfil.rol !== "coordinador" && perfil.rol !== "gestor_mesas") throw new Error("Solo el gestor de mesas o un coordinador.");
+  if (!gestionaMesas(perfil)) throw new Error("Solo el gestor de mesas o un coordinador.");
   return createClient();
 }
 const refrescar = () => { revalidatePath("/mesas"); revalidatePath("/mesas/pagos"); };

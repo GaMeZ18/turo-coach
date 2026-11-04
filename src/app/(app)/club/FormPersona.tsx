@@ -32,7 +32,7 @@ export function Credenciales({ r }: { r: NonNullable<ResultadoPersona> }) {
   );
 }
 
-export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir persona al staff" }: { equipos: { id: string; nombre: string }[]; rol?: "entrenador" | "coordinador" | "gestor_mesas"; titulo?: string }) {
+export function NuevaPersona({ equipos, rol = "entrenador", mesas = false, titulo = "Añadir persona al staff" }: { equipos: { id: string; nombre: string }[]; rol?: "entrenador" | "coordinador"; mesas?: boolean; titulo?: string }) {
   const [r, accion] = useActionState(crearPersona, null);
   const [modo, setModo] = useState("password");
   const [origen, setOrigen] = useState("");
@@ -53,7 +53,6 @@ export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir pe
           <select name="rol" className="campo" defaultValue={rol}>
             <option value="entrenador">Staff (solo sus equipos)</option>
             <option value="coordinador">Coordinador (todo el club)</option>
-            <option value="gestor_mesas">Gestor de mesas (solo mesas y pagos)</option>
           </select>
         </div>
       </div>
@@ -69,6 +68,7 @@ export function NuevaPersona({ equipos, rol = "entrenador", titulo = "Añadir pe
           {!equipos.length && <span className="text-sm text-tinta/50">Crea antes los equipos en Equipos.</span>}
         </div>
       </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="gestor_mesas" defaultChecked={mesas} /> También <strong>gestor de mesas</strong> (asigna las mesas de los partidos de casa y lleva los pagos)</label>
       <div className="flex flex-wrap gap-3 text-sm">
         <label className="flex items-center gap-1.5"><input type="radio" name="modo" value="password" checked={modo === "password"} onChange={() => setModo("password")} /> Crear con contraseña provisional (se la mandas tú por WhatsApp)</label>
         <label className="flex items-center gap-1.5"><input type="radio" name="modo" value="invitar" checked={modo === "invitar"} onChange={() => setModo("invitar")} /> Enviar invitación por email</label>
