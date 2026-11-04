@@ -9,7 +9,7 @@ $$;
 create or replace function public.proteger_gestor_mesas() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if new.gestor_mesas is distinct from old.gestor_mesas and not public.es_coordinador() then
+  if new.gestor_mesas is distinct from old.gestor_mesas and auth.uid() is not null and not public.es_coordinador() then
     new.gestor_mesas := old.gestor_mesas;
   end if;
   return new;
