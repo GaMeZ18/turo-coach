@@ -1,4 +1,5 @@
 // Traducció al català de la interfície (castellà → català).
+import { CA_EXTRA, CA_PATRONES } from "./ca-extra";
 // La fa el component <Traductor/> sobre el text que es veu: només canvia textos que coincideixen
 // exactament amb una clau (els noms, les notes i els exercicis que escriu cadascú no es toquen).
 
@@ -348,11 +349,27 @@ const PARAULES: Record<string, string> = {
 const RE_FECHA = /^[\s,.\d:·]*(?:(?:lunes|martes|miércoles|jueves|viernes|sábado|domingo|lun|mar|mié|jue|vie|sáb|dom|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|ene|feb|abr|may|jun|jul|ago|sept|sep|oct|nov|dic|de|del)\.?[\s,.\d:·]*)+$/i;
 
 /** Traduce un texto si es de la interfaz (coincidencia exacta) o una fecha */
-export function aCatalan(texto: string): string | null {
-  const t = texto.trim();
+// Patrones con huecos: "Añadidos {}, actualizados {}" → regex que captura lo que cambia
+const PATRONES = CA_PATRONES.map(([es, ca]) => ({
+  re: new RegExp(`^${es.split("{}").map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("([\\s\\S]*?)")}$`),
+  ca,
+}));
+
+export function aCatalan(texto: string, prof = 0): string | null {
+  const t = texto.trim().replace(/\s+/g, " ");
   if (!t) return null;
-  const d = CA[t];
-  if (d !== undefined) return d === t ? null : texto.replace(t, d);
+  const d = CA[t] ?? CA_EXTRA[t];
+  if (d !== undefined) return d === t ? null : texto.trim() === t ? texto.replace(t, d) : d;
+  if (prof < 2) {
+    for (const p of PATRONES) {
+      const m = t.match(p.re);
+      if (!m) continue;
+      let i = 1;
+      // lo que va en los huecos (números, nombres) se deja; si es un texto conocido, también se traduce
+      const r = p.ca.replace(/\{\}/g, () => { const v = m[i++] ?? ""; return aCatalan(v, prof + 1) ?? v; });
+      return r === t ? null : texto.replace(texto.trim(), r);
+    }
+  }
   if (RE_FECHA.test(t) && /[a-zé]/i.test(t)) {
     let numero = false;
     const r = texto.replace(/[a-záéíóú]+\.?|\d+/gi, (w) => {
