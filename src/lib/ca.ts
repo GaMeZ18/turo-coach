@@ -1,5 +1,5 @@
 // Traducció al català de la interfície (castellà → català).
-import { CA_EXTRA, CA_PATRONES } from "./ca-extra";
+import { CA_EXTRA, CA_PALABRAS, CA_PATRONES } from "./ca-extra";
 // La fa el component <Traductor/> sobre el text que es veu: només canvia textos que coincideixen
 // exactament amb una clau (els noms, les notes i els exercicis que escriu cadascú no es toquen).
 
@@ -355,6 +355,9 @@ const PATRONES = CA_PATRONES.map(([es, ca]) => ({
   ca,
 }));
 
+/** Traduce palabra a palabra lo que va dentro de un hueco: solo palabras en minúscula conocidas (los nombres no se tocan) */
+const porPalabras = (v: string) => v.replace(/[a-záéíóúñü]+/g, (w) => CA_PALABRAS[w] ?? w);
+
 export function aCatalan(texto: string, prof = 0): string | null {
   const t = texto.trim().replace(/\s+/g, " ");
   if (!t) return null;
@@ -366,8 +369,9 @@ export function aCatalan(texto: string, prof = 0): string | null {
       if (!m) continue;
       let i = 1;
       // lo que va en los huecos (números, nombres) se deja; si es un texto conocido, también se traduce
-      const r = p.ca.replace(/\{\}/g, () => { const v = m[i++] ?? ""; return aCatalan(v, prof + 1) ?? v; });
-      return r === t ? null : texto.replace(texto.trim(), r);
+      const r = p.ca.replace(/\{\}/g, () => { const v = m[i++] ?? ""; return aCatalan(v, prof + 1) ?? porPalabras(v); });
+      const fin = r.replace(/\btaulas\b/g, "taules").replace(/\bTaulas\b/g, "Taules");
+      return fin === t ? null : texto.replace(texto.trim(), fin);
     }
   }
   if (RE_FECHA.test(t) && /[a-zé]/i.test(t)) {
