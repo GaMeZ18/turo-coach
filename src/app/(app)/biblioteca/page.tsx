@@ -16,7 +16,7 @@ type Ej = {
 
 const POR_PAGINA = 60;
 
-export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<ParamsFiltro & { cat?: string; p?: string }> }) {
+export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<ParamsFiltro & { cat?: string; p?: string; autor?: string }> }) {
   const sp = await searchParams;
   const { q, edad, tipo, p } = sp;
   const cat = sp.foco ?? sp.cat;
@@ -24,12 +24,19 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
   const { supabase, perfil } = await requireUser();
   const esCoord = perfil.rol === "coordinador";
 
+  // Por creador: se ven todos sus ejercicios visibles (estén o no en la biblioteca), para poder copiarle alguno
+  const autor = sp.autor && /^[0-9a-f-]{36}$/i.test(sp.autor) ? sp.autor : "";
   let consulta = supabase
     .from("ejercicios")
     .select("id, titulo, tipo, categoria, etiquetas, edades, duracion, jugadores_min, preview, pizarra, descripcion, perfiles(nombre)", { count: "exact" })
-    .eq("en_biblioteca", true)
     .order("categoria")
     .order("titulo");
+  consulta = autor ? consulta.eq("autor_id", autor) : consulta.eq("en_biblioteca", true);
+  const { data: autoresR } = await supabase.from("ejercicios").select("autor_id, perfiles(nombre)").not("autor_id", "is", null).limit(5000);
+  const autores = [...((autoresR ?? []) as unknown as { autor_id: string; perfiles: { nombre: string | null } | null }[]).reduce((m, x) => {
+    const a = m.get(x.autor_id) ?? { id: x.autor_id, nombre: x.perfiles?.nombre?.trim() || "Sin nombre", n: 0 };
+    a.n++; return m.set(x.autor_id, a);
+  }, new Map<string, { id: string; nombre: string; n: number }>()).values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
   if (tipo) consulta = consulta.eq("tipo", tipo);
   consulta = aplicarFiltros(consulta, { ...sp, foco: cat });
   if (q) {
@@ -39,7 +46,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
   // Con más de 1000 ejercicios, por páginas (y mucho más rápido)
   const { data, error, count } = await consulta.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1);
   const total = count ?? 0, paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
-  const filtros = Object.fromEntries(Object.entries({ q, foco: cat, edad, tipo, pos: sp.pos, formato: sp.formato, jug: sp.jug, balones: sp.balones }).filter(([, v]) => v)) as Record<string, string>;
+  const filtros = Object.fromEntries(Object.entries({ q, foco: cat, edad, tipo, pos: sp.pos, formato: sp.formato, jug: sp.jug, balones: sp.balones, autor }).filter(([, v]) => v)) as Record<string, string>;
   const enlace = (n: number) => `/biblioteca?${new URLSearchParams({ ...filtros, p: String(n) })}`;
   const enlaceCat = (c: string) => `/biblioteca?${new URLSearchParams({ ...filtros, foco: c })}`;
   const faltaSQL = error && /en_biblioteca|edades/.test(error.message);
@@ -56,6 +63,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
             Los ejercicios del club, con su pizarra. Ábrelos para verlos animados, cópialos para adaptarlos o añádelos a un entreno.
             Cualquier entrenador puede publicar los suyos marcando «Publicar en la Biblioteca del club».
           </p>
+          {autor && <p className="mt-1 text-sm font-semibold text-azul">Ejercicios de {autores.find((x) => x.id === autor)?.nombre ?? "este entrenador"} (también los que no ha publicado en la biblioteca)</p>}
         </div>
         <Link href="/ejercicios/nuevo" className="btn-primario"><Plus size={16} /> Crear ejercicio</Link>
       </div>
@@ -65,7 +73,11 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <form className="tarjeta mt-5 flex flex-wrap gap-2 p-3">
-            <FiltrosEjercicios p={{ ...sp, foco: cat }} />
+            <FiltrosEjercicios p={{ ...sp, foco: cat }} extra={
+              <select name="autor" defaultValue={autor} className="campo !w-auto" aria-label="Creador">
+                <option value="">Todos los creadores</option>
+                {autores.map((a) => <option key={a.id} value={a.id}>{a.nombre} · {a.n}</option>)}
+              </select>} />
             {filtrando && <Link href="/biblioteca" className="self-center px-1 text-sm text-tinta/60 underline">Quitar filtros</Link>}
           </form>
 

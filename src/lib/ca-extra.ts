@@ -2,6 +2,8 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Todos los creadores": "Tots els creadors",
+ "Creador": "Creador",
  "Físico": "Físic",
  "Ejercicio de físico (sin pizarra)": "Exercici de físic (sense pissarra)",
  "Explica el ejercicio en la descripción y pon aquí cómo se hace: series, repeticiones o tiempo y descanso.": "Explica l'exercici a la descripció i posa aquí com es fa: sèries, repeticions o temps i descans.",
@@ -1077,6 +1079,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Ejercicios de {} (también los que no ha publicado en la biblioteca)", "Exercicis de {} (també els que no ha publicat a la biblioteca)"],
  ["Faltas de {}", "Faltes de {}"],
  ["{} con faltas · lista {}/{}", "{} amb faltes · llista {}/{}"],
  ["Paso {}", "Pas {}"],
