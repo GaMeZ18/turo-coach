@@ -10,6 +10,7 @@ export type Equipo = {
   nombre: string;
   categoria: string | null;
   congelado: boolean;
+  minibasquet?: boolean;
   temporada_id: string;
 };
 
@@ -23,7 +24,7 @@ export async function equiposDeTemporada(supabase: SupabaseClient) {
   if (!temporada) return { temporada: null, equipos: [] as Equipo[] };
   const { data } = await supabase
     .from("equipos")
-    .select("id, nombre, categoria, congelado, temporada_id")
+    .select("*")
     .eq("temporada_id", temporada.id)
     .order("nombre");
   return { temporada, equipos: (data ?? []) as Equipo[] };
@@ -46,7 +47,7 @@ export const equipoActivo = cache(async (supabase: SupabaseClient): Promise<Equi
   if (id) {
     const { data } = await supabase
       .from("equipos")
-      .select("id, nombre, categoria, congelado, temporada_id")
+      .select("*")
       .eq("id", id)
       .maybeSingle();
     if (data && perfil.rol === "coordinador") return data as Equipo;

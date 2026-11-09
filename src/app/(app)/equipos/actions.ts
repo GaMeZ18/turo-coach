@@ -7,12 +7,16 @@ import { createClient } from "@/lib/supabase/server";
 import { COOKIE_EQUIPO } from "@/lib/equipo-activo";
 import { check } from "@/lib/db";
 
+const esMinibasquet = (t: string) => /mini|premini|benjam|alev[ií]|infantil|pre-?infantil/i.test(t);
+
 export async function crearEquipo(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("equipos").insert({
     temporada_id: String(formData.get("temporada_id")),
     nombre: String(formData.get("nombre")).trim(),
     categoria: String(formData.get("categoria") ?? "").trim() || null,
+    // Minibàsquet (hasta infantil): normativa de alineaciones del CEEB
+    minibasquet: formData.get("minibasquet") === "on" || esMinibasquet(`${formData.get("nombre")} ${formData.get("categoria")}`),
   });
   if (error) throw new Error(error.message);
   revalidatePath("/equipos");
@@ -26,6 +30,7 @@ export async function actualizarEquipo(formData: FormData) {
     .update({
       nombre: String(formData.get("nombre")).trim(),
       categoria: String(formData.get("categoria") ?? "").trim() || null,
+      minibasquet: formData.get("minibasquet") === "on",
     })
     .eq("id", String(formData.get("id")));
   if (error) throw new Error(error.message);

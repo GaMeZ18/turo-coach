@@ -10,15 +10,16 @@ import InformeRival from "@/components/InformeRival";
 import { Resultado, type Partido } from "../comun";
 import Convocatoria from "./Convocatoria";
 import Periodos from "./Periodos";
+import AlineacionMini from "./AlineacionMini";
 import type { StatsPartido } from "@/lib/stats-fcbq";
 import { Binoculars, Clapperboard, ClipboardList, FileText, MapPin, Pencil, Trash2, X } from "lucide-react";
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, user, perfil } = await requireUser();
-  const { data } = await supabase.from("partidos").select("*, equipos(nombre)").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("partidos").select("*, equipos(nombre, minibasquet)").eq("id", id).maybeSingle();
   if (!data) notFound();
-  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string } | null; fcbq_stats_id?: string | null; num_periodos?: number | null; previa?: string | null };
+  const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string; minibasquet?: boolean } | null; fcbq_stats_id?: string | null; num_periodos?: number | null; previa?: string | null };
   const equipo = p.equipos?.nombre ?? "Equipo";
 
   const [{ data: plantilla }, { data: conv }, { data: staff }, { data: periodos }, { data: stats }] = await Promise.all([
@@ -201,6 +202,13 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
 
       {esStaff && (
         <div className="mt-5">
+          {p.equipos?.minibasquet ? (
+          <AlineacionMini
+            partidoId={p.id}
+            jugadores={jugadores.filter((j) => convocados.includes(j.id))}
+            inicial={Object.fromEntries((periodos ?? []).map((x) => [x.jugador_id as string, (x.periodos as number[]) ?? []]))}
+          />
+          ) : (
           <Periodos
             partidoId={p.id}
             jugadores={convocados.length ? jugadores.filter((j) => convocados.includes(j.id)) : jugadores}
@@ -208,6 +216,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
             numInicial={p.num_periodos ?? st?.numPeriodos ?? 4}
             fcbq={nuestroLado ? nuestroLado.jugadores.map((j) => ({ nombre: j.nombre, dorsal: j.dorsal, periodos: j.periodos })) : null}
           />
+          )}
         </div>
       )}
     </div>

@@ -50,6 +50,9 @@ export default async function EquiposPage() {
             <label className="etiqueta">Categoría</label>
             <input name="categoria" placeholder="Infantil" className="campo" />
           </div>
+          <label className="flex items-center gap-1.5 pb-2 text-sm" title="Alineaciones con la normativa del CEEB (6 períodos). Se marca solo si la categoría es mini, benjamí, aleví o infantil.">
+            <input type="checkbox" name="minibasquet" /> Minibàsquet (normativa CEEB)
+          </label>
           <Enviar>Añadir equipo</Enviar>
         </form>
       )}
@@ -62,6 +65,7 @@ export default async function EquiposPage() {
                 <h2 className="flex items-center gap-2 font-semibold">
                   {e.nombre}
                   {e.congelado && <Lock size={14} className="text-tinta/50" aria-label="Congelado" />}
+                  {e.minibasquet && <span className="rounded-full bg-oro/30 px-2 py-0.5 text-[10px] font-semibold uppercase">Minibàsquet CEEB</span>}
                 </h2>
                 <p className="text-xs text-tinta/60">
                   {e.categoria ?? "Sin categoría"} · {numJugadores(e.id)} jugadores
@@ -82,6 +86,7 @@ export default async function EquiposPage() {
                   <input type="hidden" name="id" value={e.id} />
                   <input name="nombre" defaultValue={e.nombre} required aria-label="Nombre" className="campo !w-auto min-w-40 flex-1 !py-1.5" />
                   <input name="categoria" defaultValue={e.categoria ?? ""} placeholder="Categoría" aria-label="Categoría" className="campo !w-36 !py-1.5" />
+                  <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="minibasquet" defaultChecked={!!e.minibasquet} /> Minibàsquet (CEEB)</label>
                   <Enviar className="btn-primario !py-1.5">Guardar</Enviar>
                 </form>
               </details>

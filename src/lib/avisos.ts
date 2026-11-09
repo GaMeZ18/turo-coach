@@ -4,6 +4,7 @@ import { aISO, fechaCorta, hora, hoyLocal } from "./fechas";
 import { lunesDe, sumarDias } from "./pistas";
 import { companerosMesa, detalleMesa, partidosDeCasa } from "./mesas";
 import { notificarPerfiles, notificarPersonasMesa } from "./notificar";
+import { validarAlineacion } from "./minibasquet";
 
 // Recordatorios automáticos (Supabase llama a /api/avisos cada 15 minutos).
 // Cada aviso tiene una clave: si ya se mandó, no se repite aunque se vuelva a lanzar.
@@ -98,6 +99,31 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
         faltan.length ? `Faltan ${personas} persona${personas > 1 ? "s" : ""} para las mesas del finde` : "Mesas del finde completas",
         faltan.length ? faltan.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} ${p.equipo} (${conf(p.id)}/${p.plazas})`).join(" · ") : `Las ${partidos.length} mesas tienen a su gente.`,
         `/mesas?semana=${lunes}`));
+    }
+  }
+
+  // 6) Minibàsquet: 3 horas antes del partido, si la alineación falta o no cumple la normativa del CEEB → entrenadores
+  const { data: miniR } = await db.from("equipos").select("id").eq("temporada_id", t.id).eq("minibasquet", true);
+  const mini = ((miniR ?? []) as { id: string }[]).map((e) => e.id);
+  if (mini.length) {
+    const { data: ppR } = await db.from("partidos").select("id, equipo_id, fecha, rival").in("equipo_id", mini)
+      .gte("fecha", new Date(ahora).toISOString()).lt("fecha", new Date(ahora + 180 * MIN).toISOString());
+    for (const pt of (ppR ?? []) as { id: string; equipo_id: string; fecha: string; rival: string }[]) {
+      if (!staff(pt.equipo_id).length) continue;
+      const [{ data: cv }, { data: pe }] = await Promise.all([
+        db.from("convocatorias").select("jugador_id, jugadores(nombre, apellidos)").eq("partido_id", pt.id),
+        db.from("partido_periodos").select("jugador_id, periodos").eq("partido_id", pt.id),
+      ]);
+      const js = ((cv ?? []) as unknown as { jugador_id: string; jugadores: { nombre: string; apellidos: string | null } | null }[])
+        .map((c) => ({ id: c.jugador_id, nombre: `${c.jugadores?.nombre ?? ""} ${c.jugadores?.apellidos ?? ""}`.trim() }));
+      const marcas = Object.fromEntries(((pe ?? []) as { jugador_id: string; periodos: number[] }[]).map((x) => [x.jugador_id, x.periodos ?? []]));
+      const errores = validarAlineacion(js, marcas).filter((a) => a.nivel === "error");
+      if (!errores.length) continue;
+      const vacia = !Object.keys(marcas).length;
+      await unaVez(`alineacion:${pt.id}`, () => notificarPerfiles(db, staff(pt.equipo_id),
+        vacia ? "Falta la alineación del partido" : "La alineación no cumple la normativa",
+        `${nombre(pt.equipo_id)} vs ${pt.rival} a las ${hora(pt.fecha)}. ${vacia ? "Marca la convocatoria y los períodos." : errores.slice(0, 2).map((e) => e.texto).join(" ")}`,
+        `/partidos/${pt.id}`, pt.equipo_id));
     }
   }
 
