@@ -1,3 +1,4 @@
+import type { EjercicioLista } from "./SelectorEjercicios";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { todas } from "@/lib/db";
@@ -148,7 +149,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           inicio={e.fecha}
           prevista={e.duracion_prevista}
           actividades={(actividades ?? []) as never}
-          ejercicios={ejercicios ?? []}
+          ejercicios={(ejercicios ?? []) as unknown as EjercicioLista[]}
           yo={user.id}
           edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
         />
