@@ -78,7 +78,7 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
   const tipoDe = new Map(p.elementos.map((e) => [e.id, e.tipo]));
   // Números del orden de las acciones (PDF): los movimientos de un fotograma van a la vez (mismo número);
   // después, cada pase o tiro lleva el siguiente (1 = pase, 2 = tiro…)
-  const marcas: { x: number; y: number; n: number }[] = [];
+  const marcas: { x: number; y: number; n: number; c: string }[] = [];
   if (numeros) {
     let n = 1;
     for (let k = k0; k < k1; k++) {
@@ -87,7 +87,8 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
       for (const m of movs) {
         const i = Math.floor(m.puntos.length / 4) * 2; // hacia la mitad del recorrido
         const [x, y] = T({ x: m.puntos[i], y: m.puntos[i + 1] });
-        marcas.push({ x, y, n });
+        const el0 = p.elementos.find((e) => e.id === m.elementoId);
+        marcas.push({ x, y, n, c: el0 && aspectoEn(el0, k).tipo === "defensor" ? "#ca010c" : "#1f2937" });
       }
       if (movs.length) n++;
       const pos = est[k + 1]?.pos ?? {};
@@ -96,7 +97,7 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
         const hacia = a.tipo === "tiro" ? a.destino : a.a ? pos[a.a] : undefined;
         if (!de || !hacia) continue;
         const [x1, y1] = T(de), [x2, y2] = T(hacia);
-        marcas.push({ x: (x1 + x2) / 2, y: (y1 + y2) / 2, n });
+        marcas.push({ x: (x1 + x2) / 2, y: (y1 + y2) / 2, n, c: a.tipo === "tiro" ? NARANJA : "#475569" });
         n++;
       }
     }
@@ -204,12 +205,10 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
         if (e.tipo === "balon") return <circle key={e.id} cx={x} cy={y} r="0.22" fill={NARANJA} />;
         return <rect key={e.id} x={x - 0.3} y={y - 0.15} width="0.6" height="0.3" fill={e.color} />;
       })}
-      {/* Orden de las acciones */}
+      {/* Orden de las acciones: número pequeño junto a la línea, como al grabar en la pizarra */}
       {marcas.map((m, i) => (
-        <g key={`n${i}`}>
-          <circle cx={m.x} cy={m.y} r={0.42} fill="#fde047" stroke="#1f2937" strokeWidth={0.06} />
-          <text x={m.x} y={m.y + 0.17} textAnchor="middle" fontSize={0.5} fontWeight="800" fill="#1f2937" fontFamily="system-ui, sans-serif">{m.n}</text>
-        </g>
+        <text key={`n${i}`} x={m.x + 0.18} y={m.y - 0.22} fontSize={0.5} fontWeight="700" fill={m.c} stroke="#ffffff" strokeWidth={0.09} paintOrder="stroke"
+          fontFamily="system-ui, sans-serif">{m.n}</text>
       ))}
     </svg>
   );
