@@ -2,6 +2,8 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Otro material": "Altre material",
+ "Petos, escalera, vallas…": "Petos, escala, tanques…",
  "← Anterior": "← Anterior",
  "justif. ·": "justif. ·",
  "ausencias ·": "absències ·",

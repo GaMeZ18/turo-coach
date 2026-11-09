@@ -150,6 +150,10 @@ export default function FormEjercicio({
           <legend className="px-1 text-xs font-semibold text-tinta/70">Datos para buscarlo (si lo dejas vacío se rellena solo)</legend>
           <div className="grid grid-cols-3 gap-2">{numero("balones")}{numero("canastas")}{numero("conos")}</div>
           <div>
+            <label className="etiqueta">Otro material</label>
+            <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="Petos, escalera, vallas…" />
+          </div>
+          <div>
             <label className="etiqueta">Tipo de trabajo</label>
             <select value={d.formato ?? ""} onChange={(e) => set("formato", e.target.value)} className="campo">
               <option value="">Automático</option>
@@ -169,10 +173,6 @@ export default function FormEjercicio({
             </div>
           </div>
         </fieldset>
-        <div>
-          <label className="etiqueta">Material</label>
-          <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="1 balón por jugador, 6 conos…" />
-        </div>
         <div>
           <label className="etiqueta">Objetivos</label>
           <textarea value={d.objetivos ?? ""} onChange={(e) => set("objetivos", e.target.value)} rows={2} className="campo" placeholder="Qué se trabaja: p. ej. Tiro tras bloqueo indirecto · Lectura de la ayuda" />
