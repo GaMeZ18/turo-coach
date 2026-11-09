@@ -127,6 +127,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           <div><label className="etiqueta">Pista</label><input name="lugar" list="lista-pistas" defaultValue={e.lugar ?? ""} className="campo" /><ListaPistas /></div>
           <div className="col-span-2">
             <label className="etiqueta">Físico fuera de pista (min)</label>
+            <p className="text-[11px] text-tinta/50">Solo si no lo pones en la sesión como «Prep. física» (eso ya se calcula solo).</p>
             <div className="flex gap-2">
               <label className="flex-1 text-[11px] text-tinta/60">Al empezar<input name="fisico_fuera" type="number" min={0} max={120} defaultValue={e.fisico_fuera ?? 0} className="campo" /></label>
               <label className="flex-1 text-[11px] text-tinta/60">Al acabar<input name="fisico_fuera_fin" type="number" min={0} max={120} defaultValue={e.fisico_fuera_fin ?? 0} className="campo" /></label>

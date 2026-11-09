@@ -60,6 +60,7 @@ function EjercicioDelEntreno({ entrenoId, a, onCambio }: { entrenoId: string; a:
 const TIPOS: Record<string, { label: string; color: string }> = {
   ejercicio: { label: "Ejercicio", color: "bg-club/10 text-club" },
   calentamiento: { label: "Calentamiento", color: "bg-amber-100 text-amber-800" },
+  prep_fisica: { label: "Prep. física", color: "bg-orange-100 text-orange-800" },
   estiramientos: { label: "Estiramientos", color: "bg-emerald-100 text-emerald-800" },
   series: { label: "Series", color: "bg-violet-100 text-violet-800" },
   agua: { label: "Agua", color: "bg-sky-100 text-sky-800" },
@@ -105,6 +106,19 @@ export default function Actividades({
           {total} / {prevista} min {exceso && `· te pasas ${total - prevista}′`}
         </span>
       </div>
+      {(() => {
+        // Pista ocupada: desde el primer ejercicio que no es de prep. física hasta el último
+        const fis = (x: Actividad) => x.tipo === "prep_fisica";
+        const primero = lista.findIndex((x) => !fis(x));
+        if (primero < 0 || !lista.some(fis)) return null;
+        let ultimo = lista.length - 1;
+        while (ultimo > primero && fis(lista[ultimo])) ultimo--;
+        const ini = lista.slice(0, primero).reduce((s2, x) => s2 + (x.duracion || 0), 0);
+        const fin = lista.slice(ultimo + 1).reduce((s2, x) => s2 + (x.duracion || 0), 0);
+        if (!ini && !fin) return null;
+        const pistaHasta = t0 + (prevista - fin) * 60000;
+        return <p className="mt-1 text-xs text-orange-800">🏟️ Pista ocupada de {hhmm(new Date(t0 + ini * 60000))} a {hhmm(new Date(pistaHasta))} · prep. física fuera: {ini ? `${ini}′ al empezar` : ""}{ini && fin ? " y " : ""}{fin ? `${fin}′ al acabar` : ""}</p>;
+      })()}
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-linea">
         <div className={`h-full ${exceso ? "bg-red-600" : "bg-club"}`} style={{ width: `${Math.min(100, (total / Math.max(prevista, 1)) * 100)}%` }} />
       </div>
@@ -199,7 +213,7 @@ export default function Actividades({
           <input name="duracion" type="number" min={0} placeholder="Min" className="campo !w-20" />
           <Enviar className="btn-secundario shrink-0">Añadir</Enviar>
         </div>
-        <textarea name="notas" rows={tipoAlta === "ejercicio" ? 2 : 1} placeholder={tipoAlta === "ejercicio" ? "Breve descripción: organización, reglas, qué corregir… (opcional)" : "Descripción (opcional)"} className="campo text-sm" />
+        <textarea name="notas" rows={tipoAlta === "ejercicio" || tipoAlta === "prep_fisica" ? 2 : 1} placeholder={tipoAlta === "ejercicio" ? "Breve descripción: organización, reglas, qué corregir… (opcional)" : tipoAlta === "prep_fisica" ? "Qué se hace: ejercicios, series, repeticiones, descanso… (fuera de pista)" : "Descripción (opcional)"} className="campo text-sm" />
       </form>
       <Link
         href={`/ejercicios/nuevo?entreno=${entrenoId}`}

@@ -100,10 +100,12 @@ export async function anadirActividad(formData: FormData) {
   const ejercicioId = String(formData.get("ejercicio_id") ?? "") || null;
   let titulo = String(formData.get("titulo") ?? "").trim() || null;
   let duracion = Number(formData.get("duracion") || 10);
+  let esFisico = false;
 
   if (ejercicioId) {
-    const { data: ej } = await supabase.from("ejercicios").select("titulo, duracion").eq("id", ejercicioId).single();
+    const { data: ej } = await supabase.from("ejercicios").select("titulo, duracion, tipo").eq("id", ejercicioId).single();
     titulo = titulo ?? ej?.titulo ?? null;
+    if (ej?.tipo === "fisico") esFisico = true;
     if (!formData.get("duracion") && ej?.duracion) duracion = ej.duracion;
   }
   const { count } = await supabase
@@ -114,7 +116,8 @@ export async function anadirActividad(formData: FormData) {
   check(await supabase.from("entreno_actividades").insert({
     entrenamiento_id: entreno,
     orden: count ?? 0,
-    tipo: ejercicioId ? "ejercicio" : String(formData.get("tipo") ?? "nota"),
+    // Los ejercicios de físico van como «Prep. física»: no cuentan como pista ocupada al principio o al final
+    tipo: esFisico ? "prep_fisica" : ejercicioId ? "ejercicio" : String(formData.get("tipo") ?? "nota"),
     ejercicio_id: ejercicioId,
     titulo,
     duracion,

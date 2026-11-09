@@ -2,6 +2,9 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Prep. física": "Prep. física",
+ "Qué se hace: ejercicios, series, repeticiones, descanso… (fuera de pista)": "Què es fa: exercicis, sèries, repeticions, descans… (fora de pista)",
+ "Solo si no lo pones en la sesión como «Prep. física» (eso ya se calcula solo).": "Només si no ho poses a la sessió com a «Prep. física» (això ja es calcula sol).",
  "Todos los creadores": "Tots els creadors",
  "Creador": "Creador",
  "Físico": "Físic",
