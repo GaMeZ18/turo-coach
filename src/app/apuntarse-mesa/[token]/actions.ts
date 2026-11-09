@@ -2,6 +2,8 @@
 
 import { adminClient } from "@/lib/supabase/admin";
 import { abierta, fechaPartidoMesa, normalizarTelefono, partidosDeCasa } from "@/lib/mesas";
+import { notificarPerfiles } from "@/lib/notificar";
+import { lunesDe } from "@/lib/pistas";
 
 export type MiMesa = { id: string; partido_id: string; estado: "candidato" | "confirmado" };
 type Res = { ok?: boolean; error?: string; mias?: MiMesa[]; nombre?: string };
@@ -49,10 +51,26 @@ export async function apuntarse(token: string, nombre: string, telefono: string,
   } else if (persona.nombre !== nombre) {
     await c.db.from("mesa_personas").update({ nombre, activo: true }).eq("id", persona.id);
   }
+  const { data: yaEstaba } = await c.db.from("mesa_asignaciones").select("partido_id").eq("persona_id", persona!.id).in("partido_id", elegidos);
+  const nuevos = elegidos.filter((id) => !((yaEstaba ?? []) as { partido_id: string }[]).some((y) => y.partido_id === id));
   const { error } = await c.db.from("mesa_asignaciones").upsert(
     elegidos.map((partido_id) => ({ partido_id, persona_id: persona!.id, importe: validos.get(partido_id)!.efectivo ? 0 : c.importe })),
     { onConflict: "partido_id,persona_id", ignoreDuplicates: true });
   if (error) return { error: "No se ha podido guardar. Prueba otra vez." };
+  // Aviso al gestor de mesas (si no hay ninguno, a coordinación) de quién se ha apuntado y a qué
+  if (nuevos.length) {
+    try {
+      const { data: pf } = await c.db.from("perfiles").select("id, rol, gestor_mesas");
+      const todos = (pf ?? []) as { id: string; rol: string; gestor_mesas: boolean | null }[];
+      const gestores = todos.filter((p) => p.rol === "gestor_mesas" || p.gestor_mesas).map((p) => p.id);
+      const destino = gestores.length ? gestores : todos.filter((p) => p.rol === "coordinador").map((p) => p.id);
+      const ps = nuevos.map((id) => validos.get(id)!).sort((a, b) => a.fecha.localeCompare(b.fecha));
+      const cuando = (f: string) => new Date(f).toLocaleString("es-ES", { timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(ps[0].fecha));
+      await notificarPerfiles(c.db, destino, `🙋 ${nombre} se ha apuntado a ${ps.length} mesa${ps.length > 1 ? "s" : ""}`,
+        ps.map((p) => `${cuando(p.fecha)} · ${p.equipo} vs ${p.rival}`).join("\n"), `/mesas?semana=${lunesDe(dia)}`, null, true);
+    } catch {}
+  }
   return { ok: true, ...(await misMesas(token, tel)) };
 }
 

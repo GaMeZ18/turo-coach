@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA } from "@/lib/mesas";
 import { notificarPersonasMesa } from "@/lib/notificar";
+import { adminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO } from "@/lib/fechas";
 
@@ -15,8 +16,11 @@ async function gestor() {
 const refrescar = () => { revalidatePath("/mesas"); revalidatePath("/mesas/pagos"); };
 
 /** Avisa al móvil de la persona (si activó los avisos desde el enlace) */
-async function avisarPersona(db: SupabaseClient, asignacionId: string, tipo: "confirmada" | "quitada") {
+async function avisarPersona(_db: SupabaseClient, asignacionId: string, tipo: "confirmada" | "quitada") {
   try {
+    // Con permisos de servidor: el gestor no puede ver los móviles ni dejar avisos a otras personas
+    const db = adminClient();
+    if (!db) return;
     const { data: a } = await db.from("mesa_asignaciones").select("partido_id, persona_id").eq("id", asignacionId).maybeSingle();
     if (!a) return;
     const [p, { data: cfg }] = await Promise.all([partidoMesa(db, a.partido_id), db.from("mesa_config").select("token").maybeSingle()]);
