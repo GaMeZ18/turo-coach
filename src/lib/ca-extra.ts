@@ -2,6 +2,16 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Mi mesa": "La meva taula",
+ "Estás confirmado/a: haces esta mesa": "Estàs confirmat/da: fas aquesta taula",
+ "Estás apuntado/a, pendiente de que el gestor te confirme": "Estàs apuntat/da, pendent que el gestor et confirmi",
+ "Con quién la haces": "Amb qui la fas",
+ "Todavía no hay nadie más confirmado (o esta mesa es de 1 persona).": "Encara no hi ha ningú més confirmat (o aquesta taula és d'1 persona).",
+ "Ver todas las mesas de esa semana": "Veure totes les taules d'aquesta setmana",
+ "Mesa no encontrada": "Taula no trobada",
+ "Puede que te hayan quitado de esta mesa o que el enlace ya no sea válido.": "Potser t'han tret d'aquesta taula o l'enllaç ja no és vàlid.",
+ "Hasta el miércoles a las 15:00 te puedes borrar desde el enlace de mesas.": "Fins dimecres a les 15:00 et pots esborrar des de l'enllaç de taules.",
+ "El plazo ya está cerrado: si tienes algún problema, escríbelo en el grupo de WhatsApp de mesas.": "El termini ja està tancat: si tens algun problema, escriu-ho al grup de WhatsApp de taules.",
  "¿También haces mesas?": "També fas taules?",
  "Desvincular": "Desvincular",
  "Vincular": "Vincular",

@@ -61,6 +61,7 @@ export default function Apuntarse({ token, partidos, clavePublica }: { token: st
                 <p className="text-xs capitalize text-tinta/60">{dia(p.fecha)} · {hora(p.fecha)}</p>
                 <p className="font-semibold">{p.equipo} <span className="font-normal text-tinta/60">vs</span> {p.rival}</p>
                 {p.manual && <p className="text-[11px] font-semibold text-azul">1 persona · la pagan los jugadores en efectivo</p>}
+                {m?.estado === "confirmado" && <p className="text-xs font-semibold text-green-700">✅ La haces tú{m.con?.length ? ` con ${m.con.join(" y ")}` : ""} · llega 30 min antes</p>}
                 {p.lugar && <p className="truncate text-xs text-tinta/50">{p.lugar}</p>}
                 <p className={`text-[11px] ${cerrada ? "text-red-700" : "text-tinta/50"}`}>{cerrada ? "Plazo cerrado" : `Puedes apuntarte o borrarte hasta el ${dia(p.plazo)} a las ${hora(p.plazo)}`}</p>
               </div>

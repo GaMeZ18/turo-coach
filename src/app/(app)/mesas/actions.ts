@@ -25,7 +25,8 @@ async function avisarPersona(_db: SupabaseClient, asignacionId: string, tipo: "c
     if (!a) return;
     const [p, { data: cfg }] = await Promise.all([partidoMesa(db, a.partido_id), db.from("mesa_config").select("token").maybeSingle()]);
     if (!p) return;
-    const url = cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/";
+    // Abre la ficha de su mesa: partido, estado y con quién la hace
+    const url = cfg?.token ? `/apuntarse-mesa/${cfg.token}/mesa/${asignacionId}` : "/";
     await notificarPersonasMesa(db, [a.persona_id],
       tipo === "confirmada" ? `Mesa confirmada: ${p.equipo}` : `Ya no haces la mesa de ${p.equipo}`,
       tipo === "confirmada" ? detalleMesa(p, await companerosMesa(db, a.partido_id, a.persona_id)) : detalleMesa(p).split("\n").slice(0, 3).join("\n"), url);

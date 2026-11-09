@@ -5,7 +5,7 @@ import { abierta, fechaPartidoMesa, normalizarTelefono, partidosDeCasa } from "@
 import { notificarPerfiles } from "@/lib/notificar";
 import { lunesDe } from "@/lib/pistas";
 
-export type MiMesa = { id: string; partido_id: string; estado: "candidato" | "confirmado" };
+export type MiMesa = { id: string; partido_id: string; estado: "candidato" | "confirmado"; con?: string[] };
 type Res = { ok?: boolean; error?: string; mias?: MiMesa[]; nombre?: string };
 
 /** Cliente con permisos, solo si el enlace (token) es el bueno */
@@ -25,7 +25,14 @@ export async function misMesas(token: string, telefono: string): Promise<Res> {
   const { data: p } = await c.db.from("mesa_personas").select("id, nombre").eq("telefono", tel).maybeSingle();
   if (!p) return { mias: [] };
   const { data } = await c.db.from("mesa_asignaciones").select("id, partido_id, estado").eq("persona_id", p.id);
-  return { mias: (data ?? []) as MiMesa[], nombre: p.nombre };
+  const mias = (data ?? []) as MiMesa[];
+  // Con quién hace cada mesa (los otros confirmados)
+  if (mias.length) {
+    const { data: otros } = await c.db.from("mesa_asignaciones").select("partido_id, mesa_personas(nombre)").eq("estado", "confirmado").neq("persona_id", p.id).in("partido_id", mias.map((m) => m.partido_id));
+    const lista = (otros ?? []) as unknown as { partido_id: string; mesa_personas: { nombre: string } | null }[];
+    for (const m of mias) m.con = lista.filter((o) => o.partido_id === m.partido_id).map((o) => o.mesa_personas?.nombre ?? "").filter(Boolean);
+  }
+  return { mias, nombre: p.nombre };
 }
 
 /** Apuntarse a varios partidos: queda «pendiente» hasta que el gestor confirma */

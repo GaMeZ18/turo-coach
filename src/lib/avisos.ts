@@ -137,7 +137,7 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     for (const a of (aR ?? []) as { id: string; partido_id: string; persona_id: string }[]) {
       const p = enUnaHora.find((x) => x.id === a.partido_id)!;
       await unaVez(`mesa1h:${a.id}`, async () => notificarPersonasMesa(db, [a.persona_id], `Hoy haces la mesa de ${p.equipo} a las ${hora(p.fecha)}`,
-        `${detalleMesa(p, await companerosMesa(db, p.id, a.persona_id))}\n¡Gracias por echar una mano!`, cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/"));
+        `${detalleMesa(p, await companerosMesa(db, p.id, a.persona_id))}\n¡Gracias por echar una mano!`, cfg?.token ? `/apuntarse-mesa/${cfg.token}/mesa/${a.id}` : "/"));
     }
   }
 
