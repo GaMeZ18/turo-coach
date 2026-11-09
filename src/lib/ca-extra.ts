@@ -2,6 +2,19 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "En iPhone los avisos solo llegan con la app instalada. En Safari, pulsa Compartir (el cuadrado con la flecha) → «Añadir a pantalla de inicio» → Añadir. Después ábrela desde el icono y activa los avisos.": "A l'iPhone els avisos només arriben amb l'app instal·lada. A Safari, prem Comparteix (el quadrat amb la fletxa) → «Afegeix a la pantalla d'inici» → Afegeix. Després obre-la des de la icona i activa els avisos.",
+ "Ábrela en Safari": "Obre-la a Safari",
+ "Desde este navegador no se puede instalar. Copia la dirección, ábrela en Safari, pulsa Compartir → «Añadir a pantalla de inicio» y ábrela desde el icono.": "Des d'aquest navegador no es pot instal·lar. Copia l'adreça, obre-la a Safari, prem Comparteix → «Afegeix a la pantalla d'inici» i obre-la des de la icona.",
+ "Actualiza el iPhone": "Actualitza l'iPhone",
+ "Los avisos necesitan iOS 16.4 o posterior (Ajustes → General → Actualización de software).": "Els avisos necessiten iOS 16.4 o posterior (Configuració → General → Actualització de programari).",
+ "Los avisos están bloqueados": "Els avisos estan bloquejats",
+ "En iPhone: Ajustes → Notificaciones → Coach Manager → Permitir. En Safari de Mac: Safari → Ajustes → Sitios web → Notificaciones → Permitir. En Chrome: el candado junto a la dirección → Notificaciones → Permitir.": "A l'iPhone: Configuració → Notificacions → Coach Manager → Permetre. A Safari de Mac: Safari → Configuració → Llocs web → Notificacions → Permetre. A Chrome: el cadenat al costat de l'adreça → Notificacions → Permetre.",
+ "Este navegador no admite avisos": "Aquest navegador no admet avisos",
+ "Usa Chrome, Edge, Firefox o Safari actualizados (en iPhone, con la app instalada).": "Fes servir Chrome, Edge, Firefox o Safari actualitzats (a l'iPhone, amb l'app instal·lada).",
+ "Probar otra vez": "Tornar-ho a provar",
+ "Listo: recibirás los avisos en este dispositivo.": "Fet: rebràs els avisos en aquest dispositiu.",
+ "Has bloqueado los avisos. Permítelos en los ajustes del navegador.": "Has bloquejat els avisos. Permet-los a la configuració del navegador.",
+ "No se ha dado permiso. Vuelve a pulsar y elige «Permitir».": "No s'ha donat permís. Torna a prémer i tria «Permetre».",
  "Añadir partido a mano (no federado)": "Afegir partit a mà (no federat)",
  "Para partidos que no vienen de la federación: mesa de 1 persona y sin importe (la pagan los jugadores en efectivo). Saldrá también en el enlace para apuntarse.": "Per a partits que no vénen de la federació: taula d'1 persona i sense import (la paguen els jugadors en efectiu). També sortirà a l'enllaç per apuntar-se.",
  "— Otro (escríbelo) —": "— Un altre (escriu-lo) —",

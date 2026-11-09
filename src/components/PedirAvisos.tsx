@@ -1,27 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Loader2, Share, X } from "lucide-react";
-import { guardarSuscripcion } from "@/app/(app)/notificaciones/actions";
+import { Bell, Loader2, X } from "lucide-react";
+import { activarPush, ayudaPush, estadoPush, type EstadoPush } from "@/lib/push-cliente";
 
-const b64 = (s: string) => {
-  const p = "=".repeat((4 - (s.length % 4)) % 4);
-  const raw = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-};
 const CLAVE = "avisos-ahora-no";
 const DIAS = 3;
 const leer = () => { try { return Number(localStorage.getItem(CLAVE) ?? 0); } catch { return 0; } };
 const posponer = () => { try { localStorage.setItem(CLAVE, String(Date.now() + DIAS * 86400000)); } catch {} };
-
-/** Suscribe este dispositivo a los avisos y lo guarda en el servidor */
-async function suscribir(clavePublica: string) {
-  const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js"));
-  await navigator.serviceWorker.ready;
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(clavePublica) }));
-  const j = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-  return guardarSuscripcion({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
-}
 
 /**
  * Pide activar los avisos al entrar, sin tener que ir a la página de Avisos.
@@ -29,45 +15,37 @@ async function suscribir(clavePublica: string) {
  * En iPhone sin la app instalada, explica cómo instalarla (es la única forma de recibir avisos allí).
  */
 export default function PedirAvisos({ clavePublica }: { clavePublica: string }) {
-  const [modo, setModo] = useState<null | "pedir" | "instalar">(null);
+  const [estado, setEstado] = useState<EstadoPush | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      const instalada = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-      const soporta = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-      if (!soporta) { if (ios && !instalada && leer() < Date.now()) setModo("instalar"); return; }
-      if (Notification.permission === "denied") return;
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (await reg?.pushManager.getSubscription()) return; // ya activos
-      if (Notification.permission === "granted") { await suscribir(clavePublica); return; } // permiso dado: se activa solo
-      if (leer() < Date.now()) setModo("pedir");
+      const e = await estadoPush();
+      if (e === "activo" || e === "no-soportado" || e === "denegado") return;
+      if (e === "inactivo" && Notification.permission === "granted") { await activarPush(clavePublica, false); return; } // permiso dado: se activa solo
+      if (leer() < Date.now()) setEstado(e);
     })().catch(() => {});
   }, [clavePublica]);
 
-  if (!modo) return null;
-  const cerrar = () => { posponer(); setModo(null); };
+  if (!estado) return null;
+  const cerrar = () => { posponer(); setEstado(null); };
   const activar = async () => {
     setOcupado(true); setError(null);
-    try {
-      const permiso = await Notification.requestPermission();
-      if (permiso !== "granted") { setModo(null); return; }
-      const r = await suscribir(clavePublica);
-      if (r?.error) { setError(r.error); return; }
-      setModo(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se han podido activar.");
-    } finally { setOcupado(false); }
+    const r = await activarPush(clavePublica);
+    setOcupado(false);
+    if (r.ok) { setEstado(null); return; }
+    if (r.estado === "denegado") { setEstado(null); return; }
+    setError(r.error ?? null);
   };
+  const ayuda = ayudaPush(estado);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-3">
       <div className="flex items-start gap-3 rounded-xl border border-oro bg-oro/15 p-3 text-sm shadow-sm">
         <Bell className="mt-0.5 shrink-0 text-azul" size={20} />
         <div className="min-w-0 flex-1">
-          {modo === "pedir" ? (
+          {estado === "inactivo" ? (
             <>
               <p className="font-semibold">Activa los avisos en este móvil</p>
               <p className="text-tinta/70">Te avisaremos si te falta pasar lista o montar el entreno, y de los cambios de partidos.</p>
@@ -79,10 +57,10 @@ export default function PedirAvisos({ clavePublica }: { clavePublica: string }) 
               </div>
               {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
             </>
-          ) : (
+          ) : ayuda && (
             <>
-              <p className="font-semibold">Instala la app para recibir avisos</p>
-              <p className="text-tinta/70">En iPhone los avisos solo llegan con la app instalada: pulsa <Share size={14} className="inline align-text-bottom" /> Compartir → «Añadir a pantalla de inicio» y ábrela desde el icono.</p>
+              <p className="font-semibold">{ayuda.titulo}</p>
+              <p className="text-tinta/70">{ayuda.texto}</p>
             </>
           )}
         </div>
