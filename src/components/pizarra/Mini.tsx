@@ -62,7 +62,7 @@ export default function MiniPizarra({ pizarra, className = "", pasos }: { pizarr
   const k0 = pasos ? Math.max(0, Math.min(pasos[0], p.fotogramas.length)) : 0;
   const k1 = pasos ? Math.max(k0, Math.min(pasos[1], p.fotogramas.length)) : p.fotogramas.length;
   const posIni: Record<string, Punto> = pasos ? (est[k0]?.pos ?? p.inicial) : p.inicial;
-  const poseedor: Record<string, string> = (pasos ? est[k0]?.poseedor : p.poseedor) ?? {};
+  const poseedor: Record<string, string | null> = (pasos ? est[k0]?.poseedor : p.poseedor) ?? {};
   const vista = p.vista;
   // Pista → dibujo: media ofensiva vertical con la canasta arriba; defensiva con la canasta abajo
   const T = (q: Punto): [number, number] =>
