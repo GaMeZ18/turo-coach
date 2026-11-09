@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { enviarAvisos } from "@/lib/avisos";
+import { enviarProgramados } from "@/lib/comunicados";
 
 export const dynamic = "force-dynamic";
 
@@ -10,5 +11,6 @@ export async function GET(req: Request) {
   if (secreto && req.headers.get("authorization") !== `Bearer ${secreto}`) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const db = adminClient();
   if (!db) return NextResponse.json({ error: "Falta la clave de servicio" }, { status: 500 });
-  return NextResponse.json(await enviarAvisos(db));
+  const comunicados = await enviarProgramados().catch(() => 0);
+  return NextResponse.json({ ...(await enviarAvisos(db)), comunicados });
 }

@@ -24,7 +24,7 @@ export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador
   const coordinador = rol === "coordinador";
   // Mesas: para coordinadores y para quien tenga el permiso de gestor de mesas (que además es entrenador)
   const conMesas = mesas || coordinador ? [{ href: "/mesas", label: "Mesas" }] : [];
-  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, { href: "/club", label: "Club" }] : [...NAV, ...conMesas];
+  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, { href: "/comunicados", label: "Comunicados" }, { href: "/club", label: "Club" }] : [...NAV, ...conMesas];
   const activo = (href: string) => (href === "/" ? ruta === "/" : href === "/mesas" ? ruta === "/mesas" || (ruta.startsWith("/mesas") && !items.some((i) => i.href !== "/mesas" && ruta.startsWith(i.href))) : ruta.startsWith(href));
 
   return (

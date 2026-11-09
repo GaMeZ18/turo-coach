@@ -263,3 +263,30 @@ export async function fichaEjercicio(id: string): Promise<FichaEjercicio | null>
   const { data } = await supabase.from("ejercicios").select("*").eq("id", id).maybeSingle();
   return (data as FichaEjercicio | null) ?? null;
 }
+
+/** Avisar al resto del cuerpo técnico del equipo de que el entreno está listo (para que le echen un vistazo) */
+export async function avisarStaff(entrenoId: string, mensaje: string): Promise<{ ok?: number; error?: string }> {
+  const { requireUser } = await import("@/lib/supabase/server");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { notificarPerfiles } = await import("@/lib/notificar");
+  const { fechaCorta, hora } = await import("@/lib/fechas");
+  const { supabase, user, perfil } = await requireUser();
+  const { data: e } = await supabase.from("entrenamientos").select("id, equipo_id, fecha, duracion_prevista, equipos(nombre)").eq("id", entrenoId).maybeSingle();
+  if (!e) return { error: "No encuentro el entreno." };
+  const { data: staff } = await supabase.from("equipo_staff").select("perfil_id").eq("equipo_id", e.equipo_id);
+  const ids = ((staff ?? []) as { perfil_id: string }[]).map((s) => s.perfil_id);
+  if (!ids.includes(user.id) && perfil.rol !== "coordinador") return { error: "Solo el cuerpo técnico del equipo." };
+  const destino = ids.filter((id) => id !== user.id);
+  if (!destino.length) return { error: "No hay nadie más en el cuerpo técnico de este equipo." };
+  const { data: act } = await supabase.from("entreno_actividades").select("duracion").eq("entrenamiento_id", entrenoId);
+  const min = ((act ?? []) as { duracion: number | null }[]).reduce((s, a) => s + (a.duracion ?? 0), 0);
+  const db = adminClient();
+  if (!db) return { error: "Falta la configuración del servidor." };
+  const equipo = (e.equipos as unknown as { nombre: string } | null)?.nombre ?? "";
+  const extra = mensaje.trim().slice(0, 300);
+  await notificarPerfiles(db, destino,
+    `${perfil.nombre?.split(" ")[0] ?? "Tu compañero"} ha preparado el entreno · ${equipo}`,
+    `${fechaCorta(e.fecha)} a las ${hora(e.fecha)} · ${min}/${e.duracion_prevista ?? min} min${extra ? `\n${extra}` : ". Échale un vistazo."}`,
+    ruta(entrenoId), e.equipo_id);
+  return { ok: destino.length };
+}

@@ -8,6 +8,7 @@ import { borrarEntreno, duplicarEntreno, editarEntreno, guardarComoPlantilla } f
 import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
+import AvisarStaff from "./AvisarStaff";
 import type { Objetivo } from "@/lib/objetivos";
 import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
@@ -93,6 +94,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <AvisarStaff entrenoId={e.id} completo={((actividades ?? []) as { duracion: number | null }[]).reduce((s, a) => s + (a.duracion ?? 0), 0) >= (e.duracion_prevista ?? 1)} />
           <Link href={`/imprimir/entreno/${e.id}`} className="btn-secundario" title="Imprimir o guardar en PDF"><Printer size={16} /> PDF</Link>
           <form action={duplicarEntreno}>
             <input type="hidden" name="id" value={e.id} />
