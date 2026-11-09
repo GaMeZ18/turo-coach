@@ -2,6 +2,31 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Pulsa «A la vez» para mover a varios en el mismo fotograma y vuelve a pulsarlo para pasar al siguiente. Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue.": "GRAVANT: toca un jugador i arrossega'l; si porta la pilota bota, si no talla. Per passar, toca la pilota i després el receptor (o arrossega la pilota fins a ell); per tirar, toca la pilota i una cistella. Prem «Alhora» per moure'n diversos al mateix fotograma i torna-hi a prémer per passar al següent. El que afegeixis gravant apareix des d'aquest fotograma; amb una fitxa seleccionada pots triar des de/fins quan es veu o canviar-la de defensor a atacant. 📷 neteja les línies i continua.",
+ "A la vez": "Alhora",
+ "A la vez: todo lo que grabes va al mismo fotograma (se mueven a la vez). Vuelve a pulsar para pasar al siguiente.": "Alhora: tot el que gravis va al mateix fotograma (es mouen alhora). Torna a prémer per passar al següent.",
+ "Pulsa REC y luego «A la vez» para mover a varios al mismo tiempo.": "Prem REC i després «Alhora» per moure'n diversos al mateix temps.",
+ "A la vez: mueve a todos los que quieras y haz el pase; irá todo al mismo fotograma. Vuelve a pulsar para cerrar el fotograma.": "Alhora: mou tots els que vulguis i fes la passada; anirà tot al mateix fotograma. Torna a prémer per tancar el fotograma.",
+ "Fotograma cerrado. Lo siguiente irá a un fotograma nuevo.": "Fotograma tancat. El següent anirà a un fotograma nou.",
+ "A LA VEZ": "ALHORA",
+ "Se ve durante toda la jugada.": "Es veu durant tota la jugada.",
+ "Cambio de papel quitado.": "Canvi de paper tret.",
+ "Ahora es atacante.": "Ara és atacant.",
+ "Ahora es defensor.": "Ara és defensor.",
+ "Cambiar de atacante a defensor o al revés": "Canviar d'atacant a defensor o al revés",
+ "Desde este fotograma cambia de papel (ejercicios de alternancia)": "Des d'aquest fotograma canvia de paper (exercicis d'alternança)",
+ "Quitar cambio": "Treure el canvi",
+ "Pasa a atacar aquí": "Passa a atacar aquí",
+ "Pasa a defender aquí": "Passa a defensar aquí",
+ "A atacante": "A atacant",
+ "A defensor": "A defensor",
+ "Se ve:": "Es veu:",
+ "Que aparezca a partir de este fotograma": "Que aparegui a partir d'aquest fotograma",
+ "Desde aquí": "Des d'aquí",
+ "Que desaparezca después de este fotograma": "Que desaparegui després d'aquest fotograma",
+ "Hasta aquí": "Fins aquí",
+ "Que se vea durante toda la jugada": "Que es vegi durant tota la jugada",
+ "Siempre": "Sempre",
  "Otro material": "Altre material",
  "Petos, escalera, vallas…": "Petos, escala, tanques…",
  "← Anterior": "← Anterior",
@@ -868,6 +893,13 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ [" · fotograma {}", " · fotograma {}"],
+ ["A LA VEZ · fotograma {}", "ALHORA · fotograma {}"],
+ ["Aparece desde el fotograma {}. Si lo quieres desde el inicio, pulsa «Siempre».", "Apareix des del fotograma {}. Si el vols des de l'inici, prem «Sempre»."],
+ ["Aparece desde el fotograma {}.", "Apareix des del fotograma {}."],
+ ["Se quita después del fotograma {}.", "Es treu després del fotograma {}."],
+ ["Desde el fotograma {} pasa a atacar.", "Des del fotograma {} passa a atacar."],
+ ["Desde el fotograma {} pasa a defender.", "Des del fotograma {} passa a defensar."],
  [
   "Añadidos {} y actualizados {}, pero ha fallado: {}",
   "Afegits {} i actualitzats {}, però ha fallat: {}"

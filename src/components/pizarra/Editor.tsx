@@ -6,13 +6,13 @@ import Konva from "konva";
 import { Stage, Layer, Group, Line, Arrow, Circle, Text, Rect, RegularPolygon } from "react-konva";
 import {
   Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera, Undo2, Trash2, Settings,
-  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown,
+  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown, Link2, Eye, EyeOff, Repeat,
 } from "lucide-react";
 import Pista from "./Pista";
 import {
   ALTO, AROS, COLOR_DEFECTO, MAX_CAPTURAS, NOMBRE, PALETA, barraFinal, barrasMano, compactar, esJugador,
   enderezar, estados, llevaBalon, longitud, normalizar, nuevoId, paralelas, pizarraVacia, puntoEn, recortarFinal,
-  siguienteEtiqueta, simplificar, tramoDeCursor, tramoDeFotograma, zigzag,
+  siguienteEtiqueta, simplificar, tramoDeCursor, tramoDeFotograma, zigzag, aspectoEn, visibleEn, visibleEntre, etiquetaPara,
   type AccionBalon, type Dibujo, type Elemento, type Estado, type Fotograma, type Movimiento, type Pizarra,
   type Punto, type TipoElemento, type TipoTrazo, type Vista,
 } from "./modelo";
@@ -58,6 +58,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const [herramienta, setHerramienta] = useState<"mover" | "flecha" | "lapiz">("mover");
   const [modoBloqueo, setModoBloqueo] = useState(false); // el siguiente arrastre será un bloqueo
   const [modoMano, setModoMano] = useState(false);       // el siguiente pase será un mano a mano
+  // «A la vez»: todo lo que se grabe va al mismo fotograma hasta que se desactive
+  const [mantener, setMantener] = useState(false);
+  const [fijo, setFijo] = useState<number | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [selDibujo, setSelDibujo] = useState<string | null>(null);
   const [balonSel, setBalonSel] = useState<string | null>(null);
@@ -158,13 +161,14 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     }
     const id = nuevoId();
     cambiar((d) => {
-      d.elementos.push({ id, tipo, etiqueta, color: colorActivo ?? COLOR_DEFECTO[tipo], rot: esJugador(tipo) ? undefined : 0 });
+      d.elementos.push({ id, tipo, etiqueta, color: colorActivo ?? COLOR_DEFECTO[tipo], rot: esJugador(tipo) ? undefined : 0, ...(grabando && cursor > 0 ? { desde: cursor } : {}) });
       d.inicial[id] = posNueva(tipo);
       if (tipo === "balon") d.poseedor[id] = null;
     });
     setSel(id);
     setEspecial(null);
     if (tipo === "balon") avisar("Toca el balón y después un jugador para dárselo.");
+    else if (grabando && cursor > 0) avisar(`Aparece desde el fotograma ${cursor}. Si lo quieres desde el inicio, pulsa «Siempre».`);
   };
 
   /** Coordenadas locales de media pista (u a lo ancho, v desde el fondo) → pista */
@@ -202,6 +206,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     return d.fotogramas[cursor];
   };
 
+  /** ¿Se está añadiendo al fotograma «a la vez»? (el último grabado, justo detrás del cursor) */
+  const enFijo = grabando && mantener && fijo !== null && fijo === cursor - 1 && fijo < n;
+  const fijarSiToca = () => { if (mantener) setFijo(cursor); };
+
   const desplazarRecorridos = (d: Pizarra, id: string, desde: number, dx: number, dy: number) => {
     for (let j = desde; j < d.fotogramas.length; j++) {
       for (const m of d.fotogramas[j].movimientos) {
@@ -225,10 +233,15 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       ? { balon, tipo: "pase", de: tiene, a: jugador, ...(modoMano ? { mano: true } : {}) }
       : { balon, tipo: "coger", a: jugador, ...(balonEnCanasta(balon) ? { rebote: true } : {}) };
     if (modoMano) setModoMano(false);
+    if (enFijo && !p.fotogramas[fijo!].balon.some((a) => a.balon === balon)) {
+      cambiar((d) => { d.fotogramas[fijo!].balon.push(accion); });
+      return;
+    }
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
       f.balon = [...f.balon.filter((a) => a.balon !== balon), accion];
     }, cursor + 1);
+    fijarSiToca();
   };
 
   /** ¿El balón está en la canasta? (lo último que hizo fue un tiro, o está junto a un aro) */
@@ -248,10 +261,15 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     if (!grabando) { avisar("Para tirar, pulsa REC."); return; }
     const tiene = E.poseedor[balon];
     if (!tiene) { avisar("Para tirar, el balón tiene que tenerlo un jugador."); return; }
+    if (enFijo && !p.fotogramas[fijo!].balon.some((a) => a.balon === balon)) {
+      cambiar((d) => { d.fotogramas[fijo!].balon.push({ balon, tipo: "tiro", de: tiene, destino }); });
+      return;
+    }
     cambiar((d) => {
       const f = fotogramaGrabacion(d);
       f.balon = [...f.balon.filter((a) => a.balon !== balon), { balon, tipo: "tiro", de: tiene, destino }];
     }, cursor + 1);
+    fijarSiToca();
   };
 
   // ---------- toques ----------
@@ -272,8 +290,54 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   const editarEtiqueta = (el: Elemento) => {
     if (!esJugador(el.tipo) && el.tipo !== "texto") return;
-    const t = window.prompt(el.tipo === "texto" ? "Texto:" : "Etiqueta (número o nombre corto):", el.etiqueta);
-    if (t !== null && t.trim()) cambiar((d) => { const x = d.elementos.find((q) => q.id === el.id); if (x) x.etiqueta = t.trim().slice(0, el.tipo === "texto" ? 40 : 3); });
+    const t = window.prompt(el.tipo === "texto" ? "Texto:" : "Etiqueta (número o nombre corto):", aspectoEn(el, cursor).etiqueta);
+    if (t !== null && t.trim()) cambiar((d) => {
+      const x = d.elementos.find((q) => q.id === el.id);
+      if (!x) return;
+      const v = t.trim().slice(0, el.tipo === "texto" ? 40 : 3);
+      const c = cambioActivo(x);
+      if (c) c.etiqueta = v; else x.etiqueta = v;
+    });
+  };
+
+  /** Cambio de papel que manda en el fotograma actual (si lo hay) */
+  const cambioActivo = (x: Elemento) => (x.cambios ?? []).filter((c) => c.k <= cursor).sort((a, b) => b.k - a.k)[0];
+
+  /** Cuándo se ve: aparece aquí, se quita después de este fotograma, o siempre */
+  const ponerVisibilidad = (id: string, modo: "aparece" | "quita" | "siempre") => {
+    cambiar((d) => {
+      const x = d.elementos.find((q) => q.id === id);
+      if (!x) return;
+      if (modo === "siempre") { delete x.desde; delete x.hasta; return; }
+      if (modo === "aparece") {
+        if (cursor > 0) x.desde = cursor; else delete x.desde;
+        if (x.hasta !== undefined && x.hasta <= cursor) delete x.hasta;
+        return;
+      }
+      x.hasta = cursor + 1;
+      if ((x.desde ?? 0) > cursor) delete x.desde;
+    });
+    avisar(modo === "aparece" ? `Aparece desde el fotograma ${cursor}.` : modo === "quita" ? `Se quita después del fotograma ${cursor}.` : "Se ve durante toda la jugada.");
+  };
+
+  /** El atacante pasa a defender (o al revés) desde el fotograma actual */
+  const cambiarRol = (el: Elemento) => {
+    const ya = (el.cambios ?? []).find((c) => c.k === cursor);
+    if (ya && cursor > 0) {
+      cambiar((d) => { const x = d.elementos.find((q) => q.id === el.id); if (x) x.cambios = (x.cambios ?? []).filter((c) => c.k !== cursor); });
+      avisar("Cambio de papel quitado.");
+      return;
+    }
+    const actual = aspectoEn(el, cursor);
+    const nuevo: "atacante" | "defensor" = actual.tipo === "defensor" ? "atacante" : "defensor";
+    const etiqueta = etiquetaPara(actual.etiqueta, nuevo);
+    cambiar((d) => {
+      const x = d.elementos.find((q) => q.id === el.id);
+      if (!x) return;
+      if (cursor === 0) { x.tipo = nuevo; x.etiqueta = etiqueta; x.color = COLOR_DEFECTO[nuevo]; return; }
+      x.cambios = [...(x.cambios ?? []), { k: cursor, tipo: nuevo, etiqueta, color: COLOR_DEFECTO[nuevo] }];
+    });
+    avisar(cursor === 0 ? `Ahora es ${nuevo}.` : `Desde el fotograma ${cursor} pasa a ${nuevo === "atacante" ? "atacar" : "defender"}.`);
   };
 
   // ---------- arrastre ----------
@@ -300,13 +364,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   const tipoAuto = (el: Elemento): TipoTrazo =>
-    modoBloqueo && esJugador(el.tipo) ? "bloqueo" : el.tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
+    modoBloqueo && esJugador(el.tipo) ? "bloqueo" : aspectoEn(el, cursor).tipo === "atacante" && llevaBalon(E, el.id) ? "botar" : "correr";
 
   /** Jugador más cercano a un punto (para soltar el balón encima) */
   const jugadorCerca = (q: Punto, excepto?: string | null) => {
     let mejor: string | null = null, dist = Math.max(1.3, R * 2.6);
     for (const el of p.elementos) {
-      if (!esJugador(el.tipo) || el.id === excepto) continue;
+      if (!esJugador(el.tipo) || el.id === excepto || !visibleEn(el, cursor)) continue;
       const pos = E.pos[el.id];
       if (!pos) continue;
       const d = Math.hypot(pos.x - q.x, pos.y - q.y);
@@ -341,7 +405,21 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     const origen = v && v.id === el.id ? v.puntos : actual ? [actual.x, actual.y] : [];
     const crudo = simplificar([...origen, destino.x, destino.y], 0.15);
     if (crudo.length < 4 || longitud(crudo) < 0.4) return;
-    const puntos = enderezar(crudo); // recta perfecta, esquina nítida o curva suave
+    const nuevo = enderezar(crudo); // recta perfecta, esquina nítida o curva suave
+    if (enFijo && actual) {
+      // «A la vez»: se añade al mismo fotograma (si ya se movía en él, su recorrido continúa)
+      const fi = fijo!;
+      const prev = p.fotogramas[fi].movimientos.find((m) => m.elementoId === el.id);
+      const tipoF = prev && !modoBloqueo ? prev.tipo : tipoAuto(el);
+      if (modoBloqueo) setModoBloqueo(false);
+      cambiar((d) => {
+        const f = d.fotogramas[fi];
+        f.movimientos = [...f.movimientos.filter((m) => m.elementoId !== el.id), { elementoId: el.id, tipo: tipoF, puntos: prev ? [...prev.puntos, ...nuevo.slice(2)] : nuevo }];
+        if (fi + 1 < d.fotogramas.length) desplazarRecorridos(d, el.id, fi + 1, destino.x - actual.x, destino.y - actual.y);
+      });
+      return;
+    }
+    const puntos = nuevo;
     const tipo = tipoAuto(el);
     if (modoBloqueo) setModoBloqueo(false);
     const finAntes = est[Math.min(cursor + 1, n)]?.pos[el.id] ?? actual;
@@ -352,6 +430,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         desplazarRecorridos(d, el.id, cursor + 1, destino.x - finAntes.x, destino.y - finAntes.y);
       }
     }, cursor + 1);
+    fijarSiToca();
   };
 
   // ---------- dibujo libre (flecha y lápiz) ----------
@@ -597,6 +676,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const lineas: Linea[] = [];
   const acciones: AccLinea[] = [];
   let dibujosVisibles: Dibujo[] = [];
+  // Estados que se están viendo (para saber qué elementos aparecen y con qué papel)
+  let ka = cursor, kb = cursor;
 
   const lineasDe = (desde: number, hasta: number, op = 1, numerar?: (f: number) => number) => {
     for (let f = desde; f < hasta; f++) {
@@ -609,6 +690,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   if (anim && p.fotogramas[anim.f]) {
     const f = anim.f;
+    ka = kb = f;
     const fot = p.fotogramas[f];
     const S0 = est[f];
     const { mov, bal } = tiempos(fot);
@@ -633,11 +715,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     dibujosVisibles = p.dibujos.filter((d) => d.seg === tramoDeFotograma(p, f + 1));
   } else if (especial?.tipo === "captura") {
     const s = segmentos.find((x) => x.seg === especial.seg) ?? { seg: 0, inicio: 0, fin: 0 };
+    ka = s.inicio; kb = s.fin;
     posiciones = { ...est[s.inicio].pos };
     poseedores = { ...est[s.inicio].poseedor };
     lineasDe(s.inicio, s.fin);
     dibujosVisibles = p.dibujos.filter((d) => d.seg === s.seg);
   } else if (especial?.tipo === "todas") {
+    ka = 0; kb = n;
     posiciones = { ...est[0].pos };
     poseedores = { ...est[0].poseedor };
     lineasDe(0, n, 1, p.capturas.length ? (f) => tramoDeFotograma(p, f + 1) + 1 : undefined);
@@ -653,9 +737,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const elemento = (id?: string) => p.elementos.find((x) => x.id === id);
 
   // ---------- pintar líneas ----------
-  const pintarMovimiento = (m: Movimiento, key: string, op: number, num?: number) => {
-    const el = elemento(m.elementoId);
-    if (!el) return null;
+  const pintarMovimiento = (m: Movimiento, key: string, op: number, num?: number, fot = ka) => {
+    const base0 = elemento(m.elementoId);
+    if (!base0) return null;
+    const el = aspectoEn(base0, fot);
     const material = !esJugador(el.tipo);
     const color = material ? "#6b7280" : el.tipo === "defensor" ? "#ca010c" : TINTA;
     const pts = material ? m.puntos : recortarFinal(m.puntos, R * 1.05);
@@ -826,7 +911,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   // orden de pintado: material, jugadores y, encima de todo, los balones
   const orden = (el: Elemento) => (el.tipo === "balon" ? 2 : esJugador(el.tipo) ? 1 : 0);
-  const elementosOrdenados = [...p.elementos].sort((a, b) => orden(a) - orden(b));
+  const elementosOrdenados = p.elementos.filter((el) => visibleEntre(el, ka, kb)).sort((a, b) => orden(a) - orden(b));
 
   const posBalon = (id: string): Punto | undefined => {
     if (balonEnVuelo[id]) return balonEnVuelo[id];
@@ -839,7 +924,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   const canastasObjetivo: Punto[] = [
     ...AROS,
-    ...(p.elementos.filter((e) => e.tipo === "canasta").map((e) => E.pos[e.id]).filter(Boolean) as Punto[]),
+    ...(p.elementos.filter((e) => e.tipo === "canasta" && visibleEn(e, cursor)).map((e) => E.pos[e.id]).filter(Boolean) as Punto[]),
   ];
 
   /** Rotación con la que se dibuja: jugadores y texto siempre derechos */
@@ -999,11 +1084,11 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
                 {dibujosVisibles.map((d) => pintarDibujo(d, `d-${d.id}`))}
                 {dibujoVivo && <Line points={dibujoVivo} stroke={colorActivo ?? TINTA} strokeWidth={0.08} tension={0.4} opacity={0.7} listening={false} />}
-                {lineas.map((l, i) => pintarMovimiento(l.m, `m-${l.f}-${i}`, l.op, l.num))}
+                {lineas.map((l, i) => pintarMovimiento(l.m, `m-${l.f}-${i}`, l.op, l.num, l.f))}
                 {acciones.map((a, i) => pintarAccion(a, `a-${a.f}-${i}`))}
                 {vivo && (() => {
                   const el = elemento(vivo.id);
-                  return el ? pintarMovimiento({ elementoId: vivo.id, tipo: tipoAuto(el), puntos: vivo.puntos }, "vivo", 0.75) : null;
+                  return el ? pintarMovimiento({ elementoId: vivo.id, tipo: tipoAuto(el), puntos: vivo.puntos }, "vivo", 0.75, undefined, cursor) : null;
                 })()}
 
                 {/* Canastas a las que se puede tirar */}
@@ -1028,7 +1113,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                     >
                       {seleccionado && <Circle radius={el.tipo === "balon" ? RB * 1.8 : el.tipo === "escalera" ? 1.7 : R * 1.45} stroke="#eab308" strokeWidth={0.1} dash={[0.2, 0.12]} listening={false} />}
                       {receptor && <Circle radius={R * 1.35} stroke="#fc6401" strokeWidth={0.07} dash={[0.15, 0.1]} listening={false} />}
-                      {forma(el)}
+                      {forma(aspectoEn(el, ka))}
                     </Group>
                   );
                 })}
@@ -1051,6 +1136,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             {grabando && !anim && (
               <span className="flex items-center gap-1.5 rounded-full bg-rojo px-2.5 py-1 text-xs font-bold text-white shadow">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> REC
+                {mantener && <span className="ml-1 rounded-full bg-white/25 px-1.5">A LA VEZ{enFijo ? ` · fotograma ${fijo! + 1}` : ""}</span>}
               </span>
             )}
             {etiquetaVista && <span className="rounded-full bg-azul px-3 py-1 text-xs font-semibold text-white shadow">{etiquetaVista}</span>}
@@ -1085,7 +1171,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                 title="Color para lo que añadas o para lo seleccionado"
                 onClick={() => {
                   setColorActivo((a) => (a === c && !sel && !selDibujo ? null : c));
-                  if (sel) cambiar((d) => { const x = d.elementos.find((q) => q.id === sel); if (x) x.color = c; });
+                  if (sel) cambiar((d) => { const x = d.elementos.find((q) => q.id === sel); if (!x) return; const ca = cambioActivo(x); if (ca) ca.color = c; else x.color = c; });
                   if (selDibujo) cambiar((d) => { const x = d.dibujos.find((q) => q.id === selDibujo); if (x) x.color = c; });
                 }}
                 className={`h-7 w-7 rounded-full border transition ${colorActivo === c ? "scale-110 ring-2 ring-tinta ring-offset-1" : "border-black/25"}`}
@@ -1104,7 +1190,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             onClick={() => {
               const empieza = !grabando;
               setGrabando(empieza); limpiarSeleccion(); setEspecial(null); setHerramienta("mover");
-              if (!empieza) { setModoBloqueo(false); setModoMano(false); }
+              if (!empieza) { setModoBloqueo(false); setModoMano(false); setMantener(false); setFijo(null); }
               if (empieza) avisar("Grabando: arrastra jugadores; toca el balón y luego a quien lo recibe.");
             }}
           >
@@ -1133,6 +1219,18 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             }}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><path d="M11 6v12M15 6v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          </Boton>
+          <Boton
+            titulo="A la vez: todo lo que grabes va al mismo fotograma (se mueven a la vez). Vuelve a pulsar para pasar al siguiente."
+            activo={mantener}
+            onClick={() => {
+              if (!grabando) { avisar("Pulsa REC y luego «A la vez» para mover a varios al mismo tiempo."); return; }
+              const on = !mantener;
+              setMantener(on); setFijo(null); setHerramienta("mover");
+              avisar(on ? "A la vez: mueve a todos los que quieras y haz el pase; irá todo al mismo fotograma. Vuelve a pulsar para cerrar el fotograma." : "Fotograma cerrado. Lo siguiente irá a un fotograma nuevo.");
+            }}
+          >
+            <span className="flex items-center gap-1 text-[11px] font-bold"><Link2 size={15} /> A la vez</span>
           </Boton>
 
           <span className="mx-1 h-6 w-px bg-linea" />
@@ -1199,7 +1297,20 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <span className="font-semibold text-azul">Dibujo</span>
           ) : elSel && (
             <>
-              <span className="font-semibold text-azul">{NOMBRE[elSel.tipo]} {elSel.tipo !== "texto" ? elSel.etiqueta : ""}</span>
+              <span className="font-semibold text-azul">{NOMBRE[aspectoEn(elSel, cursor).tipo]} {elSel.tipo !== "texto" ? aspectoEn(elSel, cursor).etiqueta : ""}</span>
+              {(elSel.tipo === "atacante" || elSel.tipo === "defensor") && (
+                <Chip titulo={cursor === 0 ? "Cambiar de atacante a defensor o al revés" : "Desde este fotograma cambia de papel (ejercicios de alternancia)"} activo={!!elSel.cambios?.some((c) => c.k === cursor) && cursor > 0} onClick={() => cambiarRol(elSel)}>
+                  <Repeat size={14} /> {elSel.cambios?.some((c) => c.k === cursor) && cursor > 0 ? "Quitar cambio" : aspectoEn(elSel, cursor).tipo === "defensor" ? (cursor ? "Pasa a atacar aquí" : "A atacante") : (cursor ? "Pasa a defender aquí" : "A defensor")}
+                </Chip>
+              )}
+              {(n > 0 || elSel.desde !== undefined || elSel.hasta !== undefined) && (
+                <>
+                  <span className="text-[11px] uppercase text-tinta/50">Se ve:</span>
+                  <Chip titulo="Que aparezca a partir de este fotograma" activo={(elSel.desde ?? 0) === cursor && cursor > 0} onClick={() => ponerVisibilidad(elSel.id, "aparece")}><Eye size={14} /> Desde aquí</Chip>
+                  <Chip titulo="Que desaparezca después de este fotograma" activo={elSel.hasta === cursor + 1} onClick={() => ponerVisibilidad(elSel.id, "quita")}><EyeOff size={14} /> Hasta aquí</Chip>
+                  <Chip titulo="Que se vea durante toda la jugada" activo={elSel.desde === undefined && elSel.hasta === undefined} onClick={() => ponerVisibilidad(elSel.id, "siempre")}>Siempre</Chip>
+                </>
+              )}
               {(esJugador(elSel.tipo) || elSel.tipo === "texto") && <Chip onClick={() => editarEtiqueta(elSel)}>Etiqueta</Chip>}
               {!esJugador(elSel.tipo) && elSel.tipo !== "balon" && (
                 <>
@@ -1256,10 +1367,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
         {grabando
-          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Con ‹ vuelve un fotograma atrás y mueve a otro jugador para que se muevan a la vez. 📷 limpia las líneas y sigue."
+          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Pulsa «A la vez» para mover a varios en el mismo fotograma y vuelve a pulsarlo para pasar al siguiente. Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.6</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.7</span>
       </p>
     </div>
   );

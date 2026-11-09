@@ -21,7 +21,27 @@ export interface Elemento {
   etiqueta: string;
   color: string;
   rot?: number; // grados
+  desde?: number;   // aparece a partir de este estado (fotograma); sin valor = desde el inicio
+  hasta?: number;   // deja de verse a partir de este estado; sin valor = hasta el final
+  cambios?: CambioRol[]; // a partir de un fotograma cambia de papel (p. ej. el defensor pasa a atacar)
 }
+
+export interface CambioRol { k: number; tipo: TipoJugador; etiqueta: string; color: string }
+
+/** ¿Se ve el elemento en el estado k? */
+export const visibleEn = (el: Elemento, k: number) => (el.desde ?? 0) <= k && (el.hasta === undefined || k < el.hasta);
+/** ¿Se ve en algún momento entre los estados a y b? */
+export const visibleEntre = (el: Elemento, a: number, b: number) => (el.desde ?? 0) <= b && (el.hasta === undefined || a < el.hasta);
+/** Cómo es el elemento en el estado k (tipo, etiqueta y color tras los cambios de papel) */
+export function aspectoEn(el: Elemento, k: number): Elemento {
+  if (!el.cambios?.length) return el;
+  let r = el;
+  for (const c of [...el.cambios].sort((a, b) => a.k - b.k)) if (c.k <= k) r = { ...r, tipo: c.tipo, etiqueta: c.etiqueta, color: c.color };
+  return r;
+}
+/** Etiqueta al pasar de atacante a defensor o al revés (3 ↔ X3) */
+export const etiquetaPara = (et: string, tipo: TipoJugador) =>
+  tipo === "defensor" ? (/^X/i.test(et) ? et : `X${et}`) : tipo === "atacante" ? et.replace(/^X/i, "") || et : et;
 
 export interface Movimiento {
   elementoId: string;
