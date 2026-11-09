@@ -87,8 +87,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
       lineas.length ? lineas.join(" · ") : "Todos los equipos han montado sus entrenos y pasado lista.", "/coordinacion/asistencia"));
   }
 
-  // 4) Jueves por la noche → gestor de mesas: cuánta gente falta en las mesas del fin de semana
-  if (diaSemana === 4 && horaLocal >= 21) {
+  // 4) Miércoles a las 15:00 (al cerrarse las inscripciones) → gestor de mesas: cuánta gente falta esta semana
+  if (diaSemana === 3 && horaLocal >= 15) {
     const partidos = (await partidosDeCasa(db, new Date(ahora).toISOString(), aISO(sumarDias(lunes, 7), "00:00"))).filter((p) => !p.federada);
     if (partidos.length) {
       const { data: aR } = await db.from("mesa_asignaciones").select("partido_id").eq("estado", "confirmado").in("partido_id", partidos.map((p) => p.id));

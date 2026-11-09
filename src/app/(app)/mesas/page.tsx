@@ -46,7 +46,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const invitacion = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
     pendientes.length ? "Necesitamos gente para estas mesas:" : "Partidos de casa de la semana:",
     ...(pendientes.length ? pendientes : deClub).map((p) => `• ${textoPartido(p)}${p.efectivo ? " (1 persona, la pagan los jugadores)" : ""}`), "",
-    `Mesas del club: ${euros(Number(cfg.importe))} por persona y partido. Apúntate a las que puedas (hasta el viernes):`, enlaceSemana].join("\n");
+    `Mesas del club: ${euros(Number(cfg.importe))} por persona y partido. Apúntate a las que puedas (hasta el miércoles a las 15:00):`, enlaceSemana].join("\n");
   const whatsapp = (tel: string, nombre: string, p: { fecha: string; equipo: string; rival: string; lugar: string | null }) =>
     `https://wa.me/${tel.replace(/[^\d]/g, "").replace(/^(?!34)(\d{9})$/, "34$1")}?text=${encodeURIComponent(`Hola ${nombre.split(" ")[0]}! Te confirmo la mesa:\n${detalleMesa(p)}\n¡Gracias!`)}`;
 

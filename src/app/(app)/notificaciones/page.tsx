@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/supabase/server";
 import { VAPID_PUBLICO } from "@/lib/notificar";
 import Enviar from "@/components/Enviar";
 import ActivarAvisos from "./ActivarAvisos";
+import MisMesas from "./MisMesas";
+import { adminClient } from "@/lib/supabase/admin";
 import { marcarLeidas } from "./actions";
 
 export default async function NotificacionesPage() {
@@ -13,6 +15,9 @@ export default async function NotificacionesPage() {
   const efimerasNuevas = lista.filter((n) => n.efimera && !n.leida).map((n) => n.id);
   if (efimerasNuevas.length) await supabase.from("notificaciones").update({ leida: true }).in("id", efimerasNuevas);
   const sinLeer = lista.filter((n) => !n.leida).length;
+  const admin = adminClient();
+  const { data: mm } = admin ? await admin.from("mesa_personas").select("telefono").eq("perfil_id", user.id).limit(1).maybeSingle() : { data: null };
+  const miTelefono = (mm as { telefono: string | null } | null)?.telefono ?? null;
 
   return (
     <div className="max-w-2xl">
@@ -21,6 +26,7 @@ export default async function NotificacionesPage() {
         {sinLeer > 0 && <form action={marcarLeidas}><Enviar className="btn-secundario !py-1.5 text-sm">Marcar todo como leído</Enviar></form>}
       </div>
       <div className="mt-4"><ActivarAvisos clavePublica={VAPID_PUBLICO} /></div>
+      <div className="mt-3"><MisMesas telefono={miTelefono} /></div>
       {error && /notificaciones/.test(error.message) && <p className="tarjeta mt-4 p-3 text-sm text-red-700">Ejecuta <code>0010_notificaciones.sql</code> en Supabase.</p>}
       <ul className="tarjeta mt-4 divide-y divide-linea">
         {lista.map((n) => {

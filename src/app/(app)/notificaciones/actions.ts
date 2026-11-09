@@ -33,3 +33,25 @@ export async function probarAvisos() {
   if (!db) return { error: "Falta la clave de servicio en el servidor." };
   return await probarPushDe(db, user.id);
 }
+
+/** Vincular «mis mesas» (por teléfono) a mi cuenta: los avisos de mesa me llegan a la app y al móvil */
+export async function vincularMesas(fd: FormData): Promise<{ ok?: string; error?: string }> {
+  const { requireUser } = await import("@/lib/supabase/server");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { normalizarTelefono } = await import("@/lib/mesas");
+  const { user, perfil } = await requireUser();
+  const db = adminClient();
+  if (!db) return { error: "Falta la clave de servicio en el servidor." };
+  const tel = normalizarTelefono(String(fd.get("telefono") ?? ""));
+  if (fd.get("quitar") === "1") {
+    await db.from("mesa_personas").update({ perfil_id: null }).eq("perfil_id", user.id);
+    revalidatePath("/notificaciones");
+    return { ok: "Desvinculado." };
+  }
+  if (tel.length < 9) return { error: "Escribe tu teléfono (el mismo con el que te apuntas a las mesas)." };
+  const { data: p } = await db.from("mesa_personas").select("id").eq("telefono", tel).maybeSingle();
+  if (p) await db.from("mesa_personas").update({ perfil_id: user.id }).eq("id", p.id);
+  else await db.from("mesa_personas").insert({ nombre: perfil.nombre ?? "Sin nombre", telefono: tel, perfil_id: user.id });
+  revalidatePath("/notificaciones");
+  return { ok: "Listo: los avisos de tus mesas te llegarán aquí y al móvil." };
+}

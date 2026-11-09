@@ -35,11 +35,11 @@ export async function apuntarse(token: string, nombre: string, telefono: string,
   if (!nombre || tel.length < 9) return { error: "Escribe tu nombre y tu teléfono." };
   if (!partidos.length) return { error: "Marca al menos un partido." };
   // Solo partidos de casa, sin mesa federada y que aún no se han jugado
-  // y con el plazo abierto (hasta el viernes de la semana del partido)
+  // y con el plazo abierto (hasta el miércoles a las 15:00 de la semana del partido)
   const lista = (await partidosDeCasa(c.db, new Date().toISOString(), new Date(Date.now() + 60 * 864e5).toISOString())).filter((p) => !p.federada && abierta(p.fecha));
   const validos = new Map(lista.map((p) => [p.id, p]));
   const elegidos = partidos.filter((p) => validos.has(p));
-  if (!elegidos.length) return { error: "El plazo para apuntarse a esos partidos ya está cerrado (se cierra el viernes)." };
+  if (!elegidos.length) return { error: "El plazo para apuntarse a esos partidos ya está cerrado (se cierra el miércoles a las 15:00). Si tienes algún problema, escribe en el grupo de WhatsApp de mesas." };
 
   let { data: persona } = await c.db.from("mesa_personas").select("id, nombre").eq("telefono", tel).maybeSingle();
   if (!persona) {
@@ -63,11 +63,11 @@ export async function desapuntarse(token: string, telefono: string, asignacion: 
   const tel = normalizarTelefono(telefono);
   const { data: p } = await c.db.from("mesa_personas").select("id").eq("telefono", tel).maybeSingle();
   if (!p) return { error: "No te encuentro." };
-  // Después del viernes ya no se puede borrar uno mismo: solo el gestor, si hay una urgencia
+  // Después del miércoles a las 15:00 ya no se puede borrar uno mismo: hay que hablarlo por el grupo de WhatsApp
   const { data: a } = await c.db.from("mesa_asignaciones").select("id, partido_id").eq("id", asignacion).eq("persona_id", p.id).maybeSingle();
   const fecha = a ? (await fechaPartidoMesa(c.db, a.partido_id))?.fecha : undefined;
   if (!a || !fecha) return misMesas(token, tel);
-  if (!abierta(fecha)) return { error: "El plazo ya está cerrado: si no puedes ir, avisa al gestor de mesas para que ponga a otra persona.", ...(await misMesas(token, tel)) };
+  if (!abierta(fecha)) return { error: "El plazo ya está cerrado: si no puedes ir, avísalo en el grupo de WhatsApp de mesas.", ...(await misMesas(token, tel)) };
   await c.db.from("mesa_asignaciones").delete().eq("id", asignacion).eq("persona_id", p.id);
   return misMesas(token, tel);
 }

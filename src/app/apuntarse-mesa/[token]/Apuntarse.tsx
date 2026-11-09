@@ -89,7 +89,7 @@ export default function Apuntarse({ token, partidos, clavePublica }: { token: st
       )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.t}</p>}
       {mias.length > 0 && <AvisosMesa token={token} telefono={telefono} clavePublica={clavePublica} />}
-      <p className="text-xs text-tinta/50">Hasta el viernes te puedes borrar tú (también si ya estás confirmado). Después del viernes, si te surge una urgencia, avisa al gestor de mesas para que ponga a otra persona.</p>
+      <p className="text-xs text-tinta/50">Hasta el miércoles a las 15:00 te puedes borrar tú (también si ya estás confirmado). Después, si tienes algún problema, escríbelo en el grupo de WhatsApp de mesas.</p>
     </div>
   );
 }

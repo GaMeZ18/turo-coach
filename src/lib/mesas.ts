@@ -50,16 +50,18 @@ export const normalizarTelefono = (t: string) => {
 };
 export const euros = (n: number) => `${n.toLocaleString("es-ES", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`;
 
+export const CIERRE_HORA = "15:00";
+
 /**
- * Hasta cuándo se puede uno apuntar o borrar sin cuenta: el viernes a las 23:59 de la semana del partido
+ * Hasta cuándo se puede uno apuntar o borrar sin cuenta: el miércoles a las 15:00 de la semana del partido
  * (o la hora del partido, si es antes). Después, solo el gestor puede cambiar la mesa.
  */
 export function plazoMesa(fechaPartido: string): string {
   const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(fechaPartido));
   const d = new Date(`${dia}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 4); // viernes de esa semana
-  const viernes = d.toISOString().slice(0, 10);
-  const corte = aISO(viernes, "23:59");
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 2); // miércoles de esa semana
+  const miercoles = d.toISOString().slice(0, 10);
+  const corte = aISO(miercoles, CIERRE_HORA);
   return corte < fechaPartido ? corte : fechaPartido;
 }
 export const abierta = (fechaPartido: string, ahora = new Date().toISOString()) => ahora < plazoMesa(fechaPartido);
@@ -86,11 +88,12 @@ export function rangoPublico(semana: string | undefined, hoy: string, lunesDe: (
   }
   const l = lunesDe(hoy);
   const dow = new Date(`${hoy}T12:00:00Z`).getUTCDay();
-  const finde = dow === 6 || dow === 0;
+  const finde = dow >= 3 || dow === 0; // desde el miércoles (cuando se cierra la semana) ya se ve también la siguiente
   return { desde: aISO(l, "00:00"), hasta: aISO(sumarDias(l, finde ? 14 : 7), "00:00"), lunes: l };
 }
 
-export const LLEGAR_ANTES = 30; // minutos antes del partido
+export const LLEGAR_ANTES = 30;
+export const CIERRE_TEXTO = "el miércoles a las 15:00"; // minutos antes del partido
 
 /** Detalle completo para el aviso o el WhatsApp a quien hace la mesa */
 export function detalleMesa(p: { fecha: string; equipo: string; rival: string; lugar: string | null }, companeros: string[] = []) {

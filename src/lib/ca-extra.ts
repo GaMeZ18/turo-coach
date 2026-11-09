@@ -2,6 +2,14 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "¿También haces mesas?": "També fas taules?",
+ "Desvincular": "Desvincular",
+ "Vincular": "Vincular",
+ "Pon el teléfono con el que te apuntas a las mesas y te llegarán aquí y al móvil los avisos cuando te confirmen y 1 hora antes del partido.": "Posa el telèfon amb què t'apuntes a les taules i et arribaran aquí i al mòbil els avisos quan et confirmin i 1 hora abans del partit.",
+ "Tus avisos de mesa (confirmación y 1 hora antes) te llegan aquí. Teléfono:": "Els teus avisos de taula (confirmació i 1 hora abans) t'arriben aquí. Telèfon:",
+ "Listo: los avisos de tus mesas te llegarán aquí y al móvil.": "Fet: els avisos de les teves taules t'arribaran aquí i al mòbil.",
+ "Hasta el miércoles a las 15:00 te puedes borrar tú (también si ya estás confirmado). Después, si tienes algún problema, escríbelo en el grupo de WhatsApp de mesas.": "Fins dimecres a les 15:00 et pots esborrar tu (també si ja estàs confirmat). Després, si tens algun problema, escriu-ho al grup de WhatsApp de taules.",
+ "El plazo ya está cerrado: si no puedes ir, avísalo en el grupo de WhatsApp de mesas.": "El termini ja està tancat: si no hi pots anar, avisa-ho al grup de WhatsApp de taules.",
  "Cambiar objetivos o descripción para hoy": "Canviar objectius o descripció per avui",
  "Modificado para este entreno": "Modificat per a aquest entrenament",
  "Volver al original": "Tornar a l'original",

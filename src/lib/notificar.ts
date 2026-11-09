@@ -47,6 +47,10 @@ export async function notificarPerfiles(db: SupabaseClient, perfiles: string[], 
 export async function notificarPersonasMesa(db: SupabaseClient, personas: string[], titulo: string, cuerpo: string, url: string) {
   const ids = [...new Set(personas)].filter(Boolean);
   if (!ids.length) return;
+  // Si esa persona también usa la app (ha vinculado su teléfono), le llega a su cuenta: Avisos y su móvil
+  const { data: vinc } = await db.from("mesa_personas").select("perfil_id").in("id", ids).not("perfil_id", "is", null);
+  const perfiles = ((vinc ?? []) as { perfil_id: string }[]).map((v) => v.perfil_id);
+  if (perfiles.length) await notificarPerfiles(db, perfiles, titulo, cuerpo, url, null, true);
   const { data: subs } = await db.from("mesa_push").select("endpoint, p256dh, auth").in("persona_id", ids);
   const privada = process.env.VAPID_PRIVATE_KEY?.trim();
   if (!privada || !subs?.length) return;
