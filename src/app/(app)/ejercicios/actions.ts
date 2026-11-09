@@ -97,14 +97,17 @@ export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
   }
   revalidatePath("/ejercicios");
   if (entrenoId && !d.id) {
-    const { count } = await supabase
+    const { data: ultima } = await supabase
       .from("entreno_actividades")
-      .select("id", { count: "exact", head: true })
-      .eq("entrenamiento_id", entrenoId);
+      .select("orden")
+      .eq("entrenamiento_id", entrenoId)
+      .order("orden", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     check(await supabase.from("entreno_actividades").insert({
       entrenamiento_id: entrenoId,
-      orden: count ?? 0,
-      tipo: "ejercicio",
+      orden: (ultima?.orden ?? -1) + 1,
+      tipo: d.tipo === "fisico" ? "prep_fisica" : "ejercicio",
       ejercicio_id: id,
       titulo: fila.titulo,
       duracion: d.duracion ?? 10,

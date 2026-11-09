@@ -108,14 +108,18 @@ export async function anadirActividad(formData: FormData) {
     if (ej?.tipo === "fisico") esFisico = true;
     if (!formData.get("duracion") && ej?.duracion) duracion = ej.duracion;
   }
-  const { count } = await supabase
+  // Siempre detrás de la última (contar las que hay repetía números si antes se había borrado alguna)
+  const { data: ultima } = await supabase
     .from("entreno_actividades")
-    .select("id", { count: "exact", head: true })
-    .eq("entrenamiento_id", entreno);
+    .select("orden")
+    .eq("entrenamiento_id", entreno)
+    .order("orden", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   check(await supabase.from("entreno_actividades").insert({
     entrenamiento_id: entreno,
-    orden: count ?? 0,
+    orden: (ultima?.orden ?? -1) + 1,
     // Los ejercicios de físico van como «Prep. física»: no cuentan como pista ocupada al principio o al final
     tipo: esFisico ? "prep_fisica" : ejercicioId ? "ejercicio" : String(formData.get("tipo") ?? "nota"),
     ejercicio_id: ejercicioId,
