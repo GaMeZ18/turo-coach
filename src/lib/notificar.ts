@@ -8,6 +8,14 @@ export const VAPID_PUBLICO = "BO322IWK9IzQJ8iAVCqo0In5uud2J9cFfM5gD6zvYLqVnPj4C7
 export async function notificarEquipo(supabase: SupabaseClient, equipoId: string, titulo: string, cuerpo: string, url: string) {
   const { data: subs, error } = await supabase.rpc("notificar_equipo", { eq: equipoId, p_titulo: titulo, p_cuerpo: cuerpo, p_url: url });
   if (error) return; // sin la tabla (0010) o sin permiso: no pasa nada
+  await enviarPush(supabase, (subs ?? []) as Sub[], { titulo, cuerpo, url });
+}
+
+type Sub = { endpoint: string; p256dh: string; auth: string };
+
+/** Manda la notificación a esos dispositivos (y borra los que ya no existen) */
+async function enviarPush(supabase: SupabaseClient, subs: Sub[], aviso: { titulo: string; cuerpo: string; url: string }) {
+  const { titulo, cuerpo, url } = aviso;
   const privada = process.env.VAPID_PRIVATE_KEY;
   if (!privada || !subs?.length) return;
   try {
@@ -23,4 +31,13 @@ export async function notificarEquipo(supabase: SupabaseClient, equipoId: string
       }
     }));
   } catch {}
+}
+
+/** Aviso a unas personas concretas (con el cliente de servidor): queda en «Avisos» y llega al móvil */
+export async function notificarPerfiles(db: SupabaseClient, perfiles: string[], titulo: string, cuerpo: string, url: string, equipoId: string | null = null) {
+  const ids = [...new Set(perfiles)].filter(Boolean);
+  if (!ids.length) return;
+  await db.from("notificaciones").insert(ids.map((id) => ({ perfil_id: id, equipo_id: equipoId, titulo, cuerpo, url })));
+  const { data: subs } = await db.from("push_suscripciones").select("endpoint, p256dh, auth").in("perfil_id", ids);
+  await enviarPush(db, (subs ?? []) as Sub[], { titulo, cuerpo, url });
 }
