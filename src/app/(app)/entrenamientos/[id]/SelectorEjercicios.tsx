@@ -11,6 +11,7 @@ import { EDADES } from "@/lib/edades";
 export type EjercicioLista = {
   id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null;
   edades?: string[] | null; etiquetas?: string[] | null; en_biblioteca?: boolean | null; autor_id?: string | null;
+  perfiles?: { nombre: string | null } | null;
 };
 
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -23,6 +24,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
   const [cat, setCat] = useState("");
   const [edad, setEdad] = useState(edadEquipo ?? "");
   const [origen, setOrigen] = useState<"todos" | "biblioteca" | "mios">("todos");
+  const [autor, setAutor] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [minutos, setMinutos] = useState<string>("");
   const [anadidos, setAnadidos] = useState<string[]>([]);
@@ -34,12 +36,24 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
     return ejercicios.filter((e) => {
       if (origen === "biblioteca" && !e.en_biblioteca) return false;
       if (origen === "mios" && e.autor_id !== yo) return false;
+      if (autor && e.autor_id !== autor) return false;
       if (cat && (cat === "Sistema de juego" ? e.tipo !== "sistema" && e.categoria !== cat : e.categoria !== cat)) return false;
       if (edad && e.edades?.length && !e.edades.includes(edad)) return false;
       if (t && !sinAcentos(`${e.titulo} ${e.categoria ?? ""} ${(e.etiquetas ?? []).join(" ")}`).includes(t)) return false;
       return true;
     });
-  }, [ejercicios, q, cat, edad, origen, yo]);
+  }, [ejercicios, q, cat, edad, origen, yo, autor]);
+
+  // Entrenadores que tienen ejercicios (para copiarle alguno a un compañero)
+  const autores = useMemo(() => {
+    const m = new Map<string, { nombre: string; n: number }>();
+    for (const e of ejercicios) {
+      if (!e.autor_id) continue;
+      const x = m.get(e.autor_id) ?? { nombre: e.perfiles?.nombre?.trim() || "Sin nombre", n: 0 };
+      x.n++; m.set(e.autor_id, x);
+    }
+    return [...m.entries()].map(([id, x]) => ({ id, ...x })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [ejercicios]);
 
   const elegido = ejercicios.find((e) => e.id === sel) ?? null;
 
@@ -104,6 +118,10 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                   <option value="">Todas las edades</option>
                   {EDADES.map((c) => <option key={c}>{c}</option>)}
                 </select>
+                <select value={autor} onChange={(e) => { setAutor(e.target.value); if (e.target.value) setOrigen("todos"); }} className="campo !w-auto flex-1 !py-1 text-sm" aria-label="Entrenador">
+                  <option value="">Todos los entrenadores</option>
+                  {autores.map((a) => <option key={a.id} value={a.id}>{a.id === yo ? `${a.nombre} (yo)` : a.nombre} · {a.n}</option>)}
+                </select>
               </div>
               <div className="flex rounded-lg border border-linea p-0.5 text-xs">
                 {([["todos", "Todos"], ["biblioteca", "Biblioteca del club"], ["mios", "Míos"]] as const).map(([k, l]) => (
@@ -119,7 +137,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{e.titulo}</span>
                       <span className="block truncate text-[11px] text-tinta/55">
-                        {e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}
+                        {e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}{!e.en_biblioteca && e.perfiles?.nombre ? ` · ${e.perfiles.nombre}` : ""}
                       </span>
                     </span>
                     {anadidos.includes(e.id) && <Check size={16} className="shrink-0 text-green-700" />}

@@ -2,6 +2,8 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Todos los entrenadores": "Tots els entrenadors",
+ "Entrenador": "Entrenador",
  "Equipos con mesa en efectivo (1 persona, la pagan los jugadores)": "Equips amb taula en efectiu (1 persona, la paguen els jugadors)",
  "1 persona · la pagan los jugadores": "1 persona · la paguen els jugadors",
  "Añadido a mano · ": "Afegit a mà · ",
@@ -968,6 +970,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["{} (yo)", "{} (jo)"],
  ["La alineación no cumple la normativa ({})", "L'alineació no compleix la normativa ({})"],
  ["{} en acta (los convocados) · 6 períodos · toca las casillas de quién juega cada período", "{} a l'acta (els convocats) · 6 períodes · toca les caselles de qui juga cada període"],
  ["{}º período: hay {} jugadores (tienen que ser 5).", "{}è període: hi ha {} jugadors (han de ser 5)."],
