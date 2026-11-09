@@ -2,7 +2,10 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
- "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Pulsa «A la vez» para mover a varios en el mismo fotograma y vuelve a pulsarlo para pasar al siguiente. Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue.": "GRAVANT: toca un jugador i arrossega'l; si porta la pilota bota, si no talla. Per passar, toca la pilota i després el receptor (o arrossega la pilota fins a ell); per tirar, toca la pilota i una cistella. Prem «Alhora» per moure'n diversos al mateix fotograma i torna-hi a prémer per passar al següent. El que afegeixis gravant apareix des d'aquest fotograma; amb una fitxa seleccionada pots triar des de/fins quan es veu o canviar-la de defensor a atacant. 📷 neteja les línies i continua.",
+ "Siguiente paso": "Pas següent",
+ "Siguiente paso: cierra este fotograma; lo que hagas después irá al siguiente": "Pas següent: tanca aquest fotograma; el que facis després anirà al següent",
+ "Grabando: mueve a todos los que se muevan a la vez y pulsa «Siguiente paso» para seguir.": "Gravant: mou tots els que es moguin alhora i prem «Pas següent» per continuar.",
+ "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Todo lo que hagas va al mismo paso (se mueve a la vez); cuando quieras que pase lo siguiente, pulsa «Siguiente paso». Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue.": "GRAVANT: toca un jugador i arrossega'l; si porta la pilota bota, si no talla. Per passar, toca la pilota i després el receptor (o arrossega la pilota fins a ell); per tirar, toca la pilota i una cistella. Tot el que facis va al mateix pas (es mou alhora); quan vulguis que passi el següent, prem «Pas següent». El que afegeixis gravant apareix des d'aquest fotograma; amb una fitxa seleccionada pots triar des de/fins quan es veu o canviar-la de defensor a atacant. 📷 neteja les línies i continua.",
  "A la vez": "Alhora",
  "A la vez: todo lo que grabes va al mismo fotograma (se mueven a la vez). Vuelve a pulsar para pasar al siguiente.": "Alhora: tot el que gravis va al mateix fotograma (es mouen alhora). Torna a prémer per passar al següent.",
  "Pulsa REC y luego «A la vez» para mover a varios al mismo tiempo.": "Prem REC i després «Alhora» per moure'n diversos al mateix temps.",
@@ -893,6 +896,8 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Paso {} cerrado. Lo siguiente irá al paso {}.", "Pas {} tancat. El següent anirà al pas {}."],
+ ["PASO {}", "PAS {}"],
  [" · fotograma {}", " · fotograma {}"],
  ["A LA VEZ · fotograma {}", "ALHORA · fotograma {}"],
  ["Aparece desde el fotograma {}. Si lo quieres desde el inicio, pulsa «Siempre».", "Apareix des del fotograma {}. Si el vols des de l'inici, prem «Sempre»."],

@@ -58,8 +58,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const [herramienta, setHerramienta] = useState<"mover" | "flecha" | "lapiz">("mover");
   const [modoBloqueo, setModoBloqueo] = useState(false); // el siguiente arrastre será un bloqueo
   const [modoMano, setModoMano] = useState(false);       // el siguiente pase será un mano a mano
-  // «A la vez»: todo lo que se grabe va al mismo fotograma hasta que se desactive
-  const [mantener, setMantener] = useState(false);
+  // Paso abierto: mientras se graba, todo va al mismo fotograma (se mueven a la vez) hasta pulsar «Siguiente paso»
   const [fijo, setFijo] = useState<number | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [selDibujo, setSelDibujo] = useState<string | null>(null);
@@ -206,9 +205,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     return d.fotogramas[cursor];
   };
 
-  /** ¿Se está añadiendo al fotograma «a la vez»? (el último grabado, justo detrás del cursor) */
-  const enFijo = grabando && mantener && fijo !== null && fijo === cursor - 1 && fijo < n;
-  const fijarSiToca = () => { if (mantener) setFijo(cursor); };
+  /** ¿Hay un paso abierto? (el último grabado, justo detrás del cursor) */
+  const enFijo = grabando && fijo !== null && fijo === cursor - 1 && fijo < n;
+  const fijarSiToca = () => setFijo(cursor);
 
   const desplazarRecorridos = (d: Pizarra, id: string, desde: number, dx: number, dy: number) => {
     for (let j = desde; j < d.fotogramas.length; j++) {
@@ -406,8 +405,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     const crudo = simplificar([...origen, destino.x, destino.y], 0.15);
     if (crudo.length < 4 || longitud(crudo) < 0.4) return;
     const nuevo = enderezar(crudo); // recta perfecta, esquina nítida o curva suave
-    if (enFijo && actual) {
-      // «A la vez»: se añade al mismo fotograma (si ya se movía en él, su recorrido continúa)
+    // Si en el paso abierto ya hubo un pase o tiro, moverse después es lo siguiente: paso nuevo
+    if (enFijo && actual && !p.fotogramas[fijo!].balon.length) {
+      // Paso abierto: se añade al mismo fotograma (si ya se movía en él, su recorrido continúa)
       const fi = fijo!;
       const prev = p.fotogramas[fi].movimientos.find((m) => m.elementoId === el.id);
       const tipoF = prev && !modoBloqueo ? prev.tipo : tipoAuto(el);
@@ -1136,7 +1136,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             {grabando && !anim && (
               <span className="flex items-center gap-1.5 rounded-full bg-rojo px-2.5 py-1 text-xs font-bold text-white shadow">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> REC
-                {mantener && <span className="ml-1 rounded-full bg-white/25 px-1.5">A LA VEZ{enFijo ? ` · fotograma ${fijo! + 1}` : ""}</span>}
+                {enFijo && <span className="ml-1 rounded-full bg-white/25 px-1.5">PASO {fijo! + 1}</span>}
               </span>
             )}
             {etiquetaVista && <span className="rounded-full bg-azul px-3 py-1 text-xs font-semibold text-white shadow">{etiquetaVista}</span>}
@@ -1190,8 +1190,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             onClick={() => {
               const empieza = !grabando;
               setGrabando(empieza); limpiarSeleccion(); setEspecial(null); setHerramienta("mover");
-              if (!empieza) { setModoBloqueo(false); setModoMano(false); setMantener(false); setFijo(null); }
-              if (empieza) avisar("Grabando: arrastra jugadores; toca el balón y luego a quien lo recibe.");
+              if (!empieza) { setModoBloqueo(false); setModoMano(false); setFijo(null); }
+              if (empieza) { setFijo(null); avisar("Grabando: mueve a todos los que se muevan a la vez y pulsa «Siguiente paso» para seguir."); }
             }}
           >
             <span className="text-[10px] font-black">REC</span>
@@ -1221,16 +1221,11 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><path d="M11 6v12M15 6v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
           </Boton>
           <Boton
-            titulo="A la vez: todo lo que grabes va al mismo fotograma (se mueven a la vez). Vuelve a pulsar para pasar al siguiente."
-            activo={mantener}
-            onClick={() => {
-              if (!grabando) { avisar("Pulsa REC y luego «A la vez» para mover a varios al mismo tiempo."); return; }
-              const on = !mantener;
-              setMantener(on); setFijo(null); setHerramienta("mover");
-              avisar(on ? "A la vez: mueve a todos los que quieras y haz el pase; irá todo al mismo fotograma. Vuelve a pulsar para cerrar el fotograma." : "Fotograma cerrado. Lo siguiente irá a un fotograma nuevo.");
-            }}
+            titulo="Siguiente paso: cierra este fotograma; lo que hagas después irá al siguiente"
+            desactivado={!grabando || !enFijo}
+            onClick={() => { setFijo(null); avisar(`Paso ${cursor} cerrado. Lo siguiente irá al paso ${cursor + 1}.`); }}
           >
-            <span className="flex items-center gap-1 text-[11px] font-bold"><Link2 size={15} /> A la vez</span>
+            <span className="flex items-center gap-1 px-0.5 text-[11px] font-bold"><ChevronsRight size={15} /> Siguiente paso</span>
           </Boton>
 
           <span className="mx-1 h-6 w-px bg-linea" />
@@ -1367,10 +1362,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
         {grabando
-          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Pulsa «A la vez» para mover a varios en el mismo fotograma y vuelve a pulsarlo para pasar al siguiente. Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue."
+          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Todo lo que hagas va al mismo paso (se mueve a la vez); cuando quieras que pase lo siguiente, pulsa «Siguiente paso». Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.7</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.8</span>
       </p>
     </div>
   );
