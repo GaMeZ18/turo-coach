@@ -62,9 +62,9 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
 
       <section className="tarjeta flex flex-wrap items-center gap-2 p-3 text-sm">
         <Link2 size={18} className="text-azul" />
-        <span className="font-semibold">Enlace para apuntarse:</span>
-        <code className="min-w-0 flex-1 truncate rounded bg-suave px-2 py-1 text-xs">{enlace}</code>
-        <Copiar texto={enlace} etiqueta="Copiar enlace" />
+        <span className="font-semibold capitalize">Enlace de la semana del {fechaCorta(desde)}:</span>
+        <code className="min-w-0 flex-1 truncate rounded bg-suave px-2 py-1 text-xs">{enlaceSemana}</code>
+        <Copiar texto={enlaceSemana} etiqueta="Copiar enlace" />
         <Copiar texto={invitacion} etiqueta="Mensaje de esta semana para WhatsApp" />
         <form action={nuevoEnlace}><Enviar className="btn-secundario !py-1 text-xs">Cambiar enlace</Enviar></form>
       </section>
