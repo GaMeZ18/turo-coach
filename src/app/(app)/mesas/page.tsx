@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
-import { partidosDeCasa, euros, POR_MESA, textoPartido, type Asignacion } from "@/lib/mesas";
+import { partidosDeCasa, euros, POR_MESA, textoPartido, detalleMesa, type Asignacion } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
 import Copiar from "./Copiar";
 import { alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
@@ -48,7 +48,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
     ...(pendientes.length ? pendientes : deClub).map((p) => `• ${textoPartido(p)}${p.manual ? " (1 persona, la pagan los jugadores)" : ""}`), "",
     `Mesas del club: ${euros(Number(cfg.importe))} por persona y partido. Apúntate a las que puedas (hasta el viernes):`, enlaceSemana].join("\n");
   const whatsapp = (tel: string, nombre: string, p: { fecha: string; equipo: string; rival: string; lugar: string | null }) =>
-    `https://wa.me/${tel.replace(/[^\d]/g, "").replace(/^(?!34)(\d{9})$/, "34$1")}?text=${encodeURIComponent(`Hola ${nombre.split(" ")[0]}! Te confirmo la mesa: ${textoPartido(p)}. ¡Gracias!`)}`;
+    `https://wa.me/${tel.replace(/[^\d]/g, "").replace(/^(?!34)(\d{9})$/, "34$1")}?text=${encodeURIComponent(`Hola ${nombre.split(" ")[0]}! Te confirmo la mesa:\n${detalleMesa(p)}\n¡Gracias!`)}`;
 
   return (
     <div className="space-y-5">

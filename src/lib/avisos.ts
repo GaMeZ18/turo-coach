@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO, fechaCorta, hora, hoyLocal } from "./fechas";
 import { lunesDe, sumarDias } from "./pistas";
-import { partidosDeCasa } from "./mesas";
+import { companerosMesa, detalleMesa, partidosDeCasa } from "./mesas";
 import { notificarPerfiles, notificarPersonasMesa } from "./notificar";
 
 // Recordatorios automáticos (Supabase llama a /api/avisos cada 15 minutos).
@@ -110,8 +110,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     ]);
     for (const a of (aR ?? []) as { id: string; partido_id: string; persona_id: string }[]) {
       const p = enUnaHora.find((x) => x.id === a.partido_id)!;
-      await unaVez(`mesa1h:${a.id}`, () => notificarPersonasMesa(db, [a.persona_id], `Mesa a las ${hora(p.fecha)}`,
-        `${p.equipo} vs ${p.rival}${p.lugar ? ` · ${p.lugar}` : ""}. ¡Gracias por echar una mano!`, cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/"));
+      await unaVez(`mesa1h:${a.id}`, async () => notificarPersonasMesa(db, [a.persona_id], `Hoy haces la mesa de ${p.equipo} a las ${hora(p.fecha)}`,
+        `${detalleMesa(p, await companerosMesa(db, p.id, a.persona_id))}\n¡Gracias por echar una mano!`, cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/"));
     }
   }
 

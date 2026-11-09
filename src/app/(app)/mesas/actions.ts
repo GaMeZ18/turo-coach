@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
-import { fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA, textoPartido } from "@/lib/mesas";
+import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA } from "@/lib/mesas";
 import { notificarPersonasMesa } from "@/lib/notificar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO } from "@/lib/fechas";
@@ -23,8 +23,8 @@ async function avisarPersona(db: SupabaseClient, asignacionId: string, tipo: "co
     if (!p) return;
     const url = cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/";
     await notificarPersonasMesa(db, [a.persona_id],
-      tipo === "confirmada" ? "Mesa confirmada: te toca a ti" : "Ya no haces esta mesa",
-      textoPartido(p), url);
+      tipo === "confirmada" ? `Mesa confirmada: ${p.equipo}` : `Ya no haces la mesa de ${p.equipo}`,
+      tipo === "confirmada" ? detalleMesa(p, await companerosMesa(db, a.partido_id, a.persona_id)) : detalleMesa(p).split("\n").slice(0, 3).join("\n"), url);
   } catch {}
 }
 

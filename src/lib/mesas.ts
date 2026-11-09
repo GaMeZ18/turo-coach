@@ -88,3 +88,25 @@ export function rangoPublico(semana: string | undefined, hoy: string, lunesDe: (
   const finde = dow === 6 || dow === 0;
   return { desde: aISO(l, "00:00"), hasta: aISO(sumarDias(l, finde ? 14 : 7), "00:00"), lunes: l };
 }
+
+export const LLEGAR_ANTES = 30; // minutos antes del partido
+
+/** Detalle completo para el aviso o el WhatsApp a quien hace la mesa */
+export function detalleMesa(p: { fecha: string; equipo: string; rival: string; lugar: string | null }, companeros: string[] = []) {
+  const f = new Date(p.fecha);
+  const dia = f.toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" });
+  const h = (d: Date) => d.toLocaleTimeString("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit" });
+  return [
+    `🏀 ${p.equipo} vs ${p.rival}`,
+    `📅 ${dia} · empieza a las ${h(f)}`,
+    `📍 ${p.lugar || "Pista por confirmar"}`,
+    `⏰ Tienes que estar a las ${h(new Date(f.getTime() - LLEGAR_ANTES * 60000))} (${LLEGAR_ANTES} min antes)`,
+    ...(companeros.length ? [`👥 Con ${companeros.join(" y ")}`] : []),
+  ].join("\n");
+}
+
+/** Nombres de los otros confirmados en esa mesa */
+export async function companerosMesa(db: SupabaseClient, partidoId: string, personaId: string) {
+  const { data } = await db.from("mesa_asignaciones").select("persona_id, mesa_personas(nombre)").eq("partido_id", partidoId).eq("estado", "confirmado").neq("persona_id", personaId);
+  return ((data ?? []) as unknown as { mesa_personas: { nombre: string } | null }[]).map((x) => x.mesa_personas?.nombre).filter(Boolean) as string[];
+}
