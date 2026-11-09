@@ -6,7 +6,7 @@ import Konva from "konva";
 import { Stage, Layer, Group, Line, Arrow, Circle, Text, Rect, RegularPolygon } from "react-konva";
 import {
   Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera, Undo2, Trash2, Settings,
-  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown, Link2, Eye, EyeOff, Repeat,
+  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown, Repeat,
 } from "lucide-react";
 import Pista from "./Pista";
 import {
@@ -35,6 +35,14 @@ function T({ fontSize, width, height, ...resto }: React.ComponentProps<typeof Te
 }
 
 const TINTA = "#1f2937";
+/** Tamaño de un texto de la pista (en metros): se parte en varias líneas si es largo */
+function medidaTexto(t: string) {
+  const fs = t.length > 30 ? 0.55 : 0.75;
+  const porLinea = t.length > 30 ? 26 : 18;
+  const ancho = Math.min(porLinea, Math.max(1, t.length)) * fs * 0.55 + 0.3;
+  const lineas = t.split("\n").reduce((s, l) => s + Math.max(1, Math.ceil(l.length / porLinea)), 0);
+  return { fs, ancho, alto: lineas * fs * 1.1 };
+}
 const esperarPintado = () =>
   new Promise<void>((r) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => r())), 40));
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -154,9 +162,9 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     if (ocupado) return;
     let etiqueta = siguienteEtiqueta(p, tipo);
     if (tipo === "texto") {
-      const t = window.prompt("Texto a mostrar en la pista:", "");
-      if (!t) return;
-      etiqueta = t.slice(0, 40);
+      const t = window.prompt("Texto o comentario para la pista:", "");
+      if (!t?.trim()) return;
+      etiqueta = t.trim().slice(0, 160);
     }
     const id = nuevoId();
     cambiar((d) => {
@@ -167,7 +175,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     setSel(id);
     setEspecial(null);
     if (tipo === "balon") avisar("Toca el balón y después un jugador para dárselo.");
-    else if (grabando && cursor > 0) avisar(`Aparece desde el fotograma ${cursor}. Si lo quieres desde el inicio, pulsa «Siempre».`);
+    else if (tipo === "texto") avisar("Abajo puedes cambiar el texto y elegir en qué pasos se ve.");
+    else if (grabando && cursor > 0) avisar(`Aparece desde el paso ${cursor}.`);
   };
 
   /** Coordenadas locales de media pista (u a lo ancho, v desde el fondo) → pista */
@@ -293,7 +302,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     if (t !== null && t.trim()) cambiar((d) => {
       const x = d.elementos.find((q) => q.id === el.id);
       if (!x) return;
-      const v = t.trim().slice(0, el.tipo === "texto" ? 40 : 3);
+      const v = t.trim().slice(0, el.tipo === "texto" ? 160 : 3);
       const c = cambioActivo(x);
       if (c) c.etiqueta = v; else x.etiqueta = v;
     });
@@ -301,23 +310,6 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
   /** Cambio de papel que manda en el fotograma actual (si lo hay) */
   const cambioActivo = (x: Elemento) => (x.cambios ?? []).filter((c) => c.k <= cursor).sort((a, b) => b.k - a.k)[0];
-
-  /** Cuándo se ve: aparece aquí, se quita después de este fotograma, o siempre */
-  const ponerVisibilidad = (id: string, modo: "aparece" | "quita" | "siempre") => {
-    cambiar((d) => {
-      const x = d.elementos.find((q) => q.id === id);
-      if (!x) return;
-      if (modo === "siempre") { delete x.desde; delete x.hasta; return; }
-      if (modo === "aparece") {
-        if (cursor > 0) x.desde = cursor; else delete x.desde;
-        if (x.hasta !== undefined && x.hasta <= cursor) delete x.hasta;
-        return;
-      }
-      x.hasta = cursor + 1;
-      if ((x.desde ?? 0) > cursor) delete x.desde;
-    });
-    avisar(modo === "aparece" ? `Aparece desde el fotograma ${cursor}.` : modo === "quita" ? `Se quita después del fotograma ${cursor}.` : "Se ve durante toda la jugada.");
-  };
 
   /** El atacante pasa a defender (o al revés) desde el fotograma actual */
   const cambiarRol = (el: Elemento) => {
@@ -553,6 +545,11 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const parar = () => { cancelAnimationFrame(rafRef.current); setAnim(null); };
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
+  /** › : grabando con un paso abierto, lo cierra (lo siguiente va a un paso nuevo); si no, avanza */
+  const siguiente = () => {
+    if (enFijo && cursor === n) { setFijo(null); avisar(`Paso ${cursor} listo. Ahora grabas el paso ${cursor + 1}.`); return; }
+    irA(cursor + 1);
+  };
   const irA = (k: number) => { if (ocupado) return; setEspecial(null); setCursor(Math.max(0, Math.min(n, k))); limpiarSeleccion(); };
 
   // ---------- exportar ----------
@@ -650,7 +647,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); deshacer(); return; }
       if (ev.key === "Escape") { limpiarSeleccion(); setHerramienta("mover"); return; }
       if (ev.key === "ArrowLeft") { ev.preventDefault(); irA(cursor - 1); return; }
-      if (ev.key === "ArrowRight") { ev.preventDefault(); irA(cursor + 1); return; }
+      if (ev.key === "ArrowRight") { ev.preventDefault(); siguiente(); return; }
       if (ev.key === "Home") { irA(0); return; }
       if (ev.key === "End") { irA(n); return; }
       if (ev.key === " ") { ev.preventDefault(); if (anim) parar(); else void reproducir(); return; }
@@ -905,7 +902,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         );
       }
       case "texto":
-        return <T text={el.etiqueta} fontSize={0.75} fontStyle="bold" fill={c} offsetX={(el.etiqueta.length * 0.75 * K) / 4} offsetY={(0.75 * K) / 2} />;
+      {
+        const m = medidaTexto(el.etiqueta);
+        return <T text={el.etiqueta} width={m.ancho} fontSize={m.fs} fontStyle="bold" fill={c} align="center" wrap="word" lineHeight={1.1} offsetX={(m.ancho * K) / 2} offsetY={(m.alto * K) / 2} />;
+      }
     }
   };
 
@@ -957,7 +957,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           case "valla": return Math.abs(lx) <= 0.65 && Math.abs(ly) <= Math.max(0.3, minimo);
           case "pica": return Math.abs(lx) <= Math.max(0.3, minimo) && Math.abs(ly) <= 0.8;
           case "canasta": return lx >= -1.25 && lx <= 0.3 && Math.abs(ly) <= 0.95;
-          case "texto": return Math.abs(lx) <= Math.max(0.4, el.etiqueta.length * 0.2) && Math.abs(ly) <= 0.45;
+          case "texto": { const m = medidaTexto(el.etiqueta); return Math.abs(lx) <= Math.max(0.4, m.ancho / 2) && Math.abs(ly) <= Math.max(0.45, m.alto / 2); }
           default: return Math.hypot(dx, dy) <= Math.max(0.45, minimo);
         }
       })();
@@ -1047,6 +1047,8 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   const contador = anim ? anim.f + 1 : cursor;
+  // Grabando al final y con el paso cerrado: se está preparando el paso siguiente (aún vacío)
+  const nuevoPaso = grabando && !anim && n > 0 && cursor === n && !enFijo;
   const etiquetaVista = especial
     ? especial.tipo === "todas" ? "Todas las imágenes" : `Imagen ${segmentos.findIndex((s) => s.seg === especial.seg) + 1}`
     : null;
@@ -1191,7 +1193,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
               const empieza = !grabando;
               setGrabando(empieza); limpiarSeleccion(); setEspecial(null); setHerramienta("mover");
               if (!empieza) { setModoBloqueo(false); setModoMano(false); setFijo(null); }
-              if (empieza) { setFijo(null); avisar("Grabando: mueve a todos los que se muevan a la vez y pulsa «Siguiente paso» para seguir."); }
+              if (empieza) { setFijo(null); avisar("Grabando: mueve a todos los que se muevan a la vez y pulsa › para pasar al siguiente paso."); }
             }}
           >
             <span className="text-[10px] font-black">REC</span>
@@ -1220,20 +1222,13 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5"><path d="M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><path d="M11 6v12M15 6v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
           </Boton>
-          <Boton
-            titulo="Siguiente paso: cierra este fotograma; lo que hagas después irá al siguiente"
-            desactivado={!grabando || !enFijo}
-            onClick={() => { setFijo(null); avisar(`Paso ${cursor} cerrado. Lo siguiente irá al paso ${cursor + 1}.`); }}
-          >
-            <span className="flex items-center gap-1 px-0.5 text-[11px] font-bold"><ChevronsRight size={15} /> Siguiente paso</span>
-          </Boton>
 
           <span className="mx-1 h-6 w-px bg-linea" />
           <Boton titulo="Al principio" onClick={() => irA(0)}><ChevronsLeft size={18} /></Boton>
           <Boton titulo={anim ? "Pausa" : "Reproducir"} onClick={() => (anim ? parar() : void reproducir())}>{anim ? <Pause size={17} /> : <Play size={17} />}</Boton>
           <Boton titulo="Fotograma anterior" onClick={() => irA(cursor - 1)}><ChevronLeft size={18} /></Boton>
-          <span className="min-w-14 text-center font-mono text-base font-bold tabular-nums text-tinta">{pad(contador)}/{pad(n)}</span>
-          <Boton titulo="Fotograma siguiente" onClick={() => irA(cursor + 1)}><ChevronRight size={18} /></Boton>
+          <span className="min-w-14 text-center font-mono text-base font-bold tabular-nums text-tinta">{nuevoPaso ? <span className="text-rojo">{pad(n + 1)}</span> : pad(contador)}/{pad(nuevoPaso ? n + 1 : n)}</span>
+          <Boton titulo={enFijo && cursor === n ? "Siguiente paso: lo que hagas después irá al paso siguiente" : "Fotograma siguiente"} onClick={siguiente}><ChevronRight size={18} /></Boton>
           <Boton titulo="Al final" onClick={() => irA(n)}><ChevronsRight size={18} /></Boton>
 
           <span className="mx-1 h-6 w-px bg-linea" />
@@ -1298,15 +1293,31 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
                   <Repeat size={14} /> {elSel.cambios?.some((c) => c.k === cursor) && cursor > 0 ? "Quitar cambio" : aspectoEn(elSel, cursor).tipo === "defensor" ? (cursor ? "Pasa a atacar aquí" : "A atacante") : (cursor ? "Pasa a defender aquí" : "A defensor")}
                 </Chip>
               )}
-              {(n > 0 || elSel.desde !== undefined || elSel.hasta !== undefined) && (
-                <>
-                  <span className="text-[11px] uppercase text-tinta/50">Se ve:</span>
-                  <Chip titulo="Que aparezca a partir de este fotograma" activo={(elSel.desde ?? 0) === cursor && cursor > 0} onClick={() => ponerVisibilidad(elSel.id, "aparece")}><Eye size={14} /> Desde aquí</Chip>
-                  <Chip titulo="Que desaparezca después de este fotograma" activo={elSel.hasta === cursor + 1} onClick={() => ponerVisibilidad(elSel.id, "quita")}><EyeOff size={14} /> Hasta aquí</Chip>
-                  <Chip titulo="Que se vea durante toda la jugada" activo={elSel.desde === undefined && elSel.hasta === undefined} onClick={() => ponerVisibilidad(elSel.id, "siempre")}>Siempre</Chip>
-                </>
+              {esJugador(elSel.tipo) && <Chip onClick={() => editarEtiqueta(elSel)}>Etiqueta</Chip>}
+              {elSel.tipo === "texto" && (
+                <div className="flex w-full flex-wrap items-center gap-1.5">
+                  <textarea
+                    key={elSel.id} defaultValue={elSel.etiqueta} rows={2} maxLength={160}
+                    className="campo !py-1 min-w-0 flex-1 text-sm" placeholder="Escribe el comentario"
+                    onBlur={(ev) => { const v = ev.target.value.trim(); if (v && v !== elSel.etiqueta) cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (x) x.etiqueta = v; }); }}
+                  />
+                  {n > 0 && (
+                    <span className="flex flex-wrap items-center gap-1 text-xs">
+                      Se ve del
+                      <select className="campo !w-auto !py-0.5 text-xs" value={elSel.desde ?? 0}
+                        onChange={(ev) => { const v = Number(ev.target.value); cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (!x) return; if (v > 0) x.desde = v; else delete x.desde; if (x.hasta !== undefined && x.hasta <= v) delete x.hasta; }); }}>
+                        {Array.from({ length: n + 1 }, (_, k) => <option key={k} value={k}>{k === 0 ? "inicio" : `paso ${k}`}</option>)}
+                      </select>
+                      al
+                      <select className="campo !w-auto !py-0.5 text-xs" value={elSel.hasta === undefined ? "fin" : String(elSel.hasta - 1)}
+                        onChange={(ev) => { const v = ev.target.value; cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (!x) return; if (v === "fin") delete x.hasta; else x.hasta = Math.max(Number(v), x.desde ?? 0) + 1; }); }}>
+                        {Array.from({ length: n + 1 }, (_, k) => k).filter((k) => k >= (elSel.desde ?? 0)).map((k) => <option key={k} value={k}>{k === 0 ? "inicio" : `paso ${k}`}</option>)}
+                        <option value="fin">final</option>
+                      </select>
+                    </span>
+                  )}
+                </div>
               )}
-              {(esJugador(elSel.tipo) || elSel.tipo === "texto") && <Chip onClick={() => editarEtiqueta(elSel)}>Etiqueta</Chip>}
               {!esJugador(elSel.tipo) && elSel.tipo !== "balon" && (
                 <>
                   <Chip titulo="Girar (Mayús+R)" onClick={() => cambiar((d) => { const x = d.elementos.find((q) => q.id === elSel.id); if (x) x.rot = (((x.rot ?? 0) - 45) % 360 + 360) % 360; })}><RotateCcw size={14} /></Chip>
@@ -1362,10 +1373,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       <p className="mx-auto w-full text-xs text-tinta/55" style={{ maxWidth: anchoBarra }}>
         {grabando
-          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Todo lo que hagas va al mismo paso (se mueve a la vez); cuando quieras que pase lo siguiente, pulsa «Siguiente paso». Lo que añadas grabando aparece desde ese fotograma; con una ficha seleccionada puedes elegir desde/hasta cuándo se ve o cambiarla de defensor a atacante. 📷 limpia las líneas y sigue."
+          ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Todo lo que hagas va al mismo paso (se mueve a la vez); para pasar al siguiente paso pulsa ›. Con la T añades comentarios y eliges en qué pasos se ven; con un jugador seleccionado puedes cambiarlo de defensor a atacante desde ese paso. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.8</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.9</span>
       </p>
     </div>
   );
