@@ -7,8 +7,11 @@ import { marcarLeidas } from "./actions";
 
 export default async function NotificacionesPage() {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase.from("notificaciones").select("id, titulo, cuerpo, url, leida, created_at").eq("perfil_id", user.id).order("created_at", { ascending: false }).limit(100);
+  // Comunicados y noticias (efímeros): se ven una vez y al leerlos desaparecen de aquí
+  const { data, error } = await supabase.from("notificaciones").select("id, titulo, cuerpo, url, leida, created_at, efimera").eq("perfil_id", user.id).or("efimera.eq.false,leida.eq.false").order("created_at", { ascending: false }).limit(100);
   const lista = data ?? [];
+  const efimerasNuevas = lista.filter((n) => n.efimera && !n.leida).map((n) => n.id);
+  if (efimerasNuevas.length) await supabase.from("notificaciones").update({ leida: true }).in("id", efimerasNuevas);
   const sinLeer = lista.filter((n) => !n.leida).length;
 
   return (
@@ -24,7 +27,7 @@ export default async function NotificacionesPage() {
           const cuerpo = (
             <>
               <p className={`text-sm ${n.leida ? "" : "font-semibold"}`}>{!n.leida && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-rojo" />}{n.titulo}</p>
-              {n.cuerpo && <p className="text-sm text-tinta/70">{n.cuerpo}</p>}
+              {n.cuerpo && <p className="whitespace-pre-line text-sm text-tinta/70">{n.cuerpo}</p>}
               <p className="text-xs text-tinta/40">{new Date(n.created_at).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
             </>
           );

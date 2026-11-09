@@ -17,6 +17,7 @@ const NAV = [
   { href: "/ejercicios", label: "Ejercicios" },
   { href: "/biblioteca", label: "Biblioteca" },
   { href: "/pizarra", label: "Pizarra" },
+  { href: "/noticias", label: "Noticias" },
 ];
 
 export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean }) {

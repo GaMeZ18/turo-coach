@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaCorta, hora } from "@/lib/fechas";
@@ -14,14 +15,14 @@ export default async function Comunicados() {
     supabase.from("perfiles").select("id, nombre, rol, gestor_mesas").order("nombre"),
     supabase.from("equipo_staff").select("equipo_id, perfil_id"),
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
-    supabase.from("comunicados").select("id, titulo, cuerpo, destinatarios, programado_para, enviado_en, created_at, perfiles(nombre)").order("created_at", { ascending: false }).limit(50),
+    supabase.from("comunicados").select("id, titulo, cuerpo, destinatarios, programado_para, enviado_en, created_at, tipo, noticia_id, perfiles(nombre)").order("created_at", { ascending: false }).limit(50),
   ]);
   const { data: eqR } = t ? await supabase.from("equipos").select("id, nombre").eq("temporada_id", t.id).order("nombre") : { data: [] };
   const personas = ((perfR ?? []) as { id: string; nombre: string | null; rol: string; gestor_mesas: boolean | null }[]).map((p) => ({ id: p.id, nombre: p.nombre ?? "Sin nombre", rol: p.rol, mesas: !!p.gestor_mesas || p.rol === "gestor_mesas" }));
   const staff = (staffR ?? []) as { equipo_id: string; perfil_id: string }[];
   const equipos = ((eqR ?? []) as { id: string; nombre: string }[]).map((e) => ({ ...e, perfiles: staff.filter((s) => s.equipo_id === e.id).map((s) => s.perfil_id) })).filter((e) => e.perfiles.length);
   const nombreDe = (id: string) => personas.find((p) => p.id === id)?.nombre ?? "—";
-  const lista = (comR ?? []) as unknown as { id: string; titulo: string; cuerpo: string; destinatarios: string[]; programado_para: string | null; enviado_en: string | null; created_at: string; perfiles: { nombre: string | null } | null }[];
+  const lista = (comR ?? []) as unknown as { id: string; titulo: string; cuerpo: string; destinatarios: string[]; programado_para: string | null; enviado_en: string | null; created_at: string; tipo?: string; noticia_id?: string | null; perfiles: { nombre: string | null } | null }[];
 
   return (
     <div className="space-y-5">
@@ -38,7 +39,7 @@ export default async function Comunicados() {
             <li key={c.id} className="tarjeta p-3 text-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold">{c.titulo}</p>
+                  <p className="font-semibold">{c.tipo === "noticia" ? "📰 " : ""}{c.titulo}{c.noticia_id && c.enviado_en && <Link href={`/noticias/${c.noticia_id}`} className="ml-2 text-xs font-normal text-azul underline">ver noticia</Link>}</p>
                   {c.cuerpo && <p className="whitespace-pre-line text-tinta/70">{c.cuerpo}</p>}
                   <p className="mt-1 text-xs text-tinta/50">
                     Para {c.destinatarios.length} persona{c.destinatarios.length === 1 ? "" : "s"}: {c.destinatarios.slice(0, 6).map(nombreDe).join(", ")}{c.destinatarios.length > 6 ? "…" : ""} · por {c.perfiles?.nombre ?? "—"}

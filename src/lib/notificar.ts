@@ -35,10 +35,10 @@ async function enviarPush(supabase: SupabaseClient, subs: Sub[], aviso: { titulo
 }
 
 /** Aviso a unas personas concretas (con el cliente de servidor): queda en «Avisos» y llega al móvil */
-export async function notificarPerfiles(db: SupabaseClient, perfiles: string[], titulo: string, cuerpo: string, url: string, equipoId: string | null = null) {
+export async function notificarPerfiles(db: SupabaseClient, perfiles: string[], titulo: string, cuerpo: string, url: string, equipoId: string | null = null, efimera = false) {
   const ids = [...new Set(perfiles)].filter(Boolean);
   if (!ids.length) return;
-  await db.from("notificaciones").insert(ids.map((id) => ({ perfil_id: id, equipo_id: equipoId, titulo, cuerpo, url })));
+  await db.from("notificaciones").insert(ids.map((id) => ({ perfil_id: id, equipo_id: equipoId, titulo, cuerpo, url, ...(efimera ? { efimera: true } : {}) })));
   const { data: subs } = await db.from("push_suscripciones").select("endpoint, p256dh, auth").in("perfil_id", ids);
   await enviarPush(db, (subs ?? []) as Sub[], { titulo, cuerpo, url });
 }
