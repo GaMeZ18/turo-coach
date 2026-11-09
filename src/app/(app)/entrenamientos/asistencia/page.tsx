@@ -49,7 +49,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
           <thead className="bg-suave text-xs text-tinta/60">
             <tr>
               <th className="sticky left-0 bg-suave px-2 py-2 text-left">Jugador</th>
-              <th className="px-2 py-2 text-center" title="% de asistencia (presente o tarde)">%</th>
+              <th className="px-2 py-2 text-center" title="% de asistencia (presente o tarde; los justificados no cuentan)">%</th>
               {(["presente", "tarde", "justificado", "lesionado", "ausente"] as const).map((k) => <th key={k} className="px-1 py-2 text-center" title={k}>{LETRA[k]}</th>)}
               {entrenosConLista.map((e) => <th key={e.id} className="px-0.5 py-2 text-center font-normal"><Link href={`/entrenamientos/${e.id}`} className="hover:underline" title={e.titulo ?? "Entreno"}>{fecha(e.fecha)}</Link></th>)}
             </tr>
@@ -59,7 +59,8 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
               const suyos = entrenosConLista.map((e) => reg(e.id, j.id));
               const cuenta = (k: string) => suyos.filter((r) => r?.estado === k).length;
               const marcados = suyos.filter(Boolean).length;
-              const pct = marcados ? Math.round(((cuenta("presente") + cuenta("tarde")) * 100) / marcados) : null;
+              const base = marcados - cuenta("justificado"); // los justificados no bajan el %
+              const pct = base ? Math.round(((cuenta("presente") + cuenta("tarde")) * 100) / base) : null;
               return (
                 <tr key={j.id} className="border-t border-linea">
                   <td className="sticky left-0 whitespace-nowrap bg-white px-2 py-1"><span className="mr-1 text-xs text-tinta/50">{j.dorsal ?? ""}</span><Link href={`/jugadores/${j.id}`} className="hover:underline">{j.nombre}</Link></td>

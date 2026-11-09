@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIAS } from "@/lib/categorias";
-import { EDADES } from "@/lib/edades";
+import { aplicarFiltros } from "@/lib/rasgos-ejercicio";
+import FiltrosEjercicios, { type ParamsFiltro } from "@/components/FiltrosEjercicios";
 import MiniPizarra from "@/components/pizarra/Mini";
 import CargarBiblioteca from "./CargarBiblioteca";
 import { SEMILLA } from "@/lib/biblioteca-semilla";
@@ -15,8 +16,10 @@ type Ej = {
 
 const POR_PAGINA = 60;
 
-export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<{ q?: string; cat?: string; edad?: string; tipo?: string; p?: string }> }) {
-  const { q, cat, edad, tipo, p } = await searchParams;
+export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<ParamsFiltro & { cat?: string; p?: string }> }) {
+  const sp = await searchParams;
+  const { q, edad, tipo, p } = sp;
+  const cat = sp.foco ?? sp.cat;
   const pagina = Math.max(1, Number(p) || 1);
   const { supabase, perfil } = await requireUser();
   const esCoord = perfil.rol === "coordinador";
@@ -27,9 +30,8 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
     .eq("en_biblioteca", true)
     .order("categoria")
     .order("titulo");
-  if (cat) consulta = consulta.eq("categoria", cat);
   if (tipo) consulta = consulta.eq("tipo", tipo);
-  if (edad) consulta = consulta.contains("edades", [edad]);
+  consulta = aplicarFiltros(consulta, { ...sp, foco: cat });
   if (q) {
     const limpio = q.replace(/[%,(){}"]/g, " ").trim();
     consulta = consulta.or(`titulo.ilike.%${limpio}%,descripcion.ilike.%${limpio}%,etiquetas.cs.{"${limpio.toLowerCase()}"}`);
@@ -37,11 +39,12 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
   // Con más de 1000 ejercicios, por páginas (y mucho más rápido)
   const { data, error, count } = await consulta.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1);
   const total = count ?? 0, paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
-  const enlace = (n: number) => `/biblioteca?${new URLSearchParams({ ...(q ? { q } : {}), ...(cat ? { cat } : {}), ...(edad ? { edad } : {}), ...(tipo ? { tipo } : {}), p: String(n) })}`;
-  const enlaceCat = (c: string) => `/biblioteca?${new URLSearchParams({ ...(edad ? { edad } : {}), ...(tipo ? { tipo } : {}), cat: c })}`;
+  const filtros = Object.fromEntries(Object.entries({ q, foco: cat, edad, tipo, pos: sp.pos, formato: sp.formato, jug: sp.jug, balones: sp.balones }).filter(([, v]) => v)) as Record<string, string>;
+  const enlace = (n: number) => `/biblioteca?${new URLSearchParams({ ...filtros, p: String(n) })}`;
+  const enlaceCat = (c: string) => `/biblioteca?${new URLSearchParams({ ...filtros, foco: c })}`;
   const faltaSQL = error && /en_biblioteca|edades/.test(error.message);
   const lista = (data ?? []) as unknown as Ej[];
-  const filtrando = !!(q || cat || edad || tipo);
+  const filtrando = Object.keys(filtros).length > 0;
 
 
   return (
@@ -62,21 +65,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <form className="tarjeta mt-5 flex flex-wrap gap-2 p-3">
-            <input name="q" defaultValue={q} placeholder="Buscar: entrada, 2c1, zona…" className="campo min-w-48 flex-1" />
-            <select name="cat" defaultValue={cat ?? ""} className="campo !w-auto">
-              <option value="">Todas las categorías</option>
-              {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <select name="edad" defaultValue={edad ?? ""} className="campo !w-auto">
-              <option value="">Todas las edades</option>
-              {EDADES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <select name="tipo" defaultValue={tipo ?? ""} className="campo !w-auto">
-              <option value="">Ejercicios y sistemas</option>
-              <option value="ejercicio">Ejercicios</option>
-              <option value="sistema">Sistemas</option>
-            </select>
-            <button className="btn-secundario">Filtrar</button>
+            <FiltrosEjercicios p={{ ...sp, foco: cat }} />
             {filtrando && <Link href="/biblioteca" className="self-center px-1 text-sm text-tinta/60 underline">Quitar filtros</Link>}
           </form>
 

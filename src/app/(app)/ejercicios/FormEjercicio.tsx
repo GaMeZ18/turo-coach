@@ -5,6 +5,7 @@ import PizarraEditor from "@/components/pizarra";
 import type { Pizarra } from "@/components/pizarra/modelo";
 import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
+import { FOCOS, FORMATOS, POSICIONES } from "@/lib/rasgos-ejercicio";
 import { Library } from "lucide-react";
 import { guardarEjercicio, type DatosEjercicio } from "./actions";
 
@@ -37,6 +38,12 @@ export default function FormEjercicio({
     edades: inicial?.edades ?? [],
     material: inicial?.material ?? "",
     objetivos: inicial?.objetivos ?? "",
+    balones: inicial?.balones ?? null,
+    canastas: inicial?.canastas ?? null,
+    conos: inicial?.conos ?? null,
+    focos: inicial?.focos ?? [],
+    posiciones: inicial?.posiciones ?? [],
+    formato: inicial?.formato ?? "",
   });
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +61,17 @@ export default function FormEjercicio({
   const capturaRef = useRef<(() => Promise<string>) | null>(null);
 
   const set = <K extends keyof DatosEjercicio>(k: K, v: DatosEjercicio[K]) => setD((x) => ({ ...x, [k]: v }));
+  const alternar = (k: "focos" | "posiciones", v: string) => setD((x) => {
+    const l = x[k] ?? [];
+    return { ...x, [k]: l.includes(v) ? l.filter((y) => y !== v) : [...l, v] };
+  });
+  const numero = (k: "balones" | "canastas" | "conos") => (
+    <div>
+      <label className="etiqueta">{k === "balones" ? "Balones" : k === "canastas" ? "Canastas" : "Conos"}</label>
+      <input type="number" min={0} value={d[k] ?? ""} placeholder="auto" onChange={(e) => set(k, e.target.value ? Number(e.target.value) : null)} className="campo" />
+    </div>
+  );
+  const chip = (on: boolean) => `rounded-full border px-2.5 py-1 text-xs font-medium ${on ? "border-azul bg-azul text-white" : "border-linea bg-white text-tinta/70"}`;
   const registrarCaptura = useCallback((fn: () => Promise<string>) => { capturaRef.current = fn; }, []);
   const onPizarra = useCallback((p: Pizarra) => { pizarraRef.current = p; }, []);
 
@@ -128,6 +146,29 @@ export default function FormEjercicio({
             })}
           </div>
         </div>
+        <fieldset className="space-y-2 rounded-lg border border-linea p-2.5">
+          <legend className="px-1 text-xs font-semibold text-tinta/70">Datos para buscarlo (si lo dejas vacío se rellena solo)</legend>
+          <div className="grid grid-cols-3 gap-2">{numero("balones")}{numero("canastas")}{numero("conos")}</div>
+          <div>
+            <label className="etiqueta">Tipo de trabajo</label>
+            <select value={d.formato ?? ""} onChange={(e) => set("formato", e.target.value)} className="campo">
+              <option value="">Automático</option>
+              {FORMATOS.map((f) => <option key={f.v} value={f.v}>{f.t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="etiqueta">Qué se trabaja (puedes marcar varios)</label>
+            <div className="flex flex-wrap gap-1">
+              {FOCOS.map((x) => <button key={x} type="button" onClick={() => alternar("focos", x)} className={chip(!!d.focos?.includes(x))}>{x}</button>)}
+            </div>
+          </div>
+          <div>
+            <label className="etiqueta">Posiciones</label>
+            <div className="flex flex-wrap gap-1">
+              {POSICIONES.map((x) => <button key={x} type="button" onClick={() => alternar("posiciones", x)} className={chip(!!d.posiciones?.includes(x))}>{x}</button>)}
+            </div>
+          </div>
+        </fieldset>
         <div>
           <label className="etiqueta">Material</label>
           <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="1 balón por jugador, 6 conos…" />

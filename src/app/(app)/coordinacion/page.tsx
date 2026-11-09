@@ -45,6 +45,9 @@ export default async function Coordinacion() {
   const pasados14 = entrenos.filter((e) => e.fecha >= hace14 && e.fecha <= ahora);
   const sinLista = pasados14.filter((e) => !conLista.has(e.id));
   const presente = (a: { estado: string }) => a.estado === "presente" || a.estado === "tarde";
+  // Los justificados no cuentan para el % (ni a favor ni en contra)
+  const cuenta = (a: { estado: string }) => a.estado !== "justificado";
+  const pcAsis = (l: { estado: string }[]) => pc(l.filter(presente).length, l.filter(cuenta).length);
 
   const partidos = (partR ?? []) as { id: string; equipo_id: string; fecha: string; rival: string; local: boolean; lugar: string | null; puntos_favor: number | null; puntos_contra: number | null }[];
   const proximos = partidos.filter((p) => p.fecha >= ahora && p.fecha < en7);
@@ -57,7 +60,7 @@ export default async function Coordinacion() {
   for (const a of asis) {
     const k = `${a.jugador_id}|${a.entrenamientos.equipo_id}`;
     const x = porJugador.get(k) ?? { nombre: `${a.jugadores?.nombre ?? ""} ${a.jugadores?.apellidos ?? ""}`.trim(), equipo: a.entrenamientos.equipo_id, n: 0, p: 0 };
-    x.n++; if (presente(a)) x.p++;
+    if (cuenta(a)) x.n++; if (presente(a)) x.p++;
     porJugador.set(k, x);
   }
   const faltan = [...porJugador.values()].filter((x) => x.n >= 4 && x.p / x.n < 0.6).sort((a, b) => a.p / a.n - b.p / b.n);
@@ -73,13 +76,13 @@ export default async function Coordinacion() {
     return {
       eq, sem: sem.length, planificados: sem.filter((e) => conActividades.has(e.id)).length,
       lista: p14.filter((e) => conLista.has(e.id)).length, p14: p14.length,
-      asistencia: pc(a30.filter(presente).length, a30.length), g, pj: jug.length, prox,
+      asistencia: pcAsis(a30), g, pj: jug.length, prox,
       staff: st.map((s) => s.perfiles?.nombre?.split(" ")[0]).filter(Boolean).join(", "),
       choques: sem.filter((e) => choques.has(e.id)).length,
     };
   });
   const totalSem = semana.length, totalPlan = semana.filter((e) => conActividades.has(e.id)).length;
-  const asisMedia = pc(asis.filter(presente).length, asis.length);
+  const asisMedia = pcAsis(asis);
   const sinStaff = filas.filter((f) => !f.staff);
 
   const Kpi = ({ icono: I, v, t, alerta }: { icono: typeof Gauge; v: string | number; t: string; alerta?: boolean }) => (
@@ -147,7 +150,7 @@ export default async function Coordinacion() {
             const sinListaEq = pasados.filter((e) => !conLista.has(e.id)).length;
             const sinMontar = es.filter((e) => !conActividades.has(e.id)).length;
             const aEq = asis.filter((a) => a.entrenamientos.equipo_id === eq.id && a.entrenamientos.fecha >= hace14);
-            const pEq = pc(aEq.filter(presente).length, aEq.length);
+            const pEq = pcAsis(aEq);
             return (
               <details key={eq.id} className="tarjeta p-3" open={sinListaEq > 0 || sinMontar > 0}>
                 <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
@@ -174,7 +177,7 @@ export default async function Coordinacion() {
                           </div>
                           <div className="w-24 shrink-0 text-right text-xs">
                             {!hecho ? <span className="text-tinta/40">Pendiente</span>
-                              : lista.length ? <span className="font-semibold">{lista.filter(presente).length}/{lista.length} <span className={pc(lista.filter(presente).length, lista.length)! >= 80 ? "text-green-700" : "text-amber-700"}>({pc(lista.filter(presente).length, lista.length)}%)</span></span>
+                              : lista.length ? <span className="font-semibold">{lista.filter(presente).length}/{lista.filter(cuenta).length} <span className={(pcAsis(lista) ?? 0) >= 80 ? "text-green-700" : "text-amber-700"}>({pcAsis(lista)}%)</span>{lista.some((a) => a.estado === "justificado") && <span className="text-tinta/50"> · {lista.filter((a) => a.estado === "justificado").length} J</span>}</span>
                               : <span className="font-semibold text-red-700">Sin lista</span>}
                           </div>
                         </li>

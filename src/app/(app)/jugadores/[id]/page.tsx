@@ -76,8 +76,9 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
         <h2 className="font-semibold">Asistencia reciente</h2>
         {hist.length > 0 && (() => {
           const ok = hist.filter((h) => h.estado === "presente" || h.estado === "tarde").length;
-          const pc = Math.round((ok * 100) / hist.length);
-          return <span className={`text-sm font-semibold ${pc >= 85 ? "text-green-700" : pc >= 65 ? "text-amber-600" : "text-rojo"}`}>{pc}% de asistencia ({ok} de {hist.length}) · <Link href="/entrenamientos/asistencia" className="font-normal text-azul underline">ver equipo</Link></span>;
+          const base = hist.filter((h) => h.estado !== "justificado").length; // los justificados no bajan el %
+          const pc = base ? Math.round((ok * 100) / base) : 100;
+          return <span className={`text-sm font-semibold ${pc >= 85 ? "text-green-700" : pc >= 65 ? "text-amber-600" : "text-rojo"}`}>{pc}% de asistencia ({ok} de {base}{hist.length > base ? `, ${hist.length - base} justificadas` : ""}) · <Link href="/entrenamientos/asistencia" className="font-normal text-azul underline">ver equipo</Link></span>;
         })()}
       </div>
       <ul className="tarjeta mt-2 divide-y divide-linea text-sm">

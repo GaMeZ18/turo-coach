@@ -45,7 +45,8 @@ export default async function JugadoresPage() {
     const mias = (asistencias ?? []).filter((a) => a.jugador_id === id);
     if (!mias.length) return null;
     const ok = mias.filter((a) => a.estado === "presente" || a.estado === "tarde").length;
-    return Math.round((ok / mias.length) * 100);
+    const base = mias.filter((a) => a.estado !== "justificado").length; // los justificados no bajan el %
+    return base ? Math.round((ok / base) * 100) : null;
   };
 
   return (

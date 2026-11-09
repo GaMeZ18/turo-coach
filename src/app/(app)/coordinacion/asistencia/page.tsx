@@ -4,11 +4,11 @@ import { requireUser } from "@/lib/supabase/server";
 import { todas } from "@/lib/db";
 import { equiposDeTemporada } from "@/lib/equipo-activo";
 import { colorEquipo } from "@/lib/colores";
-import { aISO, hoyLocal } from "@/lib/fechas";
+import { aISO, fechaCorta, hoyLocal } from "@/lib/fechas";
 import { sumarDias } from "@/lib/pistas";
 import { ArrowLeft, Users } from "lucide-react";
 
-type Fila = { jugador_id: string; estado: string; entrenamiento_id: string; entrenamientos: { fecha: string; equipo_id: string }; jugadores: { nombre: string; apellidos: string | null } | null };
+type Fila = { jugador_id: string; estado: string; motivo: string | null; entrenamiento_id: string; entrenamientos: { fecha: string; equipo_id: string }; jugadores: { nombre: string; apellidos: string | null } | null };
 const ESTADOS = ["presente", "tarde", "ausente", "justificado", "lesionado"] as const;
 const pc = (a: number, b: number) => (b ? Math.round((a * 100) / b) : null);
 const color = (v: number | null) => (v === null ? "text-tinta/40" : v >= 80 ? "text-green-700" : v >= 65 ? "text-amber-700" : "text-red-700");
@@ -26,7 +26,7 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
   const [{ data: entR }, { data: asisR }] = ids.length ? await Promise.all([
     (() => { let q = supabase.from("entrenamientos").select("id, equipo_id, fecha").in("equipo_id", ids).lte("fecha", ahora); if (desde) q = q.gte("fecha", desde); return q; })(),
     todas((a, b) => {
-      let q = supabase.from("asistencias").select("jugador_id, estado, entrenamiento_id, entrenamientos!inner(fecha, equipo_id), jugadores(nombre, apellidos)")
+      let q = supabase.from("asistencias").select("jugador_id, estado, motivo, entrenamiento_id, entrenamientos!inner(fecha, equipo_id), jugadores(nombre, apellidos)")
         .in("entrenamientos.equipo_id", ids).lte("entrenamientos.fecha", ahora);
       if (desde) q = q.gte("entrenamientos.fecha", desde);
       return q.order("entrenamiento_id").order("jugador_id").range(a, b);
@@ -36,23 +36,28 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
   const asis = (asisR ?? []) as unknown as Fila[];
   const conLista = new Set(asis.map((a) => a.entrenamiento_id));
   const presente = (e: string) => e === "presente" || e === "tarde";
+  // % = (presente + tarde) / (todos menos los justificados): una falta justificada no baja el %
+  const pctDe = (l: Fila[]) => pc(l.filter((x) => presente(x.estado)).length, l.filter((x) => x.estado !== "justificado").length);
 
   const cuenta = (lista: Fila[]) => Object.fromEntries(ESTADOS.map((s) => [s, lista.filter((a) => a.estado === s).length])) as Record<(typeof ESTADOS)[number], number>;
   const porEquipo = equipos.filter((e) => ids.includes(e.id)).map((eq) => {
     const a = asis.filter((x) => x.entrenamientos.equipo_id === eq.id);
     const ent = entrenos.filter((x) => x.equipo_id === eq.id);
-    return { eq, entrenos: ent.length, lista: ent.filter((x) => conLista.has(x.id)).length, c: cuenta(a), pct: pc(a.filter((x) => presente(x.estado)).length, a.length) };
+    return { eq, entrenos: ent.length, lista: ent.filter((x) => conLista.has(x.id)).length, c: cuenta(a), pct: pctDe(a) };
   });
-  const total = { entrenos: entrenos.length, lista: entrenos.filter((x) => conLista.has(x.id)).length, c: cuenta(asis), pct: pc(asis.filter((x) => presente(x.estado)).length, asis.length) };
+  const total = { entrenos: entrenos.length, lista: entrenos.filter((x) => conLista.has(x.id)).length, c: cuenta(asis), pct: pctDe(asis) };
 
   const jug = new Map<string, { nombre: string; equipo: string; n: number; p: number; c: Record<string, number> }>();
   for (const a of asis) {
     const k = `${a.jugador_id}|${a.entrenamientos.equipo_id}`;
     const x = jug.get(k) ?? { nombre: `${a.jugadores?.nombre ?? ""} ${a.jugadores?.apellidos ?? ""}`.trim() || "—", equipo: a.entrenamientos.equipo_id, n: 0, p: 0, c: {} };
-    x.n++; if (presente(a.estado)) x.p++; x.c[a.estado] = (x.c[a.estado] ?? 0) + 1;
+    if (a.estado !== "justificado") x.n++; if (presente(a.estado)) x.p++; x.c[a.estado] = (x.c[a.estado] ?? 0) + 1;
     jug.set(k, x);
   }
-  const jugadores = [...jug.values()].sort((a, b) => a.p / a.n - b.p / b.n || a.nombre.localeCompare(b.nombre));
+  const jugadores = [...jug.values()].sort((a, b) => (a.n ? a.p / a.n : 1) - (b.n ? b.p / b.n : 1) || a.nombre.localeCompare(b.nombre));
+  // Faltas con su motivo (justificadas, lesiones y ausencias), las más recientes primero
+  const faltas = asis.filter((a) => a.estado === "justificado" || a.estado === "lesionado" || a.estado === "ausente")
+    .sort((a, b) => b.entrenamientos.fecha.localeCompare(a.entrenamientos.fecha));
   const nombreEq = (id: string) => equipos.find((e) => e.id === id)?.nombre ?? "";
   const enlace = (p: Record<string, string>) => `?${new URLSearchParams({ periodo, ...(equipo ? { equipo } : {}), ...p }).toString()}`;
 
@@ -82,6 +87,19 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
         <button className="btn-secundario">Ver</button>
       </form>
 
+      {/* Resumen por equipo: pulsa para ver jugadores y motivos */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {porEquipo.map((f) => (
+          <Link key={f.eq.id} href={enlace({ equipo: f.eq.id })} className={`tarjeta p-3 transition hover:shadow-md ${equipo === f.eq.id ? "ring-2 ring-azul" : ""}`}>
+            <p className="truncate text-sm font-semibold"><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: colorEquipo(f.eq.id, equipos) }} />{f.eq.nombre}</p>
+            <p className={`mt-1 text-2xl font-bold ${color(f.pct)}`}>{f.pct === null ? "–" : `${f.pct}%`}</p>
+            <p className="text-[11px] text-tinta/60">{f.c.justificado} justif. · {f.c.ausente} ausencias · {f.c.lesionado} lesión</p>
+            <p className={`text-[11px] ${f.entrenos && f.lista < f.entrenos ? "font-semibold text-red-700" : "text-tinta/50"}`}>Lista {f.lista}/{f.entrenos} entrenos</p>
+          </Link>
+        ))}
+      </div>
+      {equipo && <p className="mt-2 text-sm"><Link href={`?${new URLSearchParams({ periodo }).toString()}`} className="text-azul underline">← Ver todos los equipos</Link></p>}
+
       <div className="tarjeta mt-4 overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-suave text-left text-[11px] uppercase text-tinta/60">
@@ -107,7 +125,29 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-[11px] text-tinta/50">Asistencia = presentes + tarde sobre las listas pasadas. «Lista pasada» = entrenos con asistencia / entrenos hechos.</p>
+      <p className="mt-1 text-[11px] text-tinta/50">Asistencia = (presentes + tarde) sobre las listas pasadas, sin contar las faltas justificadas (no bajan el %). «Lista pasada» = entrenos con asistencia / entrenos hechos.</p>
+
+      <h2 className="mt-6 font-semibold">Faltas y motivos{equipo ? ` · ${nombreEq(equipo)}` : ""} ({faltas.length})</h2>
+      <div className="tarjeta mt-2 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="bg-suave text-left text-[11px] uppercase text-tinta/60">
+            <tr><th className="p-2">Fecha</th><th className="p-2">Jugador</th>{!equipo && <th className="p-2">Equipo</th>}<th className="p-2">Tipo</th><th className="p-2">Motivo</th></tr>
+          </thead>
+          <tbody>
+            {faltas.slice(0, equipo ? 200 : 40).map((a, i) => (
+              <tr key={i} className="border-t border-linea align-top">
+                <td className="whitespace-nowrap p-2 text-xs capitalize text-tinta/70">{fechaCorta(a.entrenamientos.fecha)}</td>
+                <td className="p-2">{`${a.jugadores?.nombre ?? ""} ${a.jugadores?.apellidos ?? ""}`.trim()}</td>
+                {!equipo && <td className="p-2 text-xs text-tinta/70">{nombreEq(a.entrenamientos.equipo_id)}</td>}
+                <td className={`p-2 text-xs font-semibold ${a.estado === "justificado" ? "text-sky-700" : a.estado === "lesionado" ? "text-violet-700" : "text-red-700"}`}>{a.estado === "justificado" ? "Justificada" : a.estado === "lesionado" ? "Lesión" : "Ausencia"}</td>
+                <td className="p-2 text-xs">{a.motivo || <span className="text-tinta/40">Sin motivo</span>}</td>
+              </tr>
+            ))}
+            {!faltas.length && <tr><td colSpan={5} className="p-3 text-center text-tinta/50">No hay faltas en este periodo.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {!equipo && faltas.length > 40 && <p className="mt-1 text-xs text-tinta/50">Se ven las 40 más recientes. Elige un equipo para verlas todas.</p>}
 
       <h2 className="mt-6 font-semibold">Por jugador ({jugadores.length})</h2>
       <p className="text-xs text-tinta/50">Ordenados de menos a más asistencia.</p>
@@ -124,7 +164,7 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
                   <td className="p-2">{j.nombre}</td>
                   <td className="p-2 text-xs text-tinta/70">{nombreEq(j.equipo)}</td>
                   <td className={`p-2 text-center font-semibold ${color(v)}`}>{v === null ? "–" : `${v}%`}</td>
-                  <td className="p-2 text-center">{j.p}/{j.n}</td>
+                  <td className="p-2 text-center">{j.p}/{j.n}{j.c.justificado ? <span className="text-tinta/50"> (+{j.c.justificado} J)</span> : null}</td>
                   <td className="p-2 text-center">{j.c.ausente || "·"}</td>
                   <td className="p-2 text-center">{j.c.justificado || "·"}</td>
                   <td className="p-2 text-center">{j.c.lesionado || "·"}</td>

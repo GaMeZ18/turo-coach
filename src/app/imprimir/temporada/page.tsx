@@ -48,7 +48,7 @@ export default async function InformeTemporada() {
     return { ...j, total: r.length, p: n("presente"), t: n("tarde"), jus: n("justificado"), l: n("lesionado"), a: n("ausente") };
   });
   const totalReg = registros.length;
-  const mediaAsis = pc(registros.filter((x) => x.estado === "presente" || x.estado === "tarde").length, totalReg);
+  const mediaAsis = pc(registros.filter((x) => x.estado === "presente" || x.estado === "tarde").length, registros.filter((x) => x.estado !== "justificado").length);
 
   // --- Partidos ---
   const ps = (partidos ?? []) as { id: string; fecha: string; rival: string; local: boolean; puntos_favor: number | null; puntos_contra: number | null; competicion: string | null; jornada: number | null }[];
@@ -128,7 +128,7 @@ export default async function InformeTemporada() {
             </tr></thead>
             <tbody>
               {asistencia.map((j) => {
-                const v = pc(j.p + j.t, j.total);
+                const v = pc(j.p + j.t, j.total - j.jus);
                 return (
                   <tr key={j.id} className="border-b border-linea">
                     <td className="py-1 text-xs font-semibold text-azul">{j.dorsal ?? ""}</td><td>{j.nombre}</td>

@@ -6,6 +6,7 @@ import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actio
 import VisorPizarra from "./VisorPizarra";
 import { Copy, Library, Pencil, Trash2, PlayCircle } from "lucide-react";
 import Enviar from "@/components/Enviar";
+import { nombreFormato } from "@/lib/rasgos-ejercicio";
 
 export default async function VerEjercicio({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -72,6 +73,16 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           )}
         </div>
         <div className="space-y-4">
+          <section className="tarjeta grid grid-cols-3 gap-2 p-3 text-center text-sm">
+            <div><p className="text-lg font-bold">{e.balones ?? "—"}</p><p className="text-[11px] uppercase text-tinta/60">Balones</p></div>
+            <div><p className="text-lg font-bold">{e.canastas ?? "—"}</p><p className="text-[11px] uppercase text-tinta/60">Canastas</p></div>
+            <div><p className="text-lg font-bold">{e.conos ?? 0}</p><p className="text-[11px] uppercase text-tinta/60">Conos</p></div>
+            <div className="col-span-3 space-y-1.5 border-t border-linea pt-2 text-left">
+              {e.formato && <p><span className="text-tinta/60">Tipo de trabajo:</span> {nombreFormato(e.formato)}</p>}
+              {(e.focos ?? []).length > 0 && <p className="flex flex-wrap items-center gap-1"><span className="text-tinta/60">Se trabaja:</span> {(e.focos as string[]).map((x) => <Link key={x} href={`/biblioteca?foco=${encodeURIComponent(x)}`} className="rounded-full bg-suave px-2 py-0.5 text-xs hover:bg-linea">{x}</Link>)}</p>}
+              {(e.posiciones ?? []).length > 0 && <p><span className="text-tinta/60">Posiciones:</span> {(e.posiciones as string[]).join(", ")}</p>}
+            </div>
+          </section>
           {e.material && (
             <section>
               <h2 className="etiqueta">Material</h2>

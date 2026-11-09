@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
+import { rasgosDe } from "@/lib/rasgos-ejercicio";
 
 export type DatosEjercicio = {
   id?: string;
@@ -23,6 +24,13 @@ export type DatosEjercicio = {
   edades?: string[];
   material?: string;
   objetivos?: string;
+  // Datos para filtrar (0025). Si se dejan vacíos se deducen solos.
+  balones?: number | null;
+  canastas?: number | null;
+  conos?: number | null;
+  focos?: string[];
+  posiciones?: string[];
+  formato?: string;
 };
 
 const vacioANull = (s: string) => (s.trim() === "" ? null : s.trim());
@@ -50,6 +58,18 @@ export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
     material: vacioANull(d.material ?? ""),
     objetivos: vacioANull(d.objetivos ?? ""),
   };
+  // Datos para los filtros: lo que rellene el entrenador y, si falta algo, deducido de la pizarra y el título
+  const r = rasgosDe({ ...d, etiquetas: fila.etiquetas });
+  const datos = {
+    balones: d.balones ?? r.balones,
+    canastas: d.canastas ?? r.canastas,
+    conos: d.conos ?? r.conos,
+    focos: [...new Set([...(fila.categoria ? [fila.categoria] : []), ...(d.focos?.length ? d.focos : r.focos)])],
+    posiciones: d.posiciones?.length ? d.posiciones : r.posiciones,
+    formato: d.formato || r.formato,
+  };
+  if (fila.jugadores_min == null && r.jugadores) fila.jugadores_min = r.jugadores;
+  Object.assign(fila, datos);
   // En la biblioteca, siempre visible para el club
   if (fila.en_biblioteca) fila.visibilidad = "club";
 
@@ -138,15 +158,21 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; actua
     }
     // Todos los ya cargados (más de 1000: hay que paginar o se duplicarían)
     type Fila = { id: string; titulo: string; descripcion: string | null; correcciones: string | null; objetivos: string | null; categoria: string | null; etiquetas: string[] | null;
-      jugadores_min: number | null; duracion: number | null; material: string | null; edades: string[] | null; pizarra: unknown; video_url: string | null };
+      jugadores_min: number | null; duracion: number | null; material: string | null; edades: string[] | null; pizarra: unknown; video_url: string | null;
+      balones: number | null; canastas: number | null; conos: number | null; focos: string[] | null; posiciones: string[] | null; formato: string | null };
     const { data: ya, error } = await todas<Fila>((d, h) =>
-      supabase.from("ejercicios").select("id, titulo, descripcion, correcciones, objetivos, categoria, etiquetas, jugadores_min, duracion, material, edades, pizarra, video_url").eq("en_biblioteca", true).order("id").range(d, h));
+      supabase.from("ejercicios").select("id, titulo, descripcion, correcciones, objetivos, categoria, etiquetas, jugadores_min, duracion, material, edades, pizarra, video_url, balones, canastas, conos, focos, posiciones, formato").eq("en_biblioteca", true).order("id").range(d, h));
     if (error) return { nuevos: 0, error: faltaSQL(error.message) };
-    const fila = (e: (typeof SEMILLA)[number]) => ({
-      titulo: e.titulo, descripcion: e.descripcion, correcciones: e.correcciones, categoria: e.categoria, etiquetas: e.etiquetas,
-      jugadores_min: e.jugadores, duracion: e.duracion, material: e.material ?? null, objetivos: e.objetivos ?? null, edades: e.edades,
-      pizarra: montar(e.montaje), video_url: e.video ?? null,
-    });
+    const fila = (e: (typeof SEMILLA)[number]) => {
+      const pizarra = montar(e.montaje);
+      const r = rasgosDe({ pizarra, titulo: e.titulo, categoria: e.categoria, etiquetas: e.etiquetas, tipo: e.tipo ?? "ejercicio", jugadores_min: e.jugadores });
+      return {
+        titulo: e.titulo, descripcion: e.descripcion, correcciones: e.correcciones, categoria: e.categoria, etiquetas: e.etiquetas,
+        jugadores_min: e.jugadores ?? r.jugadores, duracion: e.duracion, material: e.material ?? null, objetivos: e.objetivos ?? null, edades: e.edades,
+        pizarra, video_url: e.video ?? null,
+        balones: r.balones, canastas: r.canastas, conos: r.conos, focos: r.focos, posiciones: r.posiciones, formato: r.formato,
+      };
+    };
     const porTitulo = new Map(ya.map((x) => [x.titulo, x]));
     // 2) Nuevos: por llamada, como mucho 300 (el servidor tiene un tiempo límite); el botón vuelve a llamar si quedan
     const pendientes = SEMILLA.filter((e) => !porTitulo.has(e.titulo));

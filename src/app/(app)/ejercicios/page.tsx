@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
-import { CATEGORIAS } from "@/lib/categorias";
+import { aplicarFiltros } from "@/lib/rasgos-ejercicio";
+import FiltrosEjercicios, { type ParamsFiltro } from "@/components/FiltrosEjercicios";
 import { Library, Lock, Plus } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
 
@@ -13,9 +14,11 @@ type Ej = {
 export default async function EjerciciosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tipo?: string; cat?: string; mios?: string }>;
+  searchParams: Promise<ParamsFiltro & { cat?: string; mios?: string }>;
 }) {
-  const { q, tipo, cat, mios } = await searchParams;
+  const sp = await searchParams;
+  const { q, tipo, mios } = sp;
+  const foco = sp.foco ?? sp.cat;
   const { supabase, user } = await requireUser();
 
   let consulta = supabase
@@ -24,7 +27,7 @@ export default async function EjerciciosPage({
     .order("updated_at", { ascending: false })
     .limit(120);
   if (tipo) consulta = consulta.eq("tipo", tipo);
-  if (cat) consulta = consulta.eq("categoria", cat);
+  consulta = aplicarFiltros(consulta, { ...sp, foco });
   if (mios) consulta = consulta.eq("autor_id", user.id);
   if (q) {
     const limpio = q.replace(/[%,(){}"]/g, " ").trim();
@@ -44,20 +47,10 @@ export default async function EjerciciosPage({
       </div>
 
       <form className="tarjeta mt-5 flex flex-wrap gap-2 p-3">
-        <input name="q" defaultValue={q} placeholder="Buscar por título, texto o etiqueta" className="campo min-w-48 flex-1" />
-        <select name="tipo" defaultValue={tipo ?? ""} className="campo !w-auto">
-          <option value="">Todo</option>
-          <option value="ejercicio">Ejercicios</option>
-          <option value="sistema">Sistemas</option>
-        </select>
-        <select name="cat" defaultValue={cat ?? ""} className="campo !w-auto">
-          <option value="">Cualquier categoría</option>
-          {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <label className="flex items-center gap-1.5 px-1 text-sm">
-          <input type="checkbox" name="mios" value="1" defaultChecked={!!mios} /> Solo míos
-        </label>
-        <button className="btn-secundario">Filtrar</button>
+        <FiltrosEjercicios p={{ ...sp, foco }} extra={
+          <label className="flex items-center gap-1.5 px-1 text-sm">
+            <input type="checkbox" name="mios" value="1" defaultChecked={!!mios} /> Solo míos
+          </label>} />
       </form>
 
       <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
