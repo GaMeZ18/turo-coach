@@ -67,7 +67,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     if (conf.length) {
       const otros = ((oc ?? []) as Ocupacion[]).filter((o) => conf.includes(o.id));
       const { data: eqs } = await supabase.from("equipos").select("id, nombre").in("id", otros.map((o) => o.equipo_id));
-      choque = otros.map((o) => `${(eqs ?? []).find((x) => x.id === o.equipo_id)?.nombre ?? "Otro equipo"} (${hora(o.fecha)})`);
+      choque = otros.map((o) => `${(eqs ?? []).find((x) => x.id === o.equipo_id)?.nombre ?? "Otro equipo"} (${hora(o.real_fecha ?? o.fecha)})`);
     }
   }
 

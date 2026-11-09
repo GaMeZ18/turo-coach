@@ -1,6 +1,8 @@
 // Reparto de pistas: detectar entrenos que coinciden en la misma pista más allá de su capacidad.
 export type Pista = { id: string; nombre: string; capacidad: number; orden: number; notas: string | null; partidos_casa?: boolean };
-export type Ocupacion = { id: string; equipo_id: string; fecha: string; duracion: number | null; lugar: string | null; tipo?: "entreno" | "partido"; detalle?: string | null };
+// fecha/duracion: el rato en pista (sin la prep. física del principio y del final). real_*: la hora del entreno.
+export type Ocupacion = { id: string; equipo_id: string; fecha: string; duracion: number | null; lugar: string | null; tipo?: "entreno" | "partido"; detalle?: string | null;
+  real_fecha?: string; real_duracion?: number; en_pista?: boolean };
 
 export const normPista = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
@@ -14,7 +16,7 @@ export function solapes(ocup: Ocupacion[], pistas: Pista[]) {
   const porPista = new Map<string, Ocupacion[]>();
   for (const o of ocup) {
     const k = normPista(o.lugar);
-    if (!k) continue;
+    if (!k || o.en_pista === false) continue; // toda la sesión es prep. física: no ocupa la pista
     porPista.set(k, [...(porPista.get(k) ?? []), o]);
   }
   const conflictos = new Map<string, string[]>();
@@ -40,3 +42,6 @@ export const sumarDias = (dia: string, n: number) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+
+/** Hora real del entreno (para enseñarla) */
+export const horaReal = (o: Ocupacion) => ({ ini: new Date(o.real_fecha ?? o.fecha), fin: new Date(new Date(o.real_fecha ?? o.fecha).getTime() + (o.real_duracion ?? o.duracion ?? 90) * 60000) });

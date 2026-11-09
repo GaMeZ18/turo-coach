@@ -2,6 +2,10 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "🏃 Todo fuera de pista": "🏃 Tot fora de pista",
+ "Pista ocupada": "Pista ocupada",
+ "Misma hora que otro equipo, sin choque en pista": "Mateixa hora que un altre equip, sense xoc a pista",
+ "Qué equipo entrena en cada pista y a qué hora. Los partidos en casa salen en amarillo. En rojo, solo cuando la pista está ocupada de verdad: la prep. física fuera de pista no cuenta.": "Quin equip entrena a cada pista i a quina hora. Els partits a casa surten en groc. En vermell, només quan la pista està ocupada de debò: la prep. física fora de pista no compta.",
  "Prep. física": "Prep. física",
  "Qué se hace: ejercicios, series, repeticiones, descanso… (fuera de pista)": "Què es fa: exercicis, sèries, repeticions, descans… (fora de pista)",
  "Solo si no lo pones en la sesión como «Prep. física» (eso ya se calcula solo).": "Només si no ho poses a la sessió com a «Prep. física» (això ja es calcula sol).",
@@ -1082,6 +1086,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["🏟️ En pista {}–{}", "🏟️ A pista {}–{}"],
  ["Ejercicios de {} (también los que no ha publicado en la biblioteca)", "Exercicis de {} (també els que no ha publicat a la biblioteca)"],
  ["Faltas de {}", "Faltes de {}"],
  ["{} con faltas · lista {}/{}", "{} amb faltes · llista {}/{}"],

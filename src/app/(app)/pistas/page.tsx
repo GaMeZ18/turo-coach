@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { equiposDeTemporada, misEquipos } from "@/lib/equipo-activo";
 import { colorEquipo } from "@/lib/colores";
 import { aISO, diaInput, hora, hoyLocal, TZ } from "@/lib/fechas";
-import { lunesDe, normPista, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
+import { horaReal, lunesDe, normPista, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
 import Enviar from "@/components/Enviar";
 import { borrarPista, guardarPista } from "./actions";
 import { AlertTriangle, ChevronLeft, ChevronRight, MapPin, Settings2, Trash2 } from "lucide-react";
@@ -40,14 +40,22 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
 
   const Bloque = ({ o }: { o: Ocupacion }) => {
     const fin = new Date(new Date(o.fecha).getTime() + (o.duracion || 90) * 60000);
+    const real = horaReal(o);
     const choca = conflictos.has(o.id);
     const partido = o.tipo === "partido";
+    // ¿La pista se ocupa menos rato que el entreno? (prep. física fuera al empezar o al acabar)
+    const distinto = !partido && (Math.abs(new Date(o.fecha).getTime() - real.ini.getTime()) > 60000 || Math.abs(fin.getTime() - real.fin.getTime()) > 60000);
+    // Coincide en hora con otro equipo de esta pista, pero no en pista (por la prep. física): solo informativo
+    const mismaHora = !choca && ocup.some((x) => x.id !== o.id && normPista(x.lugar) === normPista(o.lugar) && horaReal(x).ini < real.fin && real.ini < horaReal(x).fin);
     const contenido = (
       <>
-        <span className="block font-semibold tabular-nums">{hora(o.fecha)}–{hora(fin)}</span>
+        <span className="block font-semibold tabular-nums">{hora(real.ini.toISOString())}–{hora(real.fin.toISOString())}</span>
+        {o.en_pista === false ? <span className="block text-[10px] text-orange-800">🏃 Todo fuera de pista</span>
+          : distinto && <span className="block text-[10px] tabular-nums text-orange-800">🏟️ En pista {hora(o.fecha)}–{hora(fin.toISOString())}</span>}
         <span className="block truncate">{partido && "🏀 "}{nombreEq(o.equipo_id)}</span>
         {partido && <span className="block truncate text-tinta/60">Partido vs {o.detalle}</span>}
-        {choca && <span className="mt-0.5 flex items-center gap-0.5 font-bold"><AlertTriangle size={11} /> Coincide</span>}
+        {choca && <span className="mt-0.5 flex items-center gap-0.5 font-bold"><AlertTriangle size={11} /> Pista ocupada</span>}
+        {mismaHora && <span className="mt-0.5 block text-[10px] text-tinta/50">Misma hora que otro equipo, sin choque en pista</span>}
       </>
     );
     const clase = `block rounded-md border-l-4 px-1.5 py-1 text-[11px] leading-tight ${choca ? "bg-red-50 text-red-800 ring-2 ring-red-500" : partido ? "bg-oro/25" : "bg-suave"}`;
@@ -61,7 +69,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><MapPin className="text-azul" /> Reparto de pistas</h1>
-          <p className="text-sm text-tinta/60">Qué equipo entrena en cada pista y a qué hora. Los partidos en casa salen en amarillo. En rojo, lo que coincide en la misma pista.</p>
+          <p className="text-sm text-tinta/60">Qué equipo entrena en cada pista y a qué hora. Los partidos en casa salen en amarillo. En rojo, solo cuando la pista está ocupada de verdad: la prep. física fuera de pista no cuenta.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/pistas?semana=${sumarDias(lunes, -7)}`} className="btn-secundario !px-2.5" aria-label="Semana anterior"><ChevronLeft size={18} /></Link>
@@ -98,7 +106,7 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
                   {f.notas && <div className="text-[11px] text-tinta/50">{f.notas}</div>}
                 </td>
                 {dias.map((d) => {
-                  const del = ocup.filter((o) => normPista(o.lugar) === f.clave && diaInput(o.fecha) === d).sort((a, b) => a.fecha.localeCompare(b.fecha));
+                  const del = ocup.filter((o) => normPista(o.lugar) === f.clave && diaInput(o.real_fecha ?? o.fecha) === d).sort((a, b) => (a.real_fecha ?? a.fecha).localeCompare(b.real_fecha ?? b.fecha));
                   return <td key={d} className="space-y-1 p-1.5">{del.map((o) => <Bloque key={o.id} o={o} />)}</td>;
                 })}
               </tr>
