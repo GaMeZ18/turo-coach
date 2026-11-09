@@ -2,6 +2,11 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Avisos activados": "Avisos activats",
+ "Sin avisos en el móvil": "Sense avisos al mòbil",
+ "← Coordinación": "← Coordinació",
+ "Coordinación": "Coordinació",
+ "Si alguien desinstala la app o quita el permiso, desaparece de aquí al siguiente aviso que no le pueda llegar. Los dispositivos activados antes de hoy salen con el nombre del servicio hasta que esa persona vuelva a abrir la app.": "Si algú desinstal·la l'app o treu el permís, desapareix d'aquí al següent avís que no li pugui arribar. Els dispositius activats abans d'avui surten amb el nom del servei fins que aquesta persona torni a obrir l'app.",
  "Noticias": "Notícies",
  "Noticias del club": "Notícies del club",
  "Noticia del club": "Notícia del club",
@@ -1020,6 +1025,8 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["{} de {} personas reciben los avisos en algún dispositivo. Los que no, solo los ven al abrir la app.", "{} de {} persones reben els avisos en algun dispositiu. Els que no, només els veuen en obrir l'app."],
+ [" · desde {}", " · des del {}"],
  ["Para quién ({})", "Per a qui ({})"],
  ["Avisado ({})", "Avisat ({})"],
  ["{} (yo)", "{} (jo)"],

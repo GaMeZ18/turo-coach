@@ -7,7 +7,7 @@ import { colorEquipo } from "@/lib/colores";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
 import AltaRapida from "./AltaRapida";
-import { AlertTriangle, CalendarCheck, ClipboardList, Gauge, MapPin, Trophy, UserX, Users } from "lucide-react";
+import { AlertTriangle, CalendarCheck, ClipboardList, Gauge, MapPin, Trophy, UserX, Users, BellRing } from "lucide-react";
 
 type Ent = { id: string; equipo_id: string; fecha: string; duracion_prevista: number | null; lugar: string | null };
 const pc = (a: number, b: number) => (b ? Math.round((a * 100) / b) : null);
@@ -101,6 +101,7 @@ export default async function Coordinacion() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/coordinacion/asistencia" className="btn-secundario"><Users size={16} /> Asistencia general</Link>
+          <Link href="/coordinacion/avisos" className="btn-secundario"><BellRing size={16} /> Avisos activados</Link>
           <AltaRapida equipos={equipos.map((e) => ({ id: e.id, nombre: e.nombre }))} />
         </div>
       </div>

@@ -10,11 +10,11 @@ export async function marcarLeidas() {
   revalidatePath("/", "layout");
 }
 
-export async function guardarSuscripcion(s: { endpoint: string; p256dh: string; auth: string }) {
+export async function guardarSuscripcion(s: { endpoint: string; p256dh: string; auth: string; dispositivo?: string }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Sin sesión" };
-  const { error } = await supabase.from("push_suscripciones").upsert({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth, perfil_id: user.id });
+  const { error } = await supabase.from("push_suscripciones").upsert({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth, perfil_id: user.id, dispositivo: s.dispositivo?.slice(0, 60) ?? null });
   return error ? { error: /push_suscripciones/.test(error.message) ? "Ejecuta antes 0010_notificaciones.sql en Supabase." : error.message } : { ok: true };
 }
 

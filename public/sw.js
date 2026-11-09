@@ -4,7 +4,7 @@
 // - Sin conexión muestra /offline.html en vez del error del navegador.
 // Los datos (Supabase) NO se cachean: siempre se piden en vivo.
 
-const VERSION = "turo-coach-v3";
+const VERSION = "turo-coach-v4";
 const PRECACHE = ["/offline.html", "/marca/escudo.png", "/marca/escudo-128.png", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -66,7 +66,14 @@ self.addEventListener("notificationclick", (event) => {
   const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
   event.waitUntil((async () => {
     const ventanas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const v of ventanas) if (v.url.startsWith(self.location.origin)) { await v.focus(); return v.navigate(url); }
+    const v = ventanas.find((w) => w.url.startsWith(self.location.origin));
+    if (v) {
+      // Lleva a la página del aviso (entreno, partido…). En iPhone «navigate» a veces no está: se le pide a la página que vaya.
+      try { await v.focus(); } catch {}
+      try { if ("navigate" in v) { await v.navigate(url); return; } } catch {}
+      v.postMessage({ tipo: "ir", url });
+      return;
+    }
     return self.clients.openWindow(url);
   })());
 });

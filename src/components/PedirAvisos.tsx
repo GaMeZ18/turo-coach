@@ -22,7 +22,8 @@ export default function PedirAvisos({ clavePublica }: { clavePublica: string }) 
   useEffect(() => {
     (async () => {
       const e = await estadoPush();
-      if (e === "activo" || e === "no-soportado" || e === "denegado") return;
+      if (e === "activo") { await activarPush(clavePublica, false); return; } // actualiza el nombre del dispositivo
+      if (e === "no-soportado" || e === "denegado") return;
       if (e === "inactivo" && Notification.permission === "granted") { await activarPush(clavePublica, false); return; } // permiso dado: se activa solo
       if (leer() < Date.now()) setEstado(e);
     })().catch(() => {});

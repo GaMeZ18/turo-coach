@@ -24,6 +24,16 @@ export function infoDispositivo() {
   return { ios, versionIos, instalada, otraApp, soporta };
 }
 
+/** Nombre corto del dispositivo: «iPhone (app)», «Android · Chrome», «Mac · Safari»… */
+export function nombreDispositivo() {
+  const ua = navigator.userAgent;
+  const d = infoDispositivo();
+  const so = d.ios ? (/ipad/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : "iPhone")
+    : /android/i.test(ua) ? "Android" : /mac os x/i.test(ua) ? "Mac" : /windows/i.test(ua) ? "Windows" : /linux/i.test(ua) ? "Linux" : "Otro";
+  const nav = /edg\//i.test(ua) ? "Edge" : /firefox|fxios/i.test(ua) ? "Firefox" : /chrome|crios/i.test(ua) ? "Chrome" : /safari/i.test(ua) ? "Safari" : "Navegador";
+  return d.instalada ? `${so} (app)` : `${so} · ${nav}`;
+}
+
 /** En qué situación está este dispositivo (instalada: también vale abrir la web instalada desde el icono) */
 export async function estadoPush(): Promise<EstadoPush> {
   const d = infoDispositivo();
@@ -59,7 +69,7 @@ async function registro() {
 }
 
 /** Suscribe este dispositivo. pedir=true solo al tocar el botón (Safari exige un toque para pedir permiso). */
-type Guardar = (s: { endpoint: string; p256dh: string; auth: string }) => Promise<{ error?: string } | undefined | void>;
+type Guardar = (s: { endpoint: string; p256dh: string; auth: string; dispositivo?: string }) => Promise<{ error?: string } | undefined | void>;
 export async function activarPush(clavePublica: string, pedir = true, guardar: Guardar = guardarSuscripcion): Promise<{ ok?: boolean; error?: string; estado?: EstadoPush }> {
   try {
     if (Notification.permission !== "granted") {
@@ -73,7 +83,7 @@ export async function activarPush(clavePublica: string, pedir = true, guardar: G
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(clavePublica) });
     const j = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
     if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) return { error: "El navegador no ha dado los datos de la suscripción. Prueba otra vez." };
-    const r = await guardar({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+    const r = await guardar({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, dispositivo: nombreDispositivo() });
     if (r?.error) return { error: r.error };
     return { ok: true, estado: "activo" };
   } catch (e) {
