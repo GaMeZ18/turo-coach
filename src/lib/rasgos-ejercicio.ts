@@ -52,9 +52,9 @@ export function rasgosDe(e: Fuente): Rasgos {
 
 /** Filtros de búsqueda comunes (Ejercicios y Biblioteca) aplicados a una consulta de Supabase */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function aplicarFiltros<Q extends { or: (...a: any[]) => Q; contains: (...a: any[]) => Q; eq: (...a: any[]) => Q; gte: (...a: any[]) => Q; lte: (...a: any[]) => Q }>(
-  q: Q, f: { foco?: string; edad?: string; pos?: string; formato?: string; jug?: string; balones?: string },
-): Q {
+type Consulta = any;
+export function aplicarFiltros<Q>(consulta: Q, f: { foco?: string; edad?: string; pos?: string; formato?: string; jug?: string; balones?: string }): Q {
+  let q: Consulta = consulta;
   if (f.foco) q = q.or(`categoria.eq."${f.foco}",focos.cs.{"${f.foco}"}`);
   if (f.edad) q = q.contains("edades", [f.edad]);
   if (f.pos) q = q.contains("posiciones", [f.pos]);
@@ -62,5 +62,5 @@ export function aplicarFiltros<Q extends { or: (...a: any[]) => Q; contains: (..
   const r = RANGOS_JUGADORES.find((x) => x.v === f.jug);
   if (r) q = q.gte("jugadores_min", r.min).lte("jugadores_min", r.max);
   if (f.balones === "1") q = q.lte("balones", 1);
-  return q;
+  return q as Q;
 }
