@@ -1,6 +1,6 @@
 // Dibujo estático y ligero de una pizarra (para las tarjetas de la biblioteca), en SVG.
 // Sirve en servidor: no usa el editor.
-import { aspectoEn, esJugador, estados, normalizar, visibleEn, type Punto } from "./modelo";
+import { aspectoEn, esJugador, estados, normalizar, puntoEn, recortarFinal, visibleEn, zigzag, type Punto } from "./modelo";
 
 const AZUL = "#002b8e", ROJO = "#ca010c", NARANJA = "#fc6401";
 
@@ -85,8 +85,7 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
       const f = p.fotogramas[k];
       const movs = f.movimientos.filter((m) => m.puntos.length >= 4);
       for (const m of movs) {
-        const i = Math.floor(m.puntos.length / 4) * 2; // hacia la mitad del recorrido
-        const [x, y] = T({ x: m.puntos[i], y: m.puntos[i + 1] });
+        const [x, y] = T(puntoEn(m.puntos, 0.35)); // donde lo pone la pizarra al grabar
         const el0 = p.elementos.find((e) => e.id === m.elementoId);
         marcas.push({ x, y, n, c: el0 && aspectoEn(el0, k).tipo === "defensor" ? "#ca010c" : "#1f2937" });
       }
@@ -133,8 +132,9 @@ export default function MiniPizarra({ pizarra, className = "", pasos, numeros = 
             const def = (el0 ? aspectoEn(el0, k).tipo : tipoDe.get(m.elementoId)) === "defensor";
             return (
               <g key={i} opacity={def ? 0.75 : 1}>
-                <polyline points={linea(m.puntos)} fill="none" stroke={def ? "#ca010c" : "#1f2937"} strokeWidth={def ? "0.06" : "0.09"}
-                  strokeDasharray={m.tipo === "botar" ? "0.18 0.14" : undefined} markerEnd={m.tipo === "bloqueo" ? undefined : def ? "url(#flr)" : "url(#fl)"} />
+                {/* Bote en zigzag (como en la pizarra), más marcado para que se vea en un dibujo pequeño o impreso */}
+                <polyline points={linea(m.tipo === "botar" ? zigzag(recortarFinal(m.puntos, r * 1.05), 0.5, 0.3) : m.puntos)} fill="none" stroke={def ? "#ca010c" : "#1f2937"} strokeWidth={def ? "0.06" : "0.09"}
+                  strokeLinejoin="round" strokeLinecap="round" markerEnd={m.tipo === "bloqueo" ? undefined : def ? "url(#flr)" : "url(#fl)"} />
                 {m.tipo === "bloqueo" && (
                   <line x1={fin[0] - 0.4 * Math.sin(ang)} y1={fin[1] + 0.4 * Math.cos(ang)} x2={fin[0] + 0.4 * Math.sin(ang)} y2={fin[1] - 0.4 * Math.cos(ang)} stroke="#1f2937" strokeWidth="0.12" />
                 )}
