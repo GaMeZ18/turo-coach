@@ -16,11 +16,11 @@ type Sub = { endpoint: string; p256dh: string; auth: string };
 /** Manda la notificación a esos dispositivos (y borra los que ya no existen) */
 async function enviarPush(supabase: SupabaseClient, subs: Sub[], aviso: { titulo: string; cuerpo: string; url: string }) {
   const { titulo, cuerpo, url } = aviso;
-  const privada = process.env.VAPID_PRIVATE_KEY;
+  const privada = process.env.VAPID_PRIVATE_KEY?.trim();
   if (!privada || !subs?.length) return;
   try {
     const webpush = (await import("web-push")).default;
-    webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:info@cbturo.com", VAPID_PUBLICO, privada);
+    webpush.setVapidDetails((process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim(), VAPID_PUBLICO, privada);
     const carga = JSON.stringify({ titulo, cuerpo, url });
     await Promise.all((subs as { endpoint: string; p256dh: string; auth: string }[]).map(async (s) => {
       try {
@@ -48,11 +48,11 @@ export async function notificarPersonasMesa(db: SupabaseClient, personas: string
   const ids = [...new Set(personas)].filter(Boolean);
   if (!ids.length) return;
   const { data: subs } = await db.from("mesa_push").select("endpoint, p256dh, auth").in("persona_id", ids);
-  const privada = process.env.VAPID_PRIVATE_KEY;
+  const privada = process.env.VAPID_PRIVATE_KEY?.trim();
   if (!privada || !subs?.length) return;
   try {
     const webpush = (await import("web-push")).default;
-    webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:info@cbturo.com", VAPID_PUBLICO, privada);
+    webpush.setVapidDetails((process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim(), VAPID_PUBLICO, privada);
     const carga = JSON.stringify({ titulo, cuerpo, url });
     await Promise.all((subs as Sub[]).map(async (s) => {
       try {
