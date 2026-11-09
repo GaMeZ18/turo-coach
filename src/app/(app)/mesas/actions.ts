@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
-import { fechaPartidoMesa, normalizarTelefono, PLAZAS_MANUAL, POR_MESA } from "@/lib/mesas";
+import { fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA, textoPartido } from "@/lib/mesas";
+import { notificarPersonasMesa } from "@/lib/notificar";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO } from "@/lib/fechas";
 
 async function gestor() {
@@ -11,6 +13,20 @@ async function gestor() {
   return createClient();
 }
 const refrescar = () => { revalidatePath("/mesas"); revalidatePath("/mesas/pagos"); };
+
+/** Avisa al móvil de la persona (si activó los avisos desde el enlace) */
+async function avisarPersona(db: SupabaseClient, asignacionId: string, tipo: "confirmada" | "quitada") {
+  try {
+    const { data: a } = await db.from("mesa_asignaciones").select("partido_id, persona_id").eq("id", asignacionId).maybeSingle();
+    if (!a) return;
+    const [p, { data: cfg }] = await Promise.all([partidoMesa(db, a.partido_id), db.from("mesa_config").select("token").maybeSingle()]);
+    if (!p) return;
+    const url = cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/";
+    await notificarPersonasMesa(db, [a.persona_id],
+      tipo === "confirmada" ? "Mesa confirmada: te toca a ti" : "Ya no haces esta mesa",
+      textoPartido(p), url);
+  } catch {}
+}
 
 /** Confirmar a alguien en la mesa de un partido (máximo 2) */
 export async function confirmar(fd: FormData) {
@@ -21,6 +37,7 @@ export async function confirmar(fd: FormData) {
   if ((count ?? 0) >= plazas) throw new Error(`Esta mesa ya tiene ${plazas} persona${plazas > 1 ? "s" : ""} confirmada${plazas > 1 ? "s" : ""}. Quita a una antes.`);
   const { error } = await db.from("mesa_asignaciones").update({ estado: "confirmado" }).eq("id", id);
   if (error) throw new Error(error.message);
+  await avisarPersona(db, id, "confirmada");
   refrescar();
 }
 
@@ -34,7 +51,10 @@ export async function desconfirmar(fd: FormData) {
 
 export async function quitar(fd: FormData) {
   const db = await gestor();
-  const { error } = await db.from("mesa_asignaciones").delete().eq("id", String(fd.get("id")));
+  const id = String(fd.get("id"));
+  const { data: antes } = await db.from("mesa_asignaciones").select("estado").eq("id", id).maybeSingle();
+  if (antes?.estado === "confirmado") await avisarPersona(db, id, "quitada");
+  const { error } = await db.from("mesa_asignaciones").delete().eq("id", id);
   if (error) throw new Error(error.message);
   refrescar();
 }
@@ -65,6 +85,8 @@ export async function asignar(fd: FormData) {
     { partido_id: partido, persona_id: persona, estado: (count ?? 0) >= (manual ? PLAZAS_MANUAL : POR_MESA) ? "candidato" : "confirmado", importe: manual ? 0 : cfg?.importe ?? 10 },
     { onConflict: "partido_id,persona_id" });
   if (error) throw new Error(error.message);
+  const { data: nueva } = await db.from("mesa_asignaciones").select("id, estado").eq("partido_id", partido).eq("persona_id", persona).maybeSingle();
+  if (nueva?.estado === "confirmado") await avisarPersona(db, nueva.id, "confirmada");
   refrescar();
 }
 

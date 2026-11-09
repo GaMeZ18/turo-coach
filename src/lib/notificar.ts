@@ -41,3 +41,25 @@ export async function notificarPerfiles(db: SupabaseClient, perfiles: string[], 
   const { data: subs } = await db.from("push_suscripciones").select("endpoint, p256dh, auth").in("perfil_id", ids);
   await enviarPush(db, (subs ?? []) as Sub[], { titulo, cuerpo, url });
 }
+
+/** Aviso a la gente que hace mesa (sin cuenta): solo llega a los móviles donde lo activaron desde el enlace */
+export async function notificarPersonasMesa(db: SupabaseClient, personas: string[], titulo: string, cuerpo: string, url: string) {
+  const ids = [...new Set(personas)].filter(Boolean);
+  if (!ids.length) return;
+  const { data: subs } = await db.from("mesa_push").select("endpoint, p256dh, auth").in("persona_id", ids);
+  const privada = process.env.VAPID_PRIVATE_KEY;
+  if (!privada || !subs?.length) return;
+  try {
+    const webpush = (await import("web-push")).default;
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:info@cbturo.com", VAPID_PUBLICO, privada);
+    const carga = JSON.stringify({ titulo, cuerpo, url });
+    await Promise.all((subs as Sub[]).map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400 });
+      } catch (e) {
+        const code = (e as { statusCode?: number }).statusCode;
+        if (code === 404 || code === 410) await db.from("mesa_push").delete().eq("endpoint", s.endpoint);
+      }
+    }));
+  } catch {}
+}

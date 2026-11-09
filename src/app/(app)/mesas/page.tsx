@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
-import { partidosDeCasa, euros, POR_MESA, type Asignacion } from "@/lib/mesas";
+import { partidosDeCasa, euros, POR_MESA, textoPartido, type Asignacion } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
 import Copiar from "./Copiar";
 import { alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
@@ -40,7 +40,15 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const completas = deClub.filter((p) => conf(p.id).length >= p.plazas).length;
   const resumen = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
     ...deClub.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} · ${p.equipo} vs ${p.rival}\n   👉 ${conf(p.id).map((a) => a.mesa_personas?.nombre).join(" y ") || "¡FALTA GENTE!"}`)].join("\n");
-  const invitacion = `Hola! Esta semana necesitamos gente para hacer las mesas de los partidos de casa del CB Turó (${euros(Number(cfg.importe))} por persona y partido). Apúntate aquí a los que puedas: ${enlace}`;
+  // Mensaje de la semana que se está viendo: solo esos partidos, y el enlace abre esa semana
+  const enlaceSemana = `${enlace}?semana=${lunes}`;
+  const pendientes = deClub.filter((p) => conf(p.id).length < p.plazas && p.fecha > new Date().toISOString());
+  const invitacion = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
+    pendientes.length ? "Necesitamos gente para estas mesas:" : "Partidos de casa de la semana:",
+    ...(pendientes.length ? pendientes : deClub).map((p) => `• ${textoPartido(p)}${p.manual ? " (1 persona, la pagan los jugadores)" : ""}`), "",
+    `Mesas del club: ${euros(Number(cfg.importe))} por persona y partido. Apúntate a las que puedas (hasta el viernes):`, enlaceSemana].join("\n");
+  const whatsapp = (tel: string, nombre: string, p: { fecha: string; equipo: string; rival: string; lugar: string | null }) =>
+    `https://wa.me/${tel.replace(/[^\d]/g, "").replace(/^(?!34)(\d{9})$/, "34$1")}?text=${encodeURIComponent(`Hola ${nombre.split(" ")[0]}! Te confirmo la mesa: ${textoPartido(p)}. ¡Gracias!`)}`;
 
   return (
     <div className="space-y-5">
@@ -57,7 +65,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
         <span className="font-semibold">Enlace para apuntarse:</span>
         <code className="min-w-0 flex-1 truncate rounded bg-suave px-2 py-1 text-xs">{enlace}</code>
         <Copiar texto={enlace} etiqueta="Copiar enlace" />
-        <Copiar texto={invitacion} etiqueta="Mensaje para WhatsApp" />
+        <Copiar texto={invitacion} etiqueta="Mensaje de esta semana para WhatsApp" />
         <form action={nuevoEnlace}><Enviar className="btn-secundario !py-1 text-xs">Cambiar enlace</Enviar></form>
       </section>
 
@@ -117,6 +125,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
                       <li key={a.id} className="flex items-center gap-2 rounded bg-green-50 px-2 py-1">
                         <Check size={14} className="text-green-700" />
                         <span className="flex-1">{a.mesa_personas?.nombre} {a.mesa_personas?.telefono && <a href={`tel:${a.mesa_personas.telefono}`} className="text-xs text-tinta/50">{a.mesa_personas.telefono}</a>}</span>
+                        {a.mesa_personas?.telefono && <a href={whatsapp(a.mesa_personas.telefono, a.mesa_personas.nombre, p)} target="_blank" rel="noopener noreferrer" title="Avisarle por WhatsApp" className="rounded bg-green-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">WhatsApp</a>}
                         <form action={desconfirmar}><input type="hidden" name="id" value={a.id} /><button title="Quitar la confirmación" className="text-tinta/50 hover:text-tinta"><Undo2 size={15} /></button></form>
                         <form action={quitar}><input type="hidden" name="id" value={a.id} /><button title="Quitar de la mesa" className="text-tinta/50 hover:text-red-700"><X size={15} /></button></form>
                       </li>

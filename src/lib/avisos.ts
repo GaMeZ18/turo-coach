@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO, fechaCorta, hora, hoyLocal } from "./fechas";
 import { lunesDe, sumarDias } from "./pistas";
 import { partidosDeCasa } from "./mesas";
-import { notificarPerfiles } from "./notificar";
+import { notificarPerfiles, notificarPersonasMesa } from "./notificar";
 
 // Recordatorios automáticos (Supabase llama a /api/avisos cada 15 minutos).
 // Cada aviso tiene una clave: si ya se mandó, no se repite aunque se vuelva a lanzar.
@@ -98,6 +98,20 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
         faltan.length ? `Faltan ${personas} persona${personas > 1 ? "s" : ""} para las mesas del finde` : "Mesas del finde completas",
         faltan.length ? faltan.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} ${p.equipo} (${conf(p.id)}/${p.plazas})`).join(" · ") : `Las ${partidos.length} mesas tienen a su gente.`,
         `/mesas?semana=${lunes}`));
+    }
+  }
+
+  // 5) 1 hora antes de cada partido → a quien hace la mesa (si activó los avisos desde el enlace)
+  const enUnaHora = await partidosDeCasa(db, new Date(ahora).toISOString(), new Date(ahora + 65 * MIN).toISOString());
+  if (enUnaHora.length) {
+    const [{ data: aR }, { data: cfg }] = await Promise.all([
+      db.from("mesa_asignaciones").select("id, partido_id, persona_id").eq("estado", "confirmado").in("partido_id", enUnaHora.map((p) => p.id)),
+      db.from("mesa_config").select("token").maybeSingle(),
+    ]);
+    for (const a of (aR ?? []) as { id: string; partido_id: string; persona_id: string }[]) {
+      const p = enUnaHora.find((x) => x.id === a.partido_id)!;
+      await unaVez(`mesa1h:${a.id}`, () => notificarPersonasMesa(db, [a.persona_id], `Mesa a las ${hora(p.fecha)}`,
+        `${p.equipo} vs ${p.rival}${p.lugar ? ` · ${p.lugar}` : ""}. ¡Gracias por echar una mano!`, cfg?.token ? `/apuntarse-mesa/${cfg.token}` : "/"));
     }
   }
 

@@ -62,3 +62,29 @@ export function plazoMesa(fechaPartido: string): string {
   return corte < fechaPartido ? corte : fechaPartido;
 }
 export const abierta = (fechaPartido: string, ahora = new Date().toISOString()) => ahora < plazoMesa(fechaPartido);
+
+/** Datos de un partido de mesa (de la federación o añadido a mano), para los avisos */
+export async function partidoMesa(db: SupabaseClient, id: string): Promise<{ fecha: string; equipo: string; rival: string; lugar: string | null } | null> {
+  const { data: a } = await db.from("partidos").select("fecha, rival, lugar, equipos(nombre)").eq("id", id).maybeSingle();
+  if (a) return { fecha: a.fecha, rival: a.rival, lugar: a.lugar, equipo: (a.equipos as unknown as { nombre: string } | null)?.nombre ?? "" };
+  const { data: b } = await db.from("mesa_partidos").select("fecha, rival, lugar, equipo_nombre").eq("id", id).maybeSingle();
+  return b ? { fecha: b.fecha, rival: b.rival, lugar: b.lugar, equipo: b.equipo_nombre } : null;
+}
+
+/** Texto corto de un partido: «sáb 14 nov 10:00 · INFANTIL A vs Rival (Pista)» */
+export function textoPartido(p: { fecha: string; equipo: string; rival: string; lugar: string | null }) {
+  const cuando = new Date(p.fecha).toLocaleString("es-ES", { timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `${cuando} · ${p.equipo} vs ${p.rival}${p.lugar ? ` (${p.lugar})` : ""}`;
+}
+
+/** Semana que enseña el enlace público: la indicada, o la actual (desde el sábado, también la siguiente) */
+export function rangoPublico(semana: string | undefined, hoy: string, lunesDe: (d: string) => string, sumarDias: (d: string, n: number) => string) {
+  if (semana && /^\d{4}-\d{2}-\d{2}$/.test(semana)) {
+    const l = lunesDe(semana);
+    return { desde: aISO(l, "00:00"), hasta: aISO(sumarDias(l, 7), "00:00"), lunes: l };
+  }
+  const l = lunesDe(hoy);
+  const dow = new Date(`${hoy}T12:00:00Z`).getUTCDay();
+  const finde = dow === 6 || dow === 0;
+  return { desde: aISO(l, "00:00"), hasta: aISO(sumarDias(l, finde ? 14 : 7), "00:00"), lunes: l };
+}

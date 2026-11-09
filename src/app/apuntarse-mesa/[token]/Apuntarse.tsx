@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Clock, Loader2, X } from "lucide-react";
-import { apuntarse, desapuntarse, misMesas, type MiMesa } from "./actions";
+import { Bell, Check, Clock, Loader2, X } from "lucide-react";
+import { apuntarse, desapuntarse, guardarAvisoMesa, misMesas, type MiMesa } from "./actions";
+import { activarPush, ayudaPush, estadoPush, type EstadoPush } from "@/lib/push-cliente";
 
 type P = { id: string; fecha: string; equipo: string; rival: string; lugar: string | null; confirmados: number; plazo: string; plazas: number; manual: boolean };
 const TZ = "Europe/Madrid";
@@ -10,7 +11,7 @@ const dia = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { timeZon
 const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 const CLAVE = "mesas-turo-yo";
 
-export default function Apuntarse({ token, partidos }: { token: string; partidos: P[] }) {
+export default function Apuntarse({ token, partidos, clavePublica }: { token: string; partidos: P[]; clavePublica: string }) {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
@@ -87,7 +88,58 @@ export default function Apuntarse({ token, partidos }: { token: string; partidos
         </button>
       )}
       {msg && <p className={`text-sm ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.t}</p>}
+      {mias.length > 0 && <AvisosMesa token={token} telefono={telefono} clavePublica={clavePublica} />}
       <p className="text-xs text-tinta/50">Hasta el viernes te puedes borrar tú (también si ya estás confirmado). Después del viernes, si te surge una urgencia, avisa al gestor de mesas para que ponga a otra persona.</p>
+    </div>
+  );
+}
+
+/** Avisos en el móvil: cuando el gestor te confirma y 1 hora antes del partido */
+function AvisosMesa({ token, telefono, clavePublica }: { token: string; telefono: string; clavePublica: string }) {
+  const [estado, setEstado] = useState<EstadoPush | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const guardar = (s: { endpoint: string; p256dh: string; auth: string }) => guardarAvisoMesa(token, telefono, s);
+  useEffect(() => {
+    estadoPush().then(async (e) => {
+      // Si este móvil ya tiene avisos (o permiso), se asocian a esta persona sin preguntar
+      if (e === "activo" || (e === "inactivo" && Notification.permission === "granted")) {
+        const r = await activarPush(clavePublica, false, guardar);
+        setEstado(r.ok ? "activo" : e);
+      } else setEstado(e);
+    }).catch(() => setEstado("no-soportado"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telefono]);
+  if (!estado) return null;
+  const activar = async () => {
+    setOcupado(true); setMsg(null);
+    const r = await activarPush(clavePublica, true, guardar);
+    setOcupado(false);
+    if (r.estado) setEstado(r.estado);
+    setMsg(r.ok ? "Listo: te avisaremos en este móvil." : r.error ?? null);
+  };
+  const ayuda = ayudaPush(estado);
+  return (
+    <div className="tarjeta flex items-start gap-3 p-3 text-sm">
+      <Bell size={18} className="mt-0.5 shrink-0 text-azul" />
+      <div className="min-w-0 flex-1">
+        {estado === "activo" ? (
+          <p className="text-green-700">Avisos activados: te llegará un aviso cuando te confirmen y 1 hora antes del partido.</p>
+        ) : estado === "inactivo" || estado === "denegado" ? (
+          <>
+            <p className="font-semibold">¿Quieres que te avisemos en el móvil?</p>
+            <p className="text-tinta/70">Cuando el gestor te confirme y 1 hora antes del partido.</p>
+            <button type="button" onClick={activar} disabled={ocupado} className="btn-primario mt-2 !py-1.5">{ocupado ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />} Activar avisos</button>
+            {estado === "denegado" && ayuda && <p className="mt-1 text-xs text-tinta/60">{ayuda.texto}</p>}
+          </>
+        ) : ayuda && (
+          <>
+            <p className="font-semibold">{ayuda.titulo}</p>
+            <p className="text-tinta/70">{ayuda.texto.replace("activa los avisos", "pulsa «Activar avisos» aquí abajo")}</p>
+          </>
+        )}
+        {msg && <p className="mt-1 text-xs text-tinta/70">{msg}</p>}
+      </div>
     </div>
   );
 }

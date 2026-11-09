@@ -2,6 +2,13 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Mensaje de esta semana para WhatsApp": "Missatge d'aquesta setmana per a WhatsApp",
+ "Avisarle por WhatsApp": "Avisar-lo per WhatsApp",
+ "¿Quieres que te avisemos en el móvil?": "Vols que t'avisem al mòbil?",
+ "Cuando el gestor te confirme y 1 hora antes del partido.": "Quan el gestor et confirmi i 1 hora abans del partit.",
+ "Avisos activados: te llegará un aviso cuando te confirmen y 1 hora antes del partido.": "Avisos activats: et arribarà un avís quan et confirmin i 1 hora abans del partit.",
+ "Listo: te avisaremos en este móvil.": "Fet: t'avisarem en aquest mòbil.",
+ "Primero apúntate a algún partido con tu teléfono.": "Primer apunta't a algun partit amb el teu telèfon.",
  "En iPhone los avisos solo llegan con la app instalada. En Safari, pulsa Compartir (el cuadrado con la flecha) → «Añadir a pantalla de inicio» → Añadir. Después ábrela desde el icono y activa los avisos.": "A l'iPhone els avisos només arriben amb l'app instal·lada. A Safari, prem Comparteix (el quadrat amb la fletxa) → «Afegeix a la pantalla d'inici» → Afegeix. Després obre-la des de la icona i activa els avisos.",
  "Ábrela en Safari": "Obre-la a Safari",
  "Desde este navegador no se puede instalar. Copia la dirección, ábrela en Safari, pulsa Compartir → «Añadir a pantalla de inicio» y ábrela desde el icono.": "Des d'aquest navegador no es pot instal·lar. Copia l'adreça, obre-la a Safari, prem Comparteix → «Afegeix a la pantalla d'inici» i obre-la des de la icona.",
@@ -938,6 +945,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Semana del {}", "Setmana del {}"],
  ["Partidos de casa · {} personas por mesa · {} por persona · Los añadidos a mano: 1 persona, la pagan los jugadores", "Partits de casa · {} persones per taula · {} per persona · Els afegits a mà: 1 persona, la paguen els jugadors"],
  ["¿Borrar {} vs {}?", "Esborrar {} vs {}?"],
  ["Paso {} listo. Ahora grabas el paso {}.", "Pas {} fet. Ara graves el pas {}."],

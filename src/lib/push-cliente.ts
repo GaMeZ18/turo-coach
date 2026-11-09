@@ -24,7 +24,7 @@ export function infoDispositivo() {
   return { ios, versionIos, instalada, otraApp, soporta };
 }
 
-/** En qué situación está este dispositivo */
+/** En qué situación está este dispositivo (instalada: también vale abrir la web instalada desde el icono) */
 export async function estadoPush(): Promise<EstadoPush> {
   const d = infoDispositivo();
   if (d.ios && !d.instalada) return d.otraApp ? "abrir-safari" : d.versionIos !== null && d.versionIos < 16.4 ? "actualizar-ios" : "instalar-ios";
@@ -59,7 +59,8 @@ async function registro() {
 }
 
 /** Suscribe este dispositivo. pedir=true solo al tocar el botón (Safari exige un toque para pedir permiso). */
-export async function activarPush(clavePublica: string, pedir = true): Promise<{ ok?: boolean; error?: string; estado?: EstadoPush }> {
+type Guardar = (s: { endpoint: string; p256dh: string; auth: string }) => Promise<{ error?: string } | undefined | void>;
+export async function activarPush(clavePublica: string, pedir = true, guardar: Guardar = guardarSuscripcion): Promise<{ ok?: boolean; error?: string; estado?: EstadoPush }> {
   try {
     if (Notification.permission !== "granted") {
       if (!pedir) return { estado: "inactivo" };
@@ -72,7 +73,7 @@ export async function activarPush(clavePublica: string, pedir = true): Promise<{
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(clavePublica) });
     const j = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
     if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) return { error: "El navegador no ha dado los datos de la suscripción. Prueba otra vez." };
-    const r = await guardarSuscripcion({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+    const r = await guardar({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
     if (r?.error) return { error: r.error };
     return { ok: true, estado: "activo" };
   } catch (e) {

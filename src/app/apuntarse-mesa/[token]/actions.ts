@@ -71,3 +71,14 @@ export async function desapuntarse(token: string, telefono: string, asignacion: 
   await c.db.from("mesa_asignaciones").delete().eq("id", asignacion).eq("persona_id", p.id);
   return misMesas(token, tel);
 }
+
+/** Activar avisos en este móvil para esa persona (se identifica por su teléfono) */
+export async function guardarAvisoMesa(token: string, telefono: string, sub: { endpoint: string; p256dh: string; auth: string }): Promise<{ error?: string }> {
+  const c = await conEnlace(token);
+  if (!c) return { error: "Este enlace ya no es válido." };
+  const tel = normalizarTelefono(telefono);
+  const { data: p } = await c.db.from("mesa_personas").select("id").eq("telefono", tel).maybeSingle();
+  if (!p) return { error: "Primero apúntate a algún partido con tu teléfono." };
+  const { error } = await c.db.from("mesa_push").upsert({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, persona_id: p.id });
+  return error ? { error: "No se ha podido guardar. Prueba otra vez." } : {};
+}
