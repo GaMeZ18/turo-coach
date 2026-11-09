@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
-import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA, yaHayMismoNombre } from "@/lib/mesas";
+import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA, semanaCompleta, yaHayMismoNombre } from "@/lib/mesas";
+import { notificarPerfiles } from "@/lib/notificar";
+import { lunesDe, sumarDias } from "@/lib/pistas";
 import { notificarPersonasMesa } from "@/lib/notificar";
 import { adminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -14,6 +16,26 @@ async function gestor() {
   return createClient();
 }
 const refrescar = () => { revalidatePath("/mesas"); revalidatePath("/mesas/pagos"); };
+
+/** Si con esta confirmación ya están todas las mesas de la semana, avisa al gestor para mandar el resumen al grupo */
+async function avisarSiCompleta(partidoId: string) {
+  try {
+    const db = adminClient();
+    if (!db) return;
+    const f = await fechaPartidoMesa(db, partidoId);
+    if (!f) return;
+    const lunes = lunesDe(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(f.fecha)));
+    const { completa, partidos } = await semanaCompleta(db, { desde: aISO(lunes, "00:00"), hasta: aISO(sumarDias(lunes, 7), "00:00") });
+    if (!completa) return;
+    const { error } = await db.from("avisos_enviados").insert({ clave: `mesascompletas:${lunes}:${partidos.length}` });
+    if (error) return; // ya avisado
+    const { data: pf } = await db.from("perfiles").select("id, rol, gestor_mesas");
+    const todos = (pf ?? []) as { id: string; rol: string; gestor_mesas: boolean | null }[];
+    const g = todos.filter((p) => p.rol === "gestor_mesas" || p.gestor_mesas).map((p) => p.id);
+    await notificarPerfiles(db, g.length ? g : todos.filter((p) => p.rol === "coordinador").map((p) => p.id),
+      "✅ Todas las mesas de la semana confirmadas", `${partidos.length} mesa${partidos.length > 1 ? "s" : ""}. Toca para copiar el resumen y mandarlo al grupo de WhatsApp.`, `/mesas?semana=${lunes}#resumen`, null, true);
+  } catch {}
+}
 
 /** Avisa al móvil de la persona (si activó los avisos desde el enlace) */
 async function avisarPersona(_db: SupabaseClient, asignacionId: string, tipo: "confirmada" | "quitada") {
@@ -43,6 +65,7 @@ export async function confirmar(fd: FormData) {
   const { error } = await db.from("mesa_asignaciones").update({ estado: "confirmado" }).eq("id", id);
   if (error) throw new Error(error.message);
   await avisarPersona(db, id, "confirmada");
+  await avisarSiCompleta(partido);
   refrescar();
 }
 
@@ -93,7 +116,7 @@ export async function asignar(fd: FormData) {
     { onConflict: "partido_id,persona_id" });
   if (error) throw new Error(error.message);
   const { data: nueva } = await db.from("mesa_asignaciones").select("id, estado").eq("partido_id", partido).eq("persona_id", persona).maybeSingle();
-  if (nueva?.estado === "confirmado") await avisarPersona(db, nueva.id, "confirmada");
+  if (nueva?.estado === "confirmado") { await avisarPersona(db, nueva.id, "confirmada"); await avisarSiCompleta(partido); }
   refrescar();
 }
 

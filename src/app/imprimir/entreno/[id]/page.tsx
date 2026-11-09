@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaLarga, hora } from "@/lib/fechas";
+import { normalizar } from "@/components/pizarra/modelo";
 import MiniPizarra from "@/components/pizarra/Mini";
 import BotonImprimir from "./Imprimir";
 import AsistenciaHoja from "./AsistenciaHoja";
@@ -11,6 +12,17 @@ type Act = {
 };
 
 export const metadata = { title: "Entreno · Coach Manager CBTuró" };
+
+/** Pasos para el PDF: un dibujo por fotograma (si hay muchos, se juntan de 2 en 2 o más para que quepan en 9) */
+function pasosDe(pizarra: unknown): [number, number][] {
+  if (!pizarra) return [];
+  const n = normalizar(pizarra).fotogramas.length;
+  if (n < 2) return [];
+  const grupo = Math.ceil(n / 9);
+  const r: [number, number][] = [];
+  for (let i = 0; i < n; i += grupo) r.push([i, Math.min(n, i + grupo)]);
+  return r;
+}
 
 export default async function ImprimirEntreno({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -68,9 +80,9 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                 <span className="flex-1 font-semibold">{i + 1}. {a.titulo ?? ej?.titulo ?? a.tipo}</span>
                 <span className="text-sm font-semibold tabular-nums">{a.duracion}′</span>
               </div>
-              {ej && (
+              {ej && (() => { const pasos = pasosDe(ej.pizarra); return (<>
                 <div className="mt-2 flex gap-3">
-                  {(ej.preview || ej.pizarra) ? (
+                  {!pasos.length && (ej.preview || ej.pizarra) ? (
                     <div className="w-48 shrink-0 overflow-hidden rounded border border-linea">
                       {ej.preview ? <img src={ej.preview} alt="" className="w-full" /> : <MiniPizarra pizarra={ej.pizarra} className="w-full" />}
                     </div>
@@ -82,7 +94,18 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                     {ej.material && <p><strong>Material:</strong> {ej.material}</p>}
                   </div>
                 </div>
-              )}
+                {pasos.length > 0 && (
+                  // La jugada paso a paso: cada dibujo, con los jugadores donde están en ese momento y solo sus movimientos
+                  <div className={`mt-2 grid gap-2 ${pasos.length === 1 ? "grid-cols-2" : "grid-cols-3"}`}>
+                    {pasos.map((r, k) => (
+                      <figure key={k} className="break-inside-avoid overflow-hidden rounded border border-linea">
+                        <MiniPizarra pizarra={ej.pizarra} pasos={r} className="w-full" />
+                        <figcaption className="border-t border-linea px-1.5 py-0.5 text-[10px] font-semibold text-tinta/70">Paso {k + 1}{r[1] - r[0] > 1 ? ` (${r[0] + 1}–${r[1]})` : ""}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                )}
+              </>); })()}
               {a.notas && <p className="mt-1 whitespace-pre-line text-xs"><strong>{ej ? "Variantes y notas" : "Notas"}:</strong> {a.notas}</p>}
             </li>
           );

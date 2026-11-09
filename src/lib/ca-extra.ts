@@ -2,6 +2,17 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Marcar como hecho": "Marcar com a fet",
+ "Hecho (toca para desmarcar)": "Fet (toca per desmarcar)",
+ "Físico fuera de pista al empezar (min)": "Físic fora de pista en començar (min)",
+ "Aplicar también a los próximos entrenos de este equipo a la misma hora": "Aplicar també als propers entrenaments d'aquest equip a la mateixa hora",
+ "Quién ha faltado a los entrenos este mes. Las justificadas no bajan el % de asistencia.": "Qui ha faltat als entrenaments aquest mes. Les justificades no fan baixar el % d'assistència.",
+ "Nadie ha faltado este mes. 👏": "Ningú ha faltat aquest mes. 👏",
+ "Todavía no se ha pasado lista este mes.": "Encara no s'ha passat llista aquest mes.",
+ "sin faltas": "sense faltes",
+ "✅ Todas las mesas confirmadas: manda el resumen al grupo": "✅ Totes les taules confirmades: envia el resum al grup",
+ "✅ Todas las mesas de esta semana están confirmadas": "✅ Totes les taules d'aquesta setmana estan confirmades",
+ "Ver resumen para WhatsApp ↓": "Veure el resum per a WhatsApp ↓",
  "Mi mesa": "La meva taula",
  "Estás confirmado/a: haces esta mesa": "Estàs confirmat/da: fas aquesta taula",
  "Estás apuntado/a, pendiente de que el gestor te confirme": "Estàs apuntat/da, pendent que el gestor et confirmi",
@@ -1055,6 +1066,9 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Faltas de {}", "Faltes de {}"],
+ ["{} con faltas · lista {}/{}", "{} amb faltes · llista {}/{}"],
+ ["Paso {}", "Pas {}"],
  ["📋 Pasa lista · {}", "📋 Passa llista · {}"],
  ["Enlace de la semana del {}:", "Enllaç de la setmana del {}:"],
  ["{} de {} personas reciben los avisos en algún dispositivo. Los que no, solo los ven al abrir la app.", "{} de {} persones reben els avisos en algun dispositiu. Els que no, només els veuen en obrir l'app."],

@@ -1,6 +1,6 @@
 // Dibujo estático y ligero de una pizarra (para las tarjetas de la biblioteca), en SVG.
 // Sirve en servidor: no usa el editor.
-import { esJugador, estados, normalizar, type Punto } from "./modelo";
+import { aspectoEn, esJugador, estados, normalizar, visibleEn, type Punto } from "./modelo";
 
 const AZUL = "#002b8e", ROJO = "#ca010c", NARANJA = "#fc6401";
 
@@ -54,9 +54,15 @@ function Pista({ escudo = true }: { escudo?: boolean }) {
   );
 }
 
-export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unknown; className?: string }) {
+/** pasos: [desde, hasta) dibuja solo esos fotogramas, con los jugadores donde están al empezar el primero
+ *  (para enseñar la jugada paso a paso en el PDF). Sin pasos: todo el ejercicio sobre la posición inicial. */
+export default function MiniPizarra({ pizarra, className = "", pasos }: { pizarra: unknown; className?: string; pasos?: [number, number] }) {
   const p = normalizar(pizarra);
   const est = estados(p);
+  const k0 = pasos ? Math.max(0, Math.min(pasos[0], p.fotogramas.length)) : 0;
+  const k1 = pasos ? Math.max(k0, Math.min(pasos[1], p.fotogramas.length)) : p.fotogramas.length;
+  const posIni: Record<string, Punto> = pasos ? (est[k0]?.pos ?? p.inicial) : p.inicial;
+  const poseedor: Record<string, string> = (pasos ? est[k0]?.poseedor : p.poseedor) ?? {};
   const vista = p.vista;
   // Pista → dibujo: media ofensiva vertical con la canasta arriba; defensiva con la canasta abajo
   const T = (q: Punto): [number, number] =>
@@ -88,7 +94,7 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
       {vista !== "completa" && <image href="/marca/escudo-128.png" x={15 - 0.35 - 1.3} y={0.3} width={1.3} height={1.5} opacity={0.9} />}
 
       {/* Movimientos y pases */}
-      {p.fotogramas.map((f, k) => (
+      {p.fotogramas.map((f, k) => (k < k0 || k >= k1) ? null : (
         <g key={k}>
           {f.movimientos.map((m, i) => {
             if (m.puntos.length < 4) return null;
@@ -97,7 +103,8 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
             const prev = T({ x: m.puntos[n - 4], y: m.puntos[n - 3] });
             const ang = Math.atan2(fin[1] - prev[1], fin[0] - prev[0]);
             // Los defensores, en rojo y más finos: así se distingue la jugada del ataque de cómo se mueve la defensa
-            const def = tipoDe.get(m.elementoId) === "defensor";
+            const el0 = p.elementos.find((x) => x.id === m.elementoId);
+            const def = (el0 ? aspectoEn(el0, k).tipo : tipoDe.get(m.elementoId)) === "defensor";
             return (
               <g key={i} opacity={def ? 0.75 : 1}>
                 <polyline points={linea(m.puntos)} fill="none" stroke={def ? "#ca010c" : "#1f2937"} strokeWidth={def ? "0.06" : "0.09"}
@@ -129,14 +136,16 @@ export default function MiniPizarra({ pizarra, className = "" }: { pizarra: unkn
       ))}
 
       {/* Elementos en su posición inicial */}
-      {p.elementos.map((e) => {
-        const q = p.inicial[e.id];
+      {p.elementos.map((e0) => {
+        if (!visibleEn(e0, k0)) return null;
+        const e = aspectoEn(e0, k0);
+        const q = posIni[e.id];
         if (!q) return null;
-        if (e.tipo === "balon" && Object.values(p.poseedor).length && p.poseedor[e.id]) return null;
+        if (e.tipo === "balon" && Object.values(poseedor).length && poseedor[e.id]) return null;
         const [x, y] = T(q);
         if (esJugador(e.tipo)) {
           const c = e.color || (e.tipo === "defensor" ? ROJO : e.tipo === "entrenador" ? "#1f2937" : AZUL);
-          const conBalon = Object.entries(p.poseedor).some(([, j]) => j === e.id);
+          const conBalon = Object.entries(poseedor).some(([, j]) => j === e.id);
           const balon = conBalon && <circle cx={x + r * 0.85} cy={y - r * 0.85} r={r * 0.42} fill={NARANJA} stroke="#7a2c00" strokeWidth="0.05" />;
           // Mismo dibujo que en la pizarra: atacante = círculo blanco con número; defensor = X
           if (e.tipo === "defensor") {

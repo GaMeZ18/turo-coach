@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
-import { partidosDeCasa, euros, POR_MESA, textoPartido, detalleMesa, type Asignacion } from "@/lib/mesas";
+import { partidosDeCasa, euros, POR_MESA, textoPartido, detalleMesa, resumenMesas, type Asignacion } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
 import Copiar from "./Copiar";
 import { alternarEfectivo, alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
@@ -38,8 +38,8 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const conf = (id: string) => asig.filter((a) => a.partido_id === id && a.estado === "confirmado");
   const cand = (id: string) => asig.filter((a) => a.partido_id === id && a.estado === "candidato");
   const completas = deClub.filter((p) => conf(p.id).length >= p.plazas).length;
-  const resumen = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
-    ...deClub.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} · ${p.equipo} vs ${p.rival}\n   👉 ${conf(p.id).map((a) => a.mesa_personas?.nombre).join(" y ") || "¡FALTA GENTE!"}`)].join("\n");
+  const resumen = resumenMesas(fechaCorta(desde), deClub, (id) => conf(id).map((a) => a.mesa_personas?.nombre ?? "").filter(Boolean));
+  const todasCompletas = deClub.length > 0 && completas === deClub.length;
   // Mensaje de la semana que se está viendo: solo esos partidos, y el enlace abre esa semana
   const enlaceSemana = `${enlace}?semana=${lunes}`;
   const pendientes = deClub.filter((p) => conf(p.id).length < p.plazas && p.fecha > new Date().toISOString());
@@ -69,6 +69,12 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
         <form action={nuevoEnlace}><Enviar className="btn-secundario !py-1 text-xs">Cambiar enlace</Enviar></form>
       </section>
 
+      {todasCompletas && (
+        <a href="#resumen" className="tarjeta flex items-center justify-between gap-2 bg-green-50 p-3 text-sm ring-1 ring-green-300">
+          <span className="font-semibold text-green-800">✅ Todas las mesas de esta semana están confirmadas</span>
+          <span className="text-green-800 underline">Ver resumen para WhatsApp ↓</span>
+        </a>
+      )}
       <div className="flex items-center gap-2">
         <Link href={`?semana=${sumarDias(lunes, -7)}`} className="btn-secundario !px-2" aria-label="Semana anterior"><ChevronLeft size={18} /></Link>
         <div className="flex-1 text-center">
@@ -169,9 +175,9 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
       </div>
 
       {deClub.length > 0 && (
-        <section className="tarjeta p-3 text-sm">
+        <section id="resumen" className={`tarjeta scroll-mt-28 p-3 text-sm ${todasCompletas ? "ring-2 ring-green-400" : ""}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-semibold">Mesas de la semana para mandar al grupo</p>
+            <p className="font-semibold">{todasCompletas ? "✅ Todas las mesas confirmadas: manda el resumen al grupo" : "Mesas de la semana para mandar al grupo"}</p>
             <Copiar texto={resumen} etiqueta="Copiar para WhatsApp" />
           </div>
           <pre className="mt-2 whitespace-pre-wrap rounded bg-suave p-2 text-xs">{resumen}</pre>

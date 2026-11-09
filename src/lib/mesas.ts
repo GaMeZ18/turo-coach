@@ -126,3 +126,31 @@ export async function yaHayMismoNombre(db: SupabaseClient, partidos: string[], n
   return new Set(((data ?? []) as unknown as { partido_id: string; persona_id: string; mesa_personas: { nombre: string } | null }[])
     .filter((a) => a.persona_id !== personaId && nombreClave(a.mesa_personas?.nombre ?? "") === clave).map((a) => a.partido_id));
 }
+
+/** Resumen de las mesas de una semana para el grupo de WhatsApp: por días, con hora, sitio y quién la hace */
+export function resumenMesas(lunesTexto: string, partidos: PartidoMesa[], quien: (partidoId: string) => string[]) {
+  const TZ = "Europe/Madrid";
+  const lin: string[] = [`🏀 *Mesas CB Turó* · semana del ${lunesTexto}`];
+  let diaPrevio = "";
+  for (const p of [...partidos].filter((x) => !x.federada).sort((a, b) => a.fecha.localeCompare(b.fecha))) {
+    const d = new Date(p.fecha);
+    const dia = d.toLocaleDateString("es-ES", { timeZone: TZ, weekday: "long", day: "numeric", month: "short" });
+    if (dia !== diaPrevio) { lin.push("", `*${dia.charAt(0).toUpperCase()}${dia.slice(1)}*`); diaPrevio = dia; }
+    const h = (x: Date) => x.toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+    const gente = quien(p.id);
+    lin.push(`⏰ ${h(d)} · ${p.equipo} vs ${p.rival}`);
+    lin.push(`📍 ${p.lugar || "Pista por confirmar"}`);
+    lin.push(gente.length >= p.plazas ? `👉 ${gente.join(" y ")} (a las ${h(new Date(d.getTime() - LLEGAR_ANTES * 60000))})` : `⚠️ ${gente.length ? `${gente.join(" y ")} · ` : ""}FALTA ${p.plazas - gente.length} PERSONA${p.plazas - gente.length > 1 ? "S" : ""}`);
+  }
+  lin.push("", `Recordad llegar ${LLEGAR_ANTES} min antes. Cualquier problema, por este grupo. ¡Gracias! 🙌`);
+  return lin.join("\n");
+}
+
+/** ¿Están completas todas las mesas del club de esa semana? (y cuántas hay) */
+export async function semanaCompleta(db: SupabaseClient, lunesISO: { desde: string; hasta: string }) {
+  const partidos = (await partidosDeCasa(db, lunesISO.desde, lunesISO.hasta)).filter((p) => !p.federada);
+  if (!partidos.length) return { completa: false, partidos };
+  const { data } = await db.from("mesa_asignaciones").select("partido_id").eq("estado", "confirmado").in("partido_id", partidos.map((p) => p.id));
+  const n = (id: string) => ((data ?? []) as { partido_id: string }[]).filter((a) => a.partido_id === id).length;
+  return { completa: partidos.every((p) => n(p.id) >= p.plazas), partidos };
+}

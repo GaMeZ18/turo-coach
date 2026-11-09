@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { requireUser } from "@/lib/supabase/server";
-import { equipoActivo, equiposDeTemporada } from "@/lib/equipo-activo";
+import { equipoActivo, equiposDeTemporada, misEquipos } from "@/lib/equipo-activo";
+import { aISO, fechaCorta } from "@/lib/fechas";
 import { colorEquipo } from "@/lib/colores";
 import { TZ, diaInput, hora, hoyLocal } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
@@ -105,6 +106,35 @@ export default async function CalendarioPage({
     items.push({ id: `c-${x.jugadores!.id}`, dia: `${mes}-${f.slice(8, 10)}`, hora: null, tipo: "cumple", titulo: `🎂 ${x.jugadores!.nombre} (${anos})` });
   }
   items.sort((a, b) => (a.dia + (a.hora ?? "")).localeCompare(b.dia + (b.hora ?? "")));
+
+  // ---- Faltas del mes en mis equipos (las justificadas no bajan el %) ----
+  const { equipos: mios } = await misEquipos(supabase);
+  const eqFaltas = !verTodo && equipo ? [equipo] : filtro ? delClub.filter((e) => e.id === filtro) : mios;
+  const inicioMes = aISO(`${mes}-01`, "00:00"), finMes = aISO(`${mesSiguiente}-01`, "00:00");
+  const { data: entMes } = eqFaltas.length
+    ? await supabase.from("entrenamientos").select("id, fecha, equipo_id").in("equipo_id", eqFaltas.map((e) => e.id)).gte("fecha", inicioMes).lt("fecha", finMes)
+    : { data: [] };
+  const entMesL = (entMes ?? []) as { id: string; fecha: string; equipo_id: string }[];
+  const { data: asisMes } = entMesL.length
+    ? await supabase.from("asistencias").select("entrenamiento_id, estado, motivo, jugadores(id, nombre, apellidos)").in("entrenamiento_id", entMesL.map((e) => e.id))
+    : { data: [] };
+  type FilaAsis = { entrenamiento_id: string; estado: string; motivo: string | null; jugadores: { id: string; nombre: string; apellidos: string | null } | null };
+  const faltas = eqFaltas.map((eq) => {
+    const ents = new Map(entMesL.filter((e) => e.equipo_id === eq.id).map((e) => [e.id, e.fecha]));
+    const filas = ((asisMes ?? []) as unknown as FilaAsis[]).filter((a) => ents.has(a.entrenamiento_id));
+    const cuentan = filas.filter((a) => a.estado !== "justificado");
+    const pc = cuentan.length ? Math.round((cuentan.filter((a) => a.estado === "presente" || a.estado === "tarde").length / cuentan.length) * 100) : null;
+    const porJugador = new Map<string, { nombre: string; faltas: { fecha: string; estado: string; motivo: string | null }[] }>();
+    for (const a of filas) {
+      if (!a.jugadores || a.estado === "presente" || a.estado === "tarde") continue;
+      const j = porJugador.get(a.jugadores.id) ?? { nombre: `${a.jugadores.nombre} ${a.jugadores.apellidos ?? ""}`.trim(), faltas: [] };
+      j.faltas.push({ fecha: ents.get(a.entrenamiento_id)!, estado: a.estado, motivo: a.motivo });
+      porJugador.set(a.jugadores.id, j);
+    }
+    const jugadores = [...porJugador.values()].map((j) => ({ ...j, faltas: j.faltas.sort((x, y) => x.fecha.localeCompare(y.fecha)) })).sort((a, b) => b.faltas.length - a.faltas.length);
+    const conLista = new Set(filas.map((a) => a.entrenamiento_id)).size;
+    return { eq, pc, jugadores, entrenos: ents.size, conLista };
+  }).filter((f) => f.entrenos > 0);
   const porDia = new Map<string, Item[]>();
   for (const it of items) porDia.set(it.dia, [...(porDia.get(it.dia) ?? []), it]);
 
@@ -277,6 +307,41 @@ export default async function CalendarioPage({
           {!equipo && !esCoord && <p className="text-xs text-tinta/50">Elige un equipo arriba para crear eventos.</p>}
         </form>
       </div>
+      {faltas.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-semibold capitalize">Faltas de {nombreMes}</h2>
+          <p className="text-xs text-tinta/50">Quién ha faltado a los entrenos este mes. Las justificadas no bajan el % de asistencia.</p>
+          <div className="mt-2 grid gap-3 md:grid-cols-2">
+            {faltas.map((f) => (
+              <details key={f.eq.id} className="tarjeta p-3 text-sm" open={faltas.length <= 2}>
+                <summary className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="font-semibold">{f.eq.nombre}</span>
+                  <span className="flex items-center gap-2 text-xs text-tinta/60">
+                    {f.pc !== null && <span className={`rounded-full px-2 py-0.5 font-semibold ${f.pc >= 85 ? "bg-green-100 text-green-800" : f.pc >= 70 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"}`}>{f.pc}%</span>}
+                    {f.jugadores.length ? `${f.jugadores.length} con faltas` : "sin faltas"} · lista {f.conLista}/{f.entrenos}
+                  </span>
+                </summary>
+                {f.jugadores.length > 0 ? (
+                  <ul className="mt-2 divide-y divide-linea">
+                    {f.jugadores.map((j) => (
+                      <li key={j.nombre} className="py-1.5">
+                        <p className="flex justify-between gap-2"><span className="font-medium">{j.nombre}</span><span className="text-xs text-tinta/60">{j.faltas.length} falta{j.faltas.length > 1 ? "s" : ""}</span></p>
+                        <p className="mt-0.5 flex flex-wrap gap-1">
+                          {j.faltas.map((x, i) => (
+                            <span key={i} title={x.motivo ?? undefined} className={`rounded px-1.5 py-0.5 text-[11px] capitalize ${x.estado === "justificado" ? "bg-sky-100 text-sky-800" : x.estado === "lesionado" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"}`}>
+                              {fechaCorta(x.fecha)} · {x.estado === "justificado" ? "justif." : x.estado}{x.motivo ? ` (${x.motivo})` : ""}
+                            </span>
+                          ))}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="mt-2 text-xs text-tinta/50">{f.conLista ? "Nadie ha faltado este mes. 👏" : "Todavía no se ha pasado lista este mes."}</p>}
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
       <p className="mt-3 text-xs text-tinta/40">Horas en hora de Barcelona ({TZ}).</p>
     </div>
   );

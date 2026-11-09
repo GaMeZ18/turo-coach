@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, GripVertical, PenTool, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, GripVertical, PenTool, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,
 } from "../actions";
@@ -14,6 +14,7 @@ type Actividad = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
   ejercicio_id: string | null;
   objetivos?: string | null; descripcion?: string | null; // cambiados solo para este entreno
+  hecho?: boolean; // tic de «ya hecho» durante el entreno
   ejercicios: { titulo: string; preview: string | null; descripcion: string | null } | null;
 };
 
@@ -121,14 +122,19 @@ export default function Actividades({
               onDragStart={() => setArrastrando(i)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => { if (arrastrando !== null) mover(arrastrando, i); setArrastrando(null); }}
-              className={`tarjeta p-3 ${arrastrando === i ? "opacity-50" : ""}`}
+              className={`tarjeta p-3 ${arrastrando === i ? "opacity-50" : ""} ${a.hecho ? "bg-green-50 ring-1 ring-green-300" : ""}`}
             >
               <div className="flex items-center gap-2">
                 <GripVertical size={16} className="hidden shrink-0 cursor-grab text-tinta/30 sm:block" />
+                <button
+                  type="button" aria-pressed={!!a.hecho} title={a.hecho ? "Hecho (toca para desmarcar)" : "Marcar como hecho"}
+                  onClick={() => { const v = !a.hecho; setLista((l) => l.map((x) => (x.id === a.id ? { ...x, hecho: v } : x))); start(() => actualizarActividad(entrenoId, a.id, { hecho: v })); }}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${a.hecho ? "border-green-600 bg-green-600 text-white" : "border-linea text-transparent hover:border-green-500"}`}
+                ><Check size={16} strokeWidth={3} /></button>
                 <span className="w-11 shrink-0 text-xs tabular-nums text-tinta/50">{hhmm(desde)}</span>
                 <button onClick={() => setAbierta(abierta === a.id ? null : a.id)} className="min-w-0 flex-1 text-left">
                   <span className={`mr-2 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${tipo.color}`}>{tipo.label}</span>
-                  <span className="font-medium">{titulo}</span>
+                  <span className={`font-medium ${a.hecho ? "text-tinta/50 line-through" : ""}`}>{titulo}</span>
                   {!a.ejercicio_id && a.notas && abierta !== a.id && <span className="mt-0.5 block truncate text-xs text-tinta/60">{a.notas}</span>}
                 </button>
                 <input

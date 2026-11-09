@@ -40,7 +40,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
   const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }] = await Promise.all([
     supabase
       .from("entreno_actividades")
-      .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, ejercicio_id, ejercicios(titulo, preview, descripcion)")
+      .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, hecho, ejercicio_id, ejercicios(titulo, preview, descripcion)")
       .eq("entrenamiento_id", id)
       .order("orden"),
     // Más de 1000 ejercicios: se piden por páginas
@@ -125,7 +125,12 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" defaultValue={e.titulo ?? ""} className="campo" /></div>
           <div><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" min={0} defaultValue={e.duracion_prevista} className="campo" /></div>
           <div><label className="etiqueta">Pista</label><input name="lugar" list="lista-pistas" defaultValue={e.lugar ?? ""} className="campo" /><ListaPistas /></div>
-          <div className="col-span-2 sm:col-span-5"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
+          <div className="col-span-2">
+            <label className="etiqueta">Físico fuera de pista al empezar (min)</label>
+            <input name="fisico_fuera" type="number" min={0} max={120} defaultValue={e.fisico_fuera ?? 0} className="campo" />
+            <label className="mt-1 flex items-start gap-1.5 text-[11px] text-tinta/60"><input type="checkbox" name="fisico_todos" className="mt-0.5" /> Aplicar también a los próximos entrenos de este equipo a la misma hora</label>
+          </div>
+          <div className="col-span-2 sm:col-span-4"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
           <Enviar>Guardar</Enviar>
         </form>
       </details>
