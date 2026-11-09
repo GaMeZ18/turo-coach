@@ -6,6 +6,7 @@ import { guardarJugador, quitarDelEquipo } from "../actions";
 import Enviar from "@/components/Enviar";
 import EstadisticasJugador from "./EstadisticasJugador";
 import VideoJugador from "./VideoJugador";
+import { resumenAsistencia } from "@/lib/asistencia";
 
 const ESTADOS: Record<string, string> = {
   presente: "Presente", ausente: "Ausente", justificado: "Justificado", lesionado: "Lesionado", tarde: "Tarde",
@@ -75,9 +76,9 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Asistencia reciente</h2>
         {hist.length > 0 && (() => {
-          const ok = hist.filter((h) => h.estado === "presente" || h.estado === "tarde").length;
-          const pc = Math.round((ok * 100) / hist.length);
-          return <span className={`text-sm font-semibold ${pc >= 85 ? "text-green-700" : pc >= 65 ? "text-amber-600" : "text-rojo"}`}>{pc}% de asistencia ({ok} de {hist.length}) · <Link href="/entrenamientos/asistencia" className="font-normal text-azul underline">ver equipo</Link></span>;
+          const r = resumenAsistencia(hist);
+          if (r.pct === null) return <span className="text-sm text-tinta/60">{r.excluidos === 1 ? "1 falta justificada (no cuenta para el %)" : `${r.excluidos} faltas justificadas (no cuentan para el %)`}</span>;
+          return <span className={`text-sm font-semibold ${r.pct >= 85 ? "text-green-700" : r.pct >= 65 ? "text-amber-600" : "text-rojo"}`}>{`${r.pct}% de asistencia (${r.asistidos} de ${r.validos})`}{r.excluidos > 0 && <span className="font-normal text-tinta/60">{r.excluidos === 1 ? " · 1 justificada no cuenta" : ` · ${r.excluidos} justificadas no cuentan`}</span>} · <Link href="/entrenamientos/asistencia" className="font-normal text-azul underline">ver equipo</Link></span>;
         })()}
       </div>
       <ul className="tarjeta mt-2 divide-y divide-linea text-sm">

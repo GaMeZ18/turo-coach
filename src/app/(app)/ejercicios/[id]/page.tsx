@@ -6,6 +6,8 @@ import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actio
 import VisorPizarra from "./VisorPizarra";
 import { Copy, Library, Pencil, Trash2, PlayCircle } from "lucide-react";
 import Enviar from "@/components/Enviar";
+import ChipsEjercicio from "@/components/ChipsEjercicio";
+import { textoJugadores } from "@/lib/ejercicio-filtros";
 
 export default async function VerEjercicio({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,7 +33,7 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           <h1 className="text-2xl font-semibold">{e.titulo}</h1>
           <p className="text-sm text-tinta/60">
             {(e.perfiles as { nombre: string | null } | null)?.nombre}
-            {e.duracion ? ` · ${e.duracion} min` : ""}{e.jugadores_min ? ` · ${e.jugadores_min} jugadores` : ""}
+            {e.duracion ? ` · ${e.duracion} min` : ""}{textoJugadores(e.jugadores_min, e.jugadores_max) ? ` · ${textoJugadores(e.jugadores_min, e.jugadores_max)} jugadores` : ""}
             {e.visibilidad === "privado" ? " · privado" : ""}
           </p>
           {(e.en_biblioteca || e.edades?.length > 0) && (
@@ -72,9 +74,10 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           )}
         </div>
         <div className="space-y-4">
+          <ChipsEjercicio e={e} />
           {e.material && (
             <section>
-              <h2 className="etiqueta">Material</h2>
+              <h2 className="etiqueta">Otro material</h2>
               <p className="text-sm">{e.material}</p>
             </section>
           )}

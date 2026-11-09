@@ -7,6 +7,7 @@ import { colorEquipo } from "@/lib/colores";
 import { aISO, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { lunesDe, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
 import AltaRapida from "./AltaRapida";
+import { cuentaParaPorcentaje, resumenAsistencia } from "@/lib/asistencia";
 import { AlertTriangle, CalendarCheck, ClipboardList, Gauge, MapPin, Trophy, UserX, Users } from "lucide-react";
 
 type Ent = { id: string; equipo_id: string; fecha: string; duracion_prevista: number | null; lugar: string | null };
@@ -55,6 +56,7 @@ export default async function Coordinacion() {
   // Jugadores que faltan mucho (últimos 30 días, mínimo 4 entrenos con lista)
   const porJugador = new Map<string, { nombre: string; equipo: string; n: number; p: number }>();
   for (const a of asis) {
+    if (!cuentaParaPorcentaje(a.estado)) continue;
     const k = `${a.jugador_id}|${a.entrenamientos.equipo_id}`;
     const x = porJugador.get(k) ?? { nombre: `${a.jugadores?.nombre ?? ""} ${a.jugadores?.apellidos ?? ""}`.trim(), equipo: a.entrenamientos.equipo_id, n: 0, p: 0 };
     x.n++; if (presente(a)) x.p++;
@@ -73,13 +75,13 @@ export default async function Coordinacion() {
     return {
       eq, sem: sem.length, planificados: sem.filter((e) => conActividades.has(e.id)).length,
       lista: p14.filter((e) => conLista.has(e.id)).length, p14: p14.length,
-      asistencia: pc(a30.filter(presente).length, a30.length), g, pj: jug.length, prox,
+      asistencia: resumenAsistencia(a30).pct, g, pj: jug.length, prox,
       staff: st.map((s) => s.perfiles?.nombre?.split(" ")[0]).filter(Boolean).join(", "),
       choques: sem.filter((e) => choques.has(e.id)).length,
     };
   });
   const totalSem = semana.length, totalPlan = semana.filter((e) => conActividades.has(e.id)).length;
-  const asisMedia = pc(asis.filter(presente).length, asis.length);
+  const asisMedia = resumenAsistencia(asis).pct;
   const sinStaff = filas.filter((f) => !f.staff);
 
   const Kpi = ({ icono: I, v, t, alerta }: { icono: typeof Gauge; v: string | number; t: string; alerta?: boolean }) => (
@@ -127,7 +129,9 @@ export default async function Coordinacion() {
                   {f.choques > 0 && <span className="ml-1 text-red-600" title="Coincide en la pista con otro equipo">⚠</span>}
                 </td>
                 <td className={`p-2 text-center ${f.p14 && f.lista < f.p14 ? "font-semibold text-red-700" : ""}`}>{f.p14 ? `${f.lista}/${f.p14}` : "–"}</td>
-                <td className={`p-2 text-center font-semibold ${f.asistencia === null ? "text-tinta/40" : f.asistencia >= 80 ? "text-green-700" : f.asistencia >= 65 ? "text-amber-700" : "text-red-700"}`}>{f.asistencia === null ? "–" : `${f.asistencia}%`}</td>
+                <td className={`p-2 text-center font-semibold ${f.asistencia === null ? "text-tinta/40" : f.asistencia >= 80 ? "text-green-700" : f.asistencia >= 65 ? "text-amber-700" : "text-red-700"}`}>
+                  <Link href={`/coordinacion/asistencia?periodo=30&equipo=${f.eq.id}`} className="hover:underline" title="Ver los jugadores y los motivos de las faltas">{f.asistencia === null ? "–" : `${f.asistencia}%`} ›</Link>
+                </td>
                 <td className="p-2 text-center">{f.pj ? `${f.g}-${f.pj - f.g}` : "–"}</td>
                 <td className="p-2 text-xs">{f.prox ? <Link href={`/partidos/${f.prox.id}`} className="hover:underline"><span className="capitalize">{fechaCorta(f.prox.fecha)}</span> {hora(f.prox.fecha)} · {f.prox.local ? "vs" : "@"} {f.prox.rival}</Link> : <span className="text-tinta/40">—</span>}</td>
               </tr>
@@ -135,7 +139,7 @@ export default async function Coordinacion() {
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-[11px] text-tinta/50">Planificado = el entreno tiene ejercicios o actividades. Lista = se ha pasado asistencia.</p>
+      <p className="mt-1 text-[11px] text-tinta/50">Planificado = el entreno tiene ejercicios o actividades. Lista = se ha pasado asistencia. Asistencia: las faltas justificadas no bajan el porcentaje; pulsa el % de un equipo para ver sus jugadores y los motivos.</p>
 
       {/* Entrenos de cada equipo: qué se ha montado y asistencia, día a día */}
       <section className="mt-5">
@@ -147,7 +151,7 @@ export default async function Coordinacion() {
             const sinListaEq = pasados.filter((e) => !conLista.has(e.id)).length;
             const sinMontar = es.filter((e) => !conActividades.has(e.id)).length;
             const aEq = asis.filter((a) => a.entrenamientos.equipo_id === eq.id && a.entrenamientos.fecha >= hace14);
-            const pEq = pc(aEq.filter(presente).length, aEq.length);
+            const pEq = resumenAsistencia(aEq).pct;
             return (
               <details key={eq.id} className="tarjeta p-3" open={sinListaEq > 0 || sinMontar > 0}>
                 <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
@@ -162,6 +166,7 @@ export default async function Coordinacion() {
                     {es.map((e) => {
                       const act = actividades.filter((a) => a.entrenamiento_id === e.id);
                       const lista = asis.filter((a) => a.entrenamiento_id === e.id);
+                      const rl = resumenAsistencia(lista);
                       const hecho = e.fecha <= ahora;
                       const minutos = act.reduce((s2, a) => s2 + (a.duracion ?? 0), 0);
                       return (
@@ -174,7 +179,7 @@ export default async function Coordinacion() {
                           </div>
                           <div className="w-24 shrink-0 text-right text-xs">
                             {!hecho ? <span className="text-tinta/40">Pendiente</span>
-                              : lista.length ? <span className="font-semibold">{lista.filter(presente).length}/{lista.length} <span className={pc(lista.filter(presente).length, lista.length)! >= 80 ? "text-green-700" : "text-amber-700"}>({pc(lista.filter(presente).length, lista.length)}%)</span></span>
+                              : lista.length ? <span className="font-semibold">{rl.pct === null ? `${lista.length} justif.` : <>{`${rl.asistidos}/${rl.validos}`} <span className={rl.pct >= 80 ? "text-green-700" : "text-amber-700"}>{`(${rl.pct}%)`}</span></>}</span>
                               : <span className="font-semibold text-red-700">Sin lista</span>}
                           </div>
                         </li>

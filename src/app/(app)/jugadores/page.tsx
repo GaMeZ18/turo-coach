@@ -8,6 +8,7 @@ import BotonEliminar from "./BotonEliminar";
 import Enviar from "@/components/Enviar";
 import PlantillaFCBQ from "./PlantillaFCBQ";
 import { plantillaDesdeActas } from "@/lib/plantilla-fcbq";
+import { resumenAsistencia } from "@/lib/asistencia";
 
 type Fila = {
   dorsal: number | null;
@@ -43,9 +44,8 @@ export default async function JugadoresPage() {
 
   const pct = (id: string) => {
     const mias = (asistencias ?? []).filter((a) => a.jugador_id === id);
-    if (!mias.length) return null;
-    const ok = mias.filter((a) => a.estado === "presente" || a.estado === "tarde").length;
-    return Math.round((ok / mias.length) * 100);
+    // Las faltas justificadas no cuentan para el %
+    return resumenAsistencia(mias).pct;
   };
 
   return (

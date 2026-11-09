@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
-import { CATEGORIAS } from "@/lib/categorias";
+import CamposFiltro from "@/components/CamposFiltro";
+import { AVISO_MIGRACION, PARAMS_FILTRO, RE_COLUMNAS_NUEVAS, filtrarEjercicios, usaColumnasNuevas, type FiltrosEjercicio } from "@/lib/ejercicio-filtros";
 import { Library, Lock, Plus } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
 
@@ -13,9 +14,11 @@ type Ej = {
 export default async function EjerciciosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tipo?: string; cat?: string; mios?: string }>;
+  searchParams: Promise<{ q?: string; tipo?: string; mios?: string } & FiltrosEjercicio>;
 }) {
-  const { q, tipo, cat, mios } = await searchParams;
+  const sp = await searchParams;
+  const { q, tipo, mios } = sp;
+  const filtros: FiltrosEjercicio = Object.fromEntries(PARAMS_FILTRO.map((k) => [k, sp[k]])) as FiltrosEjercicio;
   const { supabase, user } = await requireUser();
 
   let consulta = supabase
@@ -24,13 +27,26 @@ export default async function EjerciciosPage({
     .order("updated_at", { ascending: false })
     .limit(120);
   if (tipo) consulta = consulta.eq("tipo", tipo);
-  if (cat) consulta = consulta.eq("categoria", cat);
   if (mios) consulta = consulta.eq("autor_id", user.id);
   if (q) {
     const limpio = q.replace(/[%,(){}"]/g, " ").trim();
     consulta = consulta.or(`titulo.ilike.%${limpio}%,descripcion.ilike.%${limpio}%,etiquetas.cs.{"${limpio.toLowerCase()}"}`);
   }
-  const { data } = await consulta;
+  const { data: d1, error } = await filtrarEjercicios(consulta, filtros);
+  let data = d1, avisoSQL = false;
+  if (error && RE_COLUMNAS_NUEVAS.test(error.message) && usaColumnasNuevas(filtros)) {
+    // Aún no se ha ejecutado 0025: se enseña la lista sin esos filtros y se avisa
+    avisoSQL = true;
+    let sin = supabase
+      .from("ejercicios")
+      .select("id, titulo, tipo, categoria, etiquetas, duracion, preview, visibilidad, autor_id, pizarra, perfiles(nombre)")
+      .order("updated_at", { ascending: false })
+      .limit(120);
+    if (tipo) sin = sin.eq("tipo", tipo);
+    if (filtros.cat) sin = sin.eq("categoria", filtros.cat);
+    if (mios) sin = sin.eq("autor_id", user.id);
+    data = (await sin).data;
+  }
   const lista = (data ?? []) as unknown as Ej[];
 
   return (
@@ -50,15 +66,13 @@ export default async function EjerciciosPage({
           <option value="ejercicio">Ejercicios</option>
           <option value="sistema">Sistemas</option>
         </select>
-        <select name="cat" defaultValue={cat ?? ""} className="campo !w-auto">
-          <option value="">Cualquier categoría</option>
-          {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-        </select>
+        <CamposFiltro f={filtros} />
         <label className="flex items-center gap-1.5 px-1 text-sm">
           <input type="checkbox" name="mios" value="1" defaultChecked={!!mios} /> Solo míos
         </label>
         <button className="btn-secundario">Filtrar</button>
       </form>
+      {avisoSQL && <p className="mt-2 text-sm text-red-700">{AVISO_MIGRACION}</p>}
 
       <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
         {lista.map((e) => (

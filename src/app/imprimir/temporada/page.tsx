@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { todas } from "@/lib/db";
 import { equipoActivo } from "@/lib/equipo-activo";
 import { fechaCorta } from "@/lib/fechas";
+import { resumenAsistencia } from "@/lib/asistencia";
 import { media, minutos, pct, resumenEquipo, type StatsPartido } from "@/lib/stats-fcbq";
 import BotonImprimir from "../entreno/[id]/Imprimir";
 
@@ -45,10 +46,11 @@ export default async function InformeTemporada() {
   const asistencia = jugadores.map((j) => {
     const r = registros.filter((x) => x.jugador_id === j.id);
     const n = (v: string) => r.filter((x) => x.estado === v).length;
-    return { ...j, total: r.length, p: n("presente"), t: n("tarde"), jus: n("justificado"), l: n("lesionado"), a: n("ausente") };
+    return { ...j, total: r.length - n("justificado"), p: n("presente"), t: n("tarde"), jus: n("justificado"), l: n("lesionado"), a: n("ausente") };
   });
-  const totalReg = registros.length;
-  const mediaAsis = pc(registros.filter((x) => x.estado === "presente" || x.estado === "tarde").length, totalReg);
+  const resumenTotal = resumenAsistencia(registros);
+  const totalReg = resumenTotal.validos; // las faltas justificadas no cuentan
+  const mediaAsis = resumenTotal.pct;
 
   // --- Partidos ---
   const ps = (partidos ?? []) as { id: string; fecha: string; rival: string; local: boolean; puntos_favor: number | null; puntos_contra: number | null; competicion: string | null; jornada: number | null }[];

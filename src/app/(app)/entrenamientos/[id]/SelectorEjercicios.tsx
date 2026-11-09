@@ -7,10 +7,12 @@ import { anadirActividad } from "../actions";
 import FichaEjercicio from "@/components/FichaEjercicio";
 import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
+import { POSICIONES, textoJugadores } from "@/lib/ejercicio-filtros";
 
 export type EjercicioLista = {
   id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null;
   edades?: string[] | null; etiquetas?: string[] | null; en_biblioteca?: boolean | null; autor_id?: string | null;
+  jugadores_min?: number | null; jugadores_max?: number | null; enfoques?: string[] | null; posiciones?: string[] | null;
 };
 
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -22,6 +24,8 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [edad, setEdad] = useState(edadEquipo ?? "");
+  const [jug, setJug] = useState("");
+  const [pos, setPos] = useState("");
   const [origen, setOrigen] = useState<"todos" | "biblioteca" | "mios">("todos");
   const [sel, setSel] = useState<string | null>(null);
   const [minutos, setMinutos] = useState<string>("");
@@ -34,12 +38,15 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
     return ejercicios.filter((e) => {
       if (origen === "biblioteca" && !e.en_biblioteca) return false;
       if (origen === "mios" && e.autor_id !== yo) return false;
-      if (cat && (cat === "Sistema de juego" ? e.tipo !== "sistema" && e.categoria !== cat : e.categoria !== cat)) return false;
+      if (cat && !(e.enfoques ?? []).includes(cat) && (cat === "Sistema de juego" ? e.tipo !== "sistema" && e.categoria !== cat : e.categoria !== cat)) return false;
+      const n = Number.parseInt(jug, 10);
+      if (n > 0 && ((e.jugadores_min && e.jugadores_min > n) || (e.jugadores_max && e.jugadores_max < n))) return false;
+      if (pos && e.posiciones?.length && !e.posiciones.includes(pos)) return false;
       if (edad && e.edades?.length && !e.edades.includes(edad)) return false;
       if (t && !sinAcentos(`${e.titulo} ${e.categoria ?? ""} ${(e.etiquetas ?? []).join(" ")}`).includes(t)) return false;
       return true;
     });
-  }, [ejercicios, q, cat, edad, origen, yo]);
+  }, [ejercicios, q, cat, edad, jug, pos, origen, yo]);
 
   const elegido = ejercicios.find((e) => e.id === sel) ?? null;
 
@@ -97,12 +104,17 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
               </div>
               <div className="flex flex-wrap gap-2">
                 <select value={cat} onChange={(e) => setCat(e.target.value)} className="campo !w-auto flex-1 !py-1 text-sm">
-                  <option value="">Todas las categorías</option>
+                  <option value="">Para qué sirve (todo)</option>
                   {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
                 </select>
                 <select value={edad} onChange={(e) => setEdad(e.target.value)} className="campo !w-auto !py-1 text-sm">
                   <option value="">Todas las edades</option>
                   {EDADES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+                <input type="number" min={1} max={30} value={jug} onChange={(e) => setJug(e.target.value)} placeholder="Nº jugadores" aria-label="Número de jugadores" className="campo !w-28 !py-1 text-sm" />
+                <select value={pos} onChange={(e) => setPos(e.target.value)} className="campo !w-auto !py-1 text-sm" aria-label="Posición">
+                  <option value="">Cualquier posición</option>
+                  {POSICIONES.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="flex rounded-lg border border-linea p-0.5 text-xs">
@@ -119,7 +131,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{e.titulo}</span>
                       <span className="block truncate text-[11px] text-tinta/55">
-                        {e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}
+                        {e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{textoJugadores(e.jugadores_min, e.jugadores_max) ? ` · ${textoJugadores(e.jugadores_min, e.jugadores_max)} jug.` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}
                       </span>
                     </span>
                     {anadidos.includes(e.id) && <Check size={16} className="shrink-0 text-green-700" />}

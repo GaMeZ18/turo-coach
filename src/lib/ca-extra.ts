@@ -2,6 +2,52 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Asistencia = presentes + tarde sobre las listas pasadas. Las faltas justificadas no cuentan: no bajan el porcentaje. «Lista pasada» = entrenos con asistencia / entrenos hechos.": "Assistència = presents + tard sobre les llistes passades. Les faltes justificades no compten: no baixen el percentatge. «Llista passada» = entrenaments amb assistència / entrenaments fets.",
+ "Justif.": "Justif.",
+ "Ordenados de menos a más asistencia. Pulsa en un jugador para ver cada falta o retraso con su motivo.": "Ordenats de menys a més assistència. Prem en un jugador per veure cada falta o retard amb el seu motiu.",
+ "Sin faltas ni retrasos en este periodo.": "Sense faltes ni retards en aquest període.",
+ "Sin motivo": "Sense motiu",
+ "Total club": "Total club",
+ "Ver jugadores": "Veure jugadors",
+ "Ver todos los equipos": "Veure tots els equips",
+ "Aros, vallas, cuerda… (o notas: 1 balón por jugador)": "Cèrcols, tanques, corda… (o notes: 1 baló per jugador)",
+ "Cómo se trabaja": "Com es treballa",
+ "El primero que marques es el principal. Con esto se busca luego: calentamiento, tiro, rebote, defensa…": "El primer que marques és el principal. Amb això es busca després: escalfament, tir, rebot, defensa…",
+ "Jugadores (máx.)": "Jugadors (màx.)",
+ "Jugadores (mín.)": "Jugadors (mín.)",
+ "Material necesario": "Material necessari",
+ "Otro material": "Altre material",
+ "Para qué sirve (elige uno o varios)": "Per a què serveix (tria'n un o diversos)",
+ "Posiciones que lo usan": "Posicions que ho fan servir",
+ "Si no marcas ninguna, vale para todas.": "Si no en marques cap, val per a totes.",
+ "Sin indicar": "Sense indicar",
+ "Cualquier material": "Qualsevol material",
+ "Cualquier posición": "Qualsevol posició",
+ "Edad": "Edat",
+ "Individual, grupos o equipo": "Individual, grups o equip",
+ "Nº jugadores": "Nre. de jugadors",
+ "Número de jugadores": "Nombre de jugadors",
+ "Para qué sirve": "Per a què serveix",
+ "Para qué sirve (todo)": "Per a què serveix (tot)",
+ "Posiciones": "Posicions",
+ "No se ha podido completar. Recarga la página y vuelve a probar.": "No s'ha pogut completar. Recarrega la pàgina i torna-ho a provar.",
+ "Rellena automáticamente los datos para filtrar (para qué sirve, jugadores, posiciones, material) en todos los ejercicios que no los tengan, también los de los entrenadores. No cambia lo que ya esté marcado.": "Omple automàticament les dades per filtrar (per a què serveix, jugadors, posicions, material) en tots els exercicis que no en tinguin, també els dels entrenadors. No canvia el que ja estigui marcat.",
+ "Completar datos de los ejercicios": "Completa les dades dels exercicis",
+ "Planificado = el entreno tiene ejercicios o actividades. Lista = se ha pasado asistencia. Asistencia: las faltas justificadas no bajan el porcentaje; pulsa el % de un equipo para ver sus jugadores y los motivos.": "Planificat = l'entrenament té exercicis o activitats. Llista = s'ha passat assistència. Assistència: les faltes justificades no baixen el percentatge; prem el % d'un equip per veure'n els jugadors i els motius.",
+ "Ver los jugadores y los motivos de las faltas": "Veure els jugadors i els motius de les faltes",
+ "Balones": "Balons",
+ "Canastas": "Cistelles",
+ "Conos": "Cons",
+ "Petos": "Petos",
+ "Para filtrar por estos datos, ejecuta antes 0025_ejercicios_filtros.sql en el SQL Editor de Supabase.": "Per filtrar per aquestes dades, executa abans 0025_ejercicios_filtros.sql a l'SQL Editor de Supabase.",
+ "Parejas o grupos pequeños": "Parelles o grups petits",
+ "Sin canastas (solo balones)": "Sense cistelles (només balons)",
+ "Sin conos": "Sense cons",
+ "Sin petos": "Sense petos",
+ "Todo el equipo": "Tot l'equip",
+ "1 falta justificada no cuenta para el porcentaje.": "1 falta justificada no compta per al percentatge.",
+ "1 falta justificada (no cuenta para el %)": "1 falta justificada (no compta per al %)",
+ " · 1 justificada no cuenta": " · 1 justificada no compta",
  "Ya estaba todo al día.": "Ja estava tot al dia.",
  "Cargar / actualizar biblioteca": "Carrega / actualitza la biblioteca",
  "Los ejercicios del club, con su pizarra. Ábrelos para verlos animados, cópialos para adaptarlos o añádelos a un entreno. Cualquier entrenador puede publicar los suyos marcando «Publicar en la Biblioteca del club».": "Els exercicis del club, amb la seva pissarra. Obre'ls per veure'ls animats, copia'ls per adaptar-los o afegeix-los a un entrenament. Qualsevol entrenador pot publicar els seus marcant «Publica a la Biblioteca del club».",
@@ -806,6 +852,90 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ [
+  "{} entrenos",
+  "{} entrenaments"
+ ],
+ [
+  "{} faltas justificadas no cuentan para el porcentaje.",
+  "{} faltes justificades no compten per al percentatge."
+ ],
+ [
+  "{} faltas justificadas (no cuentan para el %)",
+  "{} faltes justificades (no compten per al %)"
+ ],
+ [
+  "{}% de asistencia ({} de {})",
+  "{}% d'assistència ({} de {})"
+ ],
+ [
+  " · {} justificadas no cuentan",
+  " · {} justificades no compten"
+ ],
+ [
+  "{}/{} entrenos",
+  "{}/{} entrenaments"
+ ],
+ [
+  "Completados {}, pero ha fallado: {}",
+  "Completats {}, però ha fallat: {}"
+ ],
+ [
+  "Completados {}… quedan {}",
+  "Completats {}… en queden {}"
+ ],
+ [
+  "Listo: completados {} de {} ejercicios revisados.",
+  "Fet: completats {} de {} exercicis revisats."
+ ],
+ [
+  "Ya estaban todos al día ({} revisados).",
+  "Ja estaven tots al dia ({} revisats)."
+ ],
+ [
+  "{} jugadores",
+  "{} jugadors"
+ ],
+ [
+  "hasta {}",
+  "fins a {}"
+ ],
+ [
+  "{} jug.",
+  "{} jug."
+ ],
+ [
+  "{} balón",
+  "{} baló"
+ ],
+ [
+  "{} balones",
+  "{} balons"
+ ],
+ [
+  "{} canasta",
+  "{} cistella"
+ ],
+ [
+  "{} canastas",
+  "{} cistelles"
+ ],
+ [
+  "{} cono",
+  "{} con"
+ ],
+ [
+  "{} conos",
+  "{} cons"
+ ],
+ [
+  "{} peto",
+  "{} pet"
+ ],
+ [
+  "{} petos",
+  "{} petos"
+ ],
  [
   "Añadidos {} y actualizados {}, pero ha fallado: {}",
   "Afegits {} i actualitzats {}, però ha fallat: {}"

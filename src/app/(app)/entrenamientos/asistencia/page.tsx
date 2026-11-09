@@ -49,7 +49,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
           <thead className="bg-suave text-xs text-tinta/60">
             <tr>
               <th className="sticky left-0 bg-suave px-2 py-2 text-left">Jugador</th>
-              <th className="px-2 py-2 text-center" title="% de asistencia (presente o tarde)">%</th>
+              <th className="px-2 py-2 text-center" title="% de asistencia (presente o tarde). Las faltas justificadas no cuentan">%</th>
               {(["presente", "tarde", "justificado", "lesionado", "ausente"] as const).map((k) => <th key={k} className="px-1 py-2 text-center" title={k}>{LETRA[k]}</th>)}
               {entrenosConLista.map((e) => <th key={e.id} className="px-0.5 py-2 text-center font-normal"><Link href={`/entrenamientos/${e.id}`} className="hover:underline" title={e.titulo ?? "Entreno"}>{fecha(e.fecha)}</Link></th>)}
             </tr>
@@ -58,8 +58,9 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
             {jugadores.map((j) => {
               const suyos = entrenosConLista.map((e) => reg(e.id, j.id));
               const cuenta = (k: string) => suyos.filter((r) => r?.estado === k).length;
-              const marcados = suyos.filter(Boolean).length;
-              const pct = marcados ? Math.round(((cuenta("presente") + cuenta("tarde")) * 100) / marcados) : null;
+              // Las faltas justificadas no cuentan: ni suman ni bajan el %
+              const validos = suyos.filter(Boolean).length - cuenta("justificado");
+              const pct = validos > 0 ? Math.round(((cuenta("presente") + cuenta("tarde")) * 100) / validos) : null;
               return (
                 <tr key={j.id} className="border-t border-linea">
                   <td className="sticky left-0 whitespace-nowrap bg-white px-2 py-1"><span className="mr-1 text-xs text-tinta/50">{j.dorsal ?? ""}</span><Link href={`/jugadores/${j.id}`} className="hover:underline">{j.nombre}</Link></td>
@@ -76,7 +77,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-tinta/50">P presente · T tarde · J justificado · L lesionado · A ausente. Con * hay motivo (pasa el ratón por encima para verlo).</p>
+      <p className="mt-2 text-xs text-tinta/50">P presente · T tarde · J justificado · L lesionado · A ausente. Con * hay motivo (pasa el ratón por encima para verlo). Las faltas justificadas no bajan el %.</p>
     </div>
   );
 }

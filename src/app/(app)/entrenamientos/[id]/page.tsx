@@ -7,6 +7,7 @@ import { borrarEntreno, duplicarEntreno, editarEntreno, guardarComoPlantilla } f
 import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
+import type { EjercicioLista } from "./SelectorEjercicios";
 import type { Objetivo } from "@/lib/objetivos";
 import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
@@ -42,7 +43,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       .eq("entrenamiento_id", id)
       .order("orden"),
     // Más de 1000 ejercicios: se piden por páginas
-    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id").order("titulo").range(d, h)),
+    cargarEjerciciosSelector(supabase),
     supabase
       .from("equipo_jugadores")
       .select("dorsal, jugadores(id, nombre, apellidos)")
@@ -156,4 +157,15 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       </div>
     </div>
   );
+}
+
+// Lista de ejercicios para el selector, con los datos de filtro. Si aún no se ha ejecutado 0025
+// (las columnas nuevas no existen), se piden solo las de siempre y el selector sigue funcionando.
+async function cargarEjerciciosSelector(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"]): Promise<{ data: EjercicioLista[] }> {
+  const base = "id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id";
+  const nuevas = `${base}, jugadores_min, jugadores_max, enfoques, posiciones, modalidad, balones, canastas, conos, petos`;
+  const r = await todas((d, h) => supabase.from("ejercicios").select(nuevas).order("titulo").range(d, h));
+  if (!r.error) return { data: r.data as unknown as EjercicioLista[] };
+  const r2 = await todas((d, h) => supabase.from("ejercicios").select(base).order("titulo").range(d, h));
+  return { data: r2.data as unknown as EjercicioLista[] };
 }

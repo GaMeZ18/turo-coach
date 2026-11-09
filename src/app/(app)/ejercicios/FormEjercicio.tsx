@@ -3,13 +3,29 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import PizarraEditor from "@/components/pizarra";
 import type { Pizarra } from "@/components/pizarra/modelo";
-import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
+import { ENFOQUES, MATERIALES, MODALIDADES, POSICIONES } from "@/lib/ejercicio-filtros";
 import { Library } from "lucide-react";
 import { guardarEjercicio, type DatosEjercicio } from "./actions";
 
 
 export const CLAVE_BORRADOR = "turo-pizarra-borrador";
+
+/** Botones para marcar varias opciones (para qué sirve, posiciones, edades) */
+function Chips({ opciones, valor, onChange }: { opciones: readonly string[]; valor: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {opciones.map((x) => {
+        const on = valor.includes(x);
+        return (
+          <button key={x} type="button" onClick={() => onChange(on ? valor.filter((y) => y !== x) : [...valor, x])}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium ${on ? "border-azul bg-azul text-white" : "border-linea bg-white text-tinta/70"}`}>{x}</button>
+        );
+      })}
+    </div>
+  );
+}
+const aNumero = (v: string) => (v === "" ? null : Math.max(0, Number(v)));
 
 export default function FormEjercicio({
   inicial, desdePizarra = false, entrenoId,
@@ -37,6 +53,15 @@ export default function FormEjercicio({
     edades: inicial?.edades ?? [],
     material: inicial?.material ?? "",
     objetivos: inicial?.objetivos ?? "",
+    // Si el ejercicio aún no tiene «para qué sirve», se parte de su categoría de siempre
+    enfoques: inicial?.enfoques?.length ? inicial.enfoques : inicial?.categoria ? [inicial.categoria] : [],
+    posiciones: inicial?.posiciones ?? [],
+    modalidad: inicial?.modalidad ?? null,
+    jugadores_max: inicial?.jugadores_max ?? null,
+    balones: inicial?.balones ?? null,
+    canastas: inicial?.canastas ?? null,
+    conos: inicial?.conos ?? null,
+    petos: inicial?.petos ?? null,
   });
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
   const [error, setError] = useState<string | null>(null);
@@ -92,23 +117,25 @@ export default function FormEjercicio({
           <label className="etiqueta">Título</label>
           <input value={d.titulo} onChange={(e) => set("titulo", e.target.value)} className="campo" placeholder="1c1 desde medio campo" />
         </div>
+        <div>
+          <label className="etiqueta">Para qué sirve (elige uno o varios)</label>
+          <Chips opciones={ENFOQUES} valor={d.enfoques ?? []} onChange={(v) => setD((x) => ({ ...x, enfoques: v, categoria: v[0] ?? "" }))} />
+          <p className="mt-1 text-[11px] text-tinta/50">El primero que marques es el principal. Con esto se busca luego: calentamiento, tiro, rebote, defensa…</p>
+        </div>
         <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-3">
-            <label className="etiqueta">Categoría</label>
-            <select value={d.categoria} onChange={(e) => set("categoria", e.target.value)} className="campo">
-              <option value="">—</option>
-              {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </div>
           <div>
             <label className="etiqueta">Minutos</label>
             <input type="number" min={0} value={d.duracion ?? ""} onChange={(e) => set("duracion", e.target.value ? Number(e.target.value) : null)} className="campo" />
           </div>
           <div>
-            <label className="etiqueta">Jugadores</label>
-            <input type="number" min={0} value={d.jugadores_min ?? ""} onChange={(e) => set("jugadores_min", e.target.value ? Number(e.target.value) : null)} className="campo" />
+            <label className="etiqueta">Jugadores (mín.)</label>
+            <input type="number" min={0} value={d.jugadores_min ?? ""} onChange={(e) => set("jugadores_min", aNumero(e.target.value))} className="campo" />
           </div>
           <div>
+            <label className="etiqueta">Jugadores (máx.)</label>
+            <input type="number" min={0} value={d.jugadores_max ?? ""} onChange={(e) => set("jugadores_max", aNumero(e.target.value))} className="campo" />
+          </div>
+          <div className="col-span-3">
             <label className="etiqueta">Visible</label>
             <select value={d.en_biblioteca ? "club" : d.visibilidad} disabled={d.en_biblioteca} onChange={(e) => set("visibilidad", e.target.value as DatosEjercicio["visibilidad"])} className="campo">
               <option value="club">Club</option>
@@ -117,20 +144,35 @@ export default function FormEjercicio({
           </div>
         </div>
         <div>
+          <label className="etiqueta">Cómo se trabaja</label>
+          <select value={d.modalidad ?? ""} onChange={(e) => set("modalidad", e.target.value || null)} className="campo">
+            <option value="">Sin indicar</option>
+            {MODALIDADES.map((m) => <option key={m.v} value={m.v}>{m.t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="etiqueta">Posiciones que lo usan</label>
+          <Chips opciones={POSICIONES} valor={d.posiciones ?? []} onChange={(v) => set("posiciones", v)} />
+          <p className="mt-1 text-[11px] text-tinta/50">Si no marcas ninguna, vale para todas.</p>
+        </div>
+        <div>
           <label className="etiqueta">Edades</label>
-          <div className="flex flex-wrap gap-1">
-            {EDADES.map((x) => {
-              const on = d.edades?.includes(x);
-              return (
-                <button key={x} type="button" onClick={() => set("edades", on ? (d.edades ?? []).filter((y) => y !== x) : [...(d.edades ?? []), x])}
-                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${on ? "border-azul bg-azul text-white" : "border-linea bg-white text-tinta/70"}`}>{x}</button>
-              );
-            })}
+          <Chips opciones={EDADES} valor={d.edades ?? []} onChange={(v) => set("edades", v)} />
+        </div>
+        <div>
+          <label className="etiqueta">Material necesario</label>
+          <div className="grid grid-cols-4 gap-2">
+            {MATERIALES.map((m) => (
+              <div key={m.k}>
+                <label className="block text-[11px] text-tinta/60">{m.t}</label>
+                <input type="number" min={0} value={d[m.k] ?? ""} onChange={(e) => set(m.k, aNumero(e.target.value))} className="campo" />
+              </div>
+            ))}
           </div>
         </div>
         <div>
-          <label className="etiqueta">Material</label>
-          <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="1 balón por jugador, 6 conos…" />
+          <label className="etiqueta">Otro material</label>
+          <input value={d.material ?? ""} onChange={(e) => set("material", e.target.value)} className="campo" placeholder="Aros, vallas, cuerda… (o notas: 1 balón por jugador)" />
         </div>
         <div>
           <label className="etiqueta">Objetivos</label>
