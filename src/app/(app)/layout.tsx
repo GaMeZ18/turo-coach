@@ -4,6 +4,8 @@ import { equipoActivo, misEquipos } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
 import RegistrarSW from "@/components/RegistrarSW";
+import PedirAvisos from "@/components/PedirAvisos";
+import { VAPID_PUBLICO } from "@/lib/notificar";
 import SelectorIdioma from "@/components/SelectorIdioma";
 import { salir } from "@/app/login/actions";
 import { Bell, LogOut, UserRound } from "lucide-react";
@@ -50,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavPrincipal rol={perfil.rol} mesas={gestionaMesas(perfil)} />
         <div className="filete" />
       </header>
+      <PedirAvisos clavePublica={VAPID_PUBLICO} />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       <RegistrarSW />
     </div>

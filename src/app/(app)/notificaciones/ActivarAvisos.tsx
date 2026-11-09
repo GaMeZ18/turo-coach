@@ -64,7 +64,7 @@ export default function ActivarAvisos({ clavePublica }: { clavePublica: string }
           ) : (
             <button type="button" onClick={desactivar} disabled={ocupado} className="btn-secundario"><BellOff size={16} /> Desactivar en este dispositivo</button>
           )}
-          <span className="text-xs text-tinta/60">Cambios de horario o de pista, aplazamientos y resultados de tus equipos.</span>
+          <span className="text-xs text-tinta/60">Lista sin pasar, entreno sin montar, cambios de horario o de pista, aplazamientos y resultados de tus equipos.</span>
         </div>
       )}
       {msg && <p className="mt-2 text-xs text-tinta/70">{msg}</p>}

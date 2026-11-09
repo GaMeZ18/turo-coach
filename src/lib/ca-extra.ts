@@ -2,6 +2,13 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Activa los avisos en este móvil": "Activa els avisos en aquest mòbil",
+ "Te avisaremos si te falta pasar lista o montar el entreno, y de los cambios de partidos.": "T'avisarem si et falta passar llista o muntar l'entrenament, i dels canvis de partits.",
+ "Ahora no": "Ara no",
+ "Instala la app para recibir avisos": "Instal·la l'app per rebre avisos",
+ "En iPhone los avisos solo llegan con la app instalada: pulsa": "A l'iPhone els avisos només arriben amb l'app instal·lada: prem",
+ "Compartir → «Añadir a pantalla de inicio» y ábrela desde el icono.": "Comparteix → «Afegeix a la pantalla d'inici» i obre-la des de la icona.",
+ "Lista sin pasar, entreno sin montar, cambios de horario o de pista, aplazamientos y resultados de tus equipos.": "Llista sense passar, entrenament sense muntar, canvis d'horari o de pista, ajornaments i resultats dels teus equips.",
  "Siguiente paso: lo que hagas después irá al paso siguiente": "Pas següent: el que facis després anirà al pas següent",
  "Grabando: mueve a todos los que se muevan a la vez y pulsa › para pasar al siguiente paso.": "Gravant: mou tots els que es moguin alhora i prem › per passar al pas següent.",
  "Texto o comentario para la pista:": "Text o comentari per a la pista:",
