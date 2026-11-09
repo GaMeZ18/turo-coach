@@ -2,19 +2,59 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, GripVertical, PenTool, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, PenTool, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,
 } from "../actions";
 import Enviar from "@/components/Enviar";
-import FichaEjercicio from "@/components/FichaEjercicio";
+import FichaEjercicio, { useFicha } from "@/components/FichaEjercicio";
 import SelectorEjercicios, { type EjercicioLista } from "./SelectorEjercicios";
 
 type Actividad = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
   ejercicio_id: string | null;
+  objetivos?: string | null; descripcion?: string | null; // cambiados solo para este entreno
   ejercicios: { titulo: string; preview: string | null; descripcion: string | null } | null;
 };
+
+/** Ejercicio dentro del entreno: pizarra animada aquí mismo y objetivos/descripción editables solo para esta sesión */
+function EjercicioDelEntreno({ entrenoId, a, onCambio }: { entrenoId: string; a: Actividad; onCambio: (c: Partial<Actividad>) => void }) {
+  const { ficha } = useFicha(a.ejercicio_id);
+  const [editando, setEditando] = useState(false);
+  const [obj, setObj] = useState("");
+  const [desc, setDesc] = useState("");
+  const [, start] = useTransition();
+  const cambiado = a.objetivos != null || a.descripcion != null;
+  const abrir = () => { setObj(a.objetivos ?? ficha?.objetivos ?? ""); setDesc(a.descripcion ?? ficha?.descripcion ?? ""); setEditando(true); };
+  const guardar = () => {
+    const c = { objetivos: obj.trim() === (ficha?.objetivos ?? "").trim() ? null : obj, descripcion: desc.trim() === (ficha?.descripcion ?? "").trim() ? null : desc };
+    onCambio(c); setEditando(false);
+    start(() => actualizarActividad(entrenoId, a.id, c));
+  };
+  const original = () => { onCambio({ objetivos: null, descripcion: null }); setEditando(false); start(() => actualizarActividad(entrenoId, a.id, { objetivos: null, descripcion: null })); };
+  return (
+    <div className="space-y-2">
+      {editando ? (
+        <div className="space-y-2 rounded-lg border border-azul/30 bg-azul/5 p-3">
+          <p className="text-xs text-tinta/70">Los cambios son <strong>solo para este entreno</strong>: el ejercicio de la biblioteca no se toca.</p>
+          <div><label className="etiqueta">Objetivos (hoy)</label><textarea value={obj} onChange={(e) => setObj(e.target.value)} rows={3} className="campo text-sm" placeholder="Un objetivo por línea" /></div>
+          <div><label className="etiqueta">Descripción (hoy)</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={5} className="campo text-sm" /></div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={guardar} className="btn-primario !py-1.5 text-sm">Guardar para este entreno</button>
+            <button type="button" onClick={() => setEditando(false)} className="btn-secundario !py-1.5 text-sm">Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={abrir} disabled={!ficha} className="btn-secundario !py-1 text-xs"><Pencil size={13} /> Cambiar objetivos o descripción para hoy</button>
+          {cambiado && <><span className="rounded-full bg-oro/30 px-2 py-0.5 text-[11px] font-semibold">Modificado para este entreno</span>
+            <button type="button" onClick={original} className="inline-flex items-center gap-1 text-xs text-tinta/60 hover:text-tinta"><RotateCcw size={12} /> Volver al original</button></>}
+        </div>
+      )}
+      <FichaEjercicio id={a.ejercicio_id!} compacta reproductor propios={{ objetivos: a.objetivos, descripcion: a.descripcion }} />
+    </div>
+  );
+}
 
 const TIPOS: Record<string, { label: string; color: string }> = {
   ejercicio: { label: "Ejercicio", color: "bg-club/10 text-club" },
@@ -110,9 +150,10 @@ export default function Actividades({
 
               {abierta === a.id && (
                 <div className="mt-3 space-y-2 border-t border-linea pt-3">
-                  {a.ejercicio_id && <FichaEjercicio id={a.ejercicio_id} compacta />}
+                  {a.ejercicio_id && <EjercicioDelEntreno entrenoId={entrenoId} a={a} onCambio={(c) => setLista((l) => l.map((x) => (x.id === a.id ? { ...x, ...c } : x)))} />}
+                  {a.ejercicio_id && <label className="etiqueta !mb-0">Variantes y notas para este entreno</label>}
                   <textarea
-                    defaultValue={a.notas ?? ""} rows={2} placeholder="Notas para este entreno…" className="campo"
+                    defaultValue={a.notas ?? ""} rows={a.ejercicio_id ? 3 : 2} placeholder={a.ejercicio_id ? "Variantes, progresiones, cambios de reglas, a quién vigilar…" : "Notas para este entreno…"} className="campo"
                     onBlur={(e) => start(() => actualizarActividad(entrenoId, a.id, { notas: e.target.value }))}
                   />
                   <div className="flex justify-between">

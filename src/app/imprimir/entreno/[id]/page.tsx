@@ -6,7 +6,7 @@ import BotonImprimir from "./Imprimir";
 import AsistenciaHoja from "./AsistenciaHoja";
 
 type Act = {
-  id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
+  id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null; objetivos?: string | null; descripcion?: string | null;
   ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null } | null;
 };
 
@@ -18,7 +18,7 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
   const { data: e } = await supabase.from("entrenamientos").select("*, equipos(nombre)").eq("id", id).maybeSingle();
   if (!e) notFound();
   const [{ data: acts }, { data: plantilla }, { data: objs }, { data: asistencias }] = await Promise.all([
-    supabase.from("entreno_actividades").select("id, orden, tipo, titulo, duracion, notas, ejercicios(*)").eq("entrenamiento_id", id).order("orden"),
+    supabase.from("entreno_actividades").select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, ejercicios(*)").eq("entrenamiento_id", id).order("orden"),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", e.equipo_id),
     supabase.from("entreno_objetivos").select("objetivos(nombre, color)").eq("entrenamiento_id", id),
     supabase.from("asistencias").select("jugador_id, estado, motivo").eq("entrenamiento_id", id),
@@ -76,14 +76,14 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                     </div>
                   ) : null}
                   <div className="min-w-0 flex-1 space-y-1 text-xs leading-snug">
-                    {ej.objetivos && <p className="whitespace-pre-line"><strong>Objetivos:</strong> {ej.objetivos}</p>}
-                    {ej.descripcion && <p className="whitespace-pre-line">{ej.descripcion}</p>}
+                    {(a.objetivos ?? ej.objetivos) && <p className="whitespace-pre-line"><strong>Objetivos:</strong> {a.objetivos ?? ej.objetivos}</p>}
+                    {(a.descripcion ?? ej.descripcion) && <p className="whitespace-pre-line">{a.descripcion ?? ej.descripcion}</p>}
                     {ej.correcciones && <p className="whitespace-pre-line"><strong>Claves:</strong> {ej.correcciones}</p>}
                     {ej.material && <p><strong>Material:</strong> {ej.material}</p>}
                   </div>
                 </div>
               )}
-              {a.notas && <p className="mt-1 whitespace-pre-line text-xs"><strong>Notas:</strong> {a.notas}</p>}
+              {a.notas && <p className="mt-1 whitespace-pre-line text-xs"><strong>{ej ? "Variantes y notas" : "Notas"}:</strong> {a.notas}</p>}
             </li>
           );
         })}

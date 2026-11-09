@@ -56,9 +56,10 @@ export interface EditorProps {
   registrarCaptura?: (fn: () => Promise<string>) => void;
   altoMax?: number;
   titulo?: string;
+  soloVer?: boolean; // solo reproducir (sin editar): play, pausa, stop y fotogramas
 }
 
-export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra" }: EditorProps) {
+export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra", soloVer = false }: EditorProps) {
   const [p, setP] = useState<Pizarra>(() => normalizar(valor ?? pizarraVacia()));
   const [historial, setHistorial] = useState<{ p: Pizarra; cursor: number }[]>([]);
   const [cursor, setCursor] = useState(0);
@@ -644,6 +645,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     const k = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (soloVer) return; // en modo ver no se capturan teclas (puede haber varias pizarras en la página)
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); deshacer(); return; }
       if (ev.key === "Escape") { limpiarSeleccion(); setHerramienta("mover"); return; }
       if (ev.key === "ArrowLeft") { ev.preventDefault(); irA(cursor - 1); return; }
@@ -987,6 +989,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   };
 
   const alApretar = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (soloVer) return;
     if (ocupado || especial || (ev.pointerType === "mouse" && ev.button !== 0)) return;
     const q = aMetros(ev);
     ev.currentTarget.setPointerCapture(ev.pointerId);
@@ -1147,6 +1150,20 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           </div>
         </div>
 
+        {/* ===== Solo ver: controles de reproducción ===== */}
+        {soloVer && (
+          <div className="mx-auto flex w-full items-center justify-center gap-1 rounded-b-xl border border-linea bg-white px-2 py-1.5" style={{ maxWidth: anchoBarra }}>
+            <Boton titulo={anim ? "Pausa" : "Reproducir"} onClick={() => (anim ? parar() : void reproducir())}>{anim ? <Pause size={17} /> : <Play size={17} />}</Boton>
+            <Boton titulo="Stop (volver al principio)" onClick={() => { parar(); setCursor(0); }}><span className="block h-3.5 w-3.5 rounded-sm bg-current" /></Boton>
+            <span className="mx-1 h-6 w-px bg-linea" />
+            <Boton titulo="Fotograma anterior" onClick={() => irA(cursor - 1)}><ChevronLeft size={18} /></Boton>
+            <span className="min-w-14 text-center font-mono text-sm font-bold tabular-nums text-tinta">{pad(contador)}/{pad(n)}</span>
+            <Boton titulo="Fotograma siguiente" onClick={() => irA(cursor + 1)}><ChevronRight size={18} /></Boton>
+            <span className="mx-1 h-6 w-px bg-linea" />
+            <Boton titulo={grande ? "Salir de pantalla completa" : "Pantalla completa"} onClick={() => setGrande((g) => !g)}>{grande ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</Boton>
+          </div>
+        )}
+        {!soloVer && <>
         {/* ===== Fila de elementos + colores ===== */}
         <div className="mx-auto flex w-full flex-wrap items-center gap-0.5 border-x border-t border-linea bg-white px-2 py-1" style={{ maxWidth: anchoBarra }}>
           <Pieza titulo="Atacante" onClick={() => agregar("atacante")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#1f2937" strokeWidth="1.6" /></svg></Pieza>
@@ -1261,8 +1278,10 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <Boton titulo="Configuración" activo={panel === "config"} onClick={() => setPanel((x) => (x === "config" ? null : "config"))}><Settings size={17} /></Boton>
           </div>
         </div>
+        </>}
       </div>
 
+      {soloVer ? null : <>
       {/* ===== Paneles ===== */}
       {panel === "config" && (
         <div className="mx-auto flex w-full flex-wrap items-center gap-4 rounded-xl border border-linea bg-white p-3 text-sm" style={{ maxWidth: anchoBarra }}>
@@ -1378,6 +1397,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
         <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.9</span>
       </p>
+      </>}
     </div>
   );
 }

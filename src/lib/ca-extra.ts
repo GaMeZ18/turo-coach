@@ -2,6 +2,18 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Cambiar objetivos o descripción para hoy": "Canviar objectius o descripció per avui",
+ "Modificado para este entreno": "Modificat per a aquest entrenament",
+ "Volver al original": "Tornar a l'original",
+ "Objetivos (hoy)": "Objectius (avui)",
+ "Descripción (hoy)": "Descripció (avui)",
+ "Guardar para este entreno": "Desar per a aquest entrenament",
+ "Un objetivo por línea": "Un objectiu per línia",
+ "Variantes y notas para este entreno": "Variants i notes per a aquest entrenament",
+ "Variantes, progresiones, cambios de reglas, a quién vigilar…": "Variants, progressions, canvis de regles, a qui vigilar…",
+ "Variantes y notas": "Variants i notes",
+ "Stop (volver al principio)": "Stop (tornar al principi)",
+ "Salir de pantalla completa": "Sortir de pantalla completa",
  "Avisos activados": "Avisos activats",
  "Sin avisos en el móvil": "Sense avisos al mòbil",
  "← Coordinación": "← Coordinació",

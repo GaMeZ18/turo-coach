@@ -40,7 +40,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
   const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }] = await Promise.all([
     supabase
       .from("entreno_actividades")
-      .select("id, orden, tipo, titulo, duracion, notas, ejercicio_id, ejercicios(titulo, preview, descripcion)")
+      .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, ejercicio_id, ejercicios(titulo, preview, descripcion)")
       .eq("entrenamiento_id", id)
       .order("orden"),
     // Más de 1000 ejercicios: se piden por páginas

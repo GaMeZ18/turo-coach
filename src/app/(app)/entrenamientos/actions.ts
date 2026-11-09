@@ -109,7 +109,7 @@ export async function anadirActividad(formData: FormData) {
   revalidatePath(ruta(entreno));
 }
 
-export async function actualizarActividad(entreno: string, id: string, campos: { duracion?: number; notas?: string; titulo?: string }) {
+export async function actualizarActividad(entreno: string, id: string, campos: { duracion?: number; notas?: string; titulo?: string; objetivos?: string | null; descripcion?: string | null }) {
   const supabase = await createClient();
   check(await supabase.from("entreno_actividades").update(campos).eq("id", id));
   revalidatePath(ruta(entreno));

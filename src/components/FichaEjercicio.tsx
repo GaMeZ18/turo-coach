@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Loader2, Target, Timer, Users, PlayCircle } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
+import PizarraEditor from "@/components/pizarra";
 import { fichaEjercicio, type FichaEjercicio as Ficha } from "@/app/(app)/entrenamientos/actions";
 
 const cache = new Map<string, Ficha | null>();
@@ -25,14 +26,21 @@ export function useFicha(id: string | null) {
 
 const puntos = (t: string) => t.split(/\s*·\s*|\n+/).map((x) => x.trim()).filter(Boolean);
 
-export default function FichaEjercicio({ id, compacta = false }: { id: string; compacta?: boolean }) {
-  const { ficha: f, cargando } = useFicha(id);
+/** propios: objetivos y descripción cambiados para un entreno concreto (si los hay, se ven en lugar de los del ejercicio).
+ *  reproductor: la pizarra se ve animada aquí mismo (play, pausa, stop), sin poder editarla. */
+export default function FichaEjercicio({ id, compacta = false, reproductor = false, propios }: {
+  id: string; compacta?: boolean; reproductor?: boolean; propios?: { objetivos?: string | null; descripcion?: string | null };
+}) {
+  const { ficha: f0, cargando } = useFicha(id);
+  const f = f0 ? { ...f0, objetivos: propios?.objetivos ?? f0.objetivos, descripcion: propios?.descripcion ?? f0.descripcion } : null;
   if (cargando || !f) {
     return <div className="flex items-center gap-2 p-4 text-sm text-tinta/50">{cargando ? <><Loader2 size={16} className="animate-spin" /> Cargando ejercicio…</> : "No se ha encontrado el ejercicio."}</div>;
   }
   return (
     <div className={compacta ? "space-y-3" : "space-y-4"}>
-      {(f.preview || f.pizarra) ? (
+      {reproductor && f.pizarra ? (
+        <PizarraEditor valor={f.pizarra} soloVer altoMax={340} titulo={f.titulo} />
+      ) : (f.preview || f.pizarra) ? (
         <div className="overflow-hidden rounded-lg border border-linea bg-suave">
           {f.preview ? <img src={f.preview} alt="" className="mx-auto max-h-80 w-full object-contain" /> : <MiniPizarra pizarra={f.pizarra} className="mx-auto max-h-80 w-full" />}
         </div>
@@ -80,9 +88,11 @@ export default function FichaEjercicio({ id, compacta = false }: { id: string; c
       {f.video_url && (
         <a href={f.video_url} target="_blank" rel="noopener" className="mr-3 inline-flex items-center gap-1 text-sm text-azul hover:underline"><PlayCircle size={14} /> Ver vídeos que lo explican</a>
       )}
-      <Link href={`/ejercicios/${f.id}`} target="_blank" className="inline-flex items-center gap-1 text-sm text-azul hover:underline">
-        <ExternalLink size={14} /> Ver la pizarra animada
-      </Link>
+      {!reproductor && (
+        <Link href={`/ejercicios/${f.id}`} target="_blank" className="inline-flex items-center gap-1 text-sm text-azul hover:underline">
+          <ExternalLink size={14} /> Ver la pizarra animada
+        </Link>
+      )}
     </div>
   );
 }
