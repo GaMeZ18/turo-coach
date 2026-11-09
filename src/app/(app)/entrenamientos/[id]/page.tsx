@@ -155,7 +155,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           yo={user.id}
           edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
         />
-        <Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} />
+        <div id="asistencia" className="scroll-mt-28"><Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} /></div>
       </div>
     </div>
   );

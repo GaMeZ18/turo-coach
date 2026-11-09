@@ -1055,6 +1055,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["📋 Pasa lista · {}", "📋 Passa llista · {}"],
  ["Enlace de la semana del {}:", "Enllaç de la setmana del {}:"],
  ["{} de {} personas reciben los avisos en algún dispositivo. Los que no, solo los ven al abrir la app.", "{} de {} persones reben els avisos en algun dispositiu. Els que no, només els veuen en obrir l'app."],
  [" · desde {}", " · des del {}"],

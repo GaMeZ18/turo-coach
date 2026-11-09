@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Check, CheckCircle2, Copy, Loader2, Sparkles, Eraser } from "lucide-react";
 import { guardarPeriodos } from "../actions";
 import { PERIODOS_MINI, proponerAlineacion, textoAlineacion, validarAlineacion } from "@/lib/minibasquet";
@@ -14,7 +14,10 @@ export default function AlineacionMini({ partidoId, jugadores, inicial }: { part
   const [pendiente, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
-  useEffect(() => { setMarcas(inicial); setCambiado(false); }, [inicial]);
+  // Al refrescarse la página llegan los datos guardados: solo se aplican si no hay cambios sin guardar
+  const sinGuardar = useRef(false);
+  useEffect(() => { if (!sinGuardar.current) { setMarcas(inicial); setCambiado(false); } }, [inicial]);
+  useEffect(() => { sinGuardar.current = cambiado; }, [cambiado]);
 
   const avisos = useMemo(() => validarAlineacion(jugadores, marcas), [jugadores, marcas]);
   const errores = avisos.filter((a) => a.nivel === "error");

@@ -5,6 +5,7 @@ import SelectorEquipo from "@/components/SelectorEquipo";
 import NavPrincipal from "@/components/NavPrincipal";
 import RegistrarSW from "@/components/RegistrarSW";
 import PedirAvisos from "@/components/PedirAvisos";
+import AutoRefresco from "@/components/AutoRefresco";
 import { VAPID_PUBLICO } from "@/lib/notificar";
 import SelectorIdioma from "@/components/SelectorIdioma";
 import { salir } from "@/app/login/actions";
@@ -55,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <PedirAvisos clavePublica={VAPID_PUBLICO} />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       <RegistrarSW />
+      <AutoRefresco />
     </div>
   );
 }

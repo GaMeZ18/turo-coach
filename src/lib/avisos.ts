@@ -59,6 +59,13 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
   const inicio = (e: Entreno) => new Date(e.fecha).getTime();
   const fin = (e: Entreno) => inicio(e) + (e.duracion_prevista ?? 90) * MIN;
 
+  // 0) A la hora de empezar el entreno → «pasa lista», que abre directamente la asistencia
+  for (const e of entrenos) {
+    if (ahora < inicio(e) || ahora > inicio(e) + 30 * MIN || conLista.has(e.id) || !staff(e.equipo_id).length) continue;
+    await unaVez(`pasalista:${e.id}`, () => notificarPerfiles(db, staff(e.equipo_id),
+      `📋 Pasa lista · ${nombre(e.equipo_id)}`, `Empieza el entreno de las ${hora(e.fecha)}. Toca aquí para marcar quién ha venido.`, `/entrenamientos/${e.id}#asistencia`, e.equipo_id, true));
+  }
+
   // 1) 1 hora después de acabar el entreno, si no se ha pasado lista → entrenadores del equipo
   for (const e of entrenos) {
     if (ahora < fin(e) + 60 * MIN || ahora > fin(e) + 12 * 60 * MIN || conLista.has(e.id) || !staff(e.equipo_id).length) continue;
