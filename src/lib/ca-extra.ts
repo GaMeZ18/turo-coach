@@ -2,6 +2,7 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "PASO": "PAS",
  "Siguiente paso": "Pas següent",
  "Siguiente paso: cierra este fotograma; lo que hagas después irá al siguiente": "Pas següent: tanca aquest fotograma; el que facis després anirà al següent",
  "Grabando: mueve a todos los que se muevan a la vez y pulsa «Siguiente paso» para seguir.": "Gravant: mou tots els que es moguin alhora i prem «Pas següent» per continuar.",
