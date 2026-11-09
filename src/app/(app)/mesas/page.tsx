@@ -7,8 +7,8 @@ import { lunesDe, sumarDias } from "@/lib/pistas";
 import { partidosDeCasa, euros, POR_MESA, type Asignacion } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
 import Copiar from "./Copiar";
-import { alternarFederada, asignar, confirmar, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
-import { ChevronLeft, ChevronRight, ClipboardCheck, Link2, Settings, Wallet, X, Check, Undo2 } from "lucide-react";
+import { alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Link2, Settings, Wallet, X, Check, Undo2, Plus, Trash2 } from "lucide-react";
 
 export default async function Mesas({ searchParams }: { searchParams: Promise<{ semana?: string }> }) {
   const { supabase, perfil } = await requireUser();
@@ -18,11 +18,12 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const desde = aISO(lunes, "00:00"), hasta = aISO(sumarDias(lunes, 7), "00:00");
 
   const partidos = await partidosDeCasa(supabase, desde, hasta);
-  const [{ data: asigR }, { data: personasR }, { data: cfg }, { data: t }] = await Promise.all([
+  const [{ data: asigR }, { data: personasR }, { data: cfg }, { data: t }, { data: pistasR }] = await Promise.all([
     partidos.length ? supabase.from("mesa_asignaciones").select("id, partido_id, persona_id, estado, importe, created_at, mesa_personas(nombre, telefono)").in("partido_id", partidos.map((p) => p.id)).order("created_at") : Promise.resolve({ data: [] }),
     supabase.from("mesa_personas").select("id, nombre, telefono").eq("activo", true).order("nombre"),
     supabase.from("mesa_config").select("token, importe").maybeSingle(),
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
+    supabase.from("pistas").select("nombre").order("orden"),
   ]);
   if (!cfg) {
     return <p className="tarjeta p-4 text-sm">Falta preparar la base de datos de mesas (migración 0023_mesas.sql).</p>;
@@ -36,7 +37,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const deClub = partidos.filter((p) => !p.federada);
   const conf = (id: string) => asig.filter((a) => a.partido_id === id && a.estado === "confirmado");
   const cand = (id: string) => asig.filter((a) => a.partido_id === id && a.estado === "candidato");
-  const completas = deClub.filter((p) => conf(p.id).length >= POR_MESA).length;
+  const completas = deClub.filter((p) => conf(p.id).length >= p.plazas).length;
   const resumen = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
     ...deClub.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} · ${p.equipo} vs ${p.rival}\n   👉 ${conf(p.id).map((a) => a.mesa_personas?.nombre).join(" y ") || "¡FALTA GENTE!"}`)].join("\n");
   const invitacion = `Hola! Esta semana necesitamos gente para hacer las mesas de los partidos de casa del CB Turó (${euros(Number(cfg.importe))} por persona y partido). Apúntate aquí a los que puedas: ${enlace}`;
@@ -46,7 +47,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><ClipboardCheck className="text-azul" /> Mesas</h1>
-          <p className="text-sm text-tinta/60">Partidos de casa · {POR_MESA} personas por mesa · {euros(Number(cfg.importe))} por persona</p>
+          <p className="text-sm text-tinta/60">Partidos de casa · {POR_MESA} personas por mesa · {euros(Number(cfg.importe))} por persona · Los añadidos a mano: 1 persona, la pagan los jugadores</p>
         </div>
         <Link href="/mesas/pagos" className="btn-secundario"><Wallet size={16} /> Pagos del mes</Link>
       </div>
@@ -69,19 +70,45 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
         <Link href={`?semana=${sumarDias(lunes, 7)}`} className="btn-secundario !px-2" aria-label="Semana siguiente"><ChevronRight size={18} /></Link>
       </div>
 
+      <details className="tarjeta p-3 text-sm">
+        <summary className="flex cursor-pointer items-center gap-2 font-semibold text-azul"><Plus size={16} /> Añadir partido a mano (no federado)</summary>
+        <p className="mt-1 text-xs text-tinta/60">Para partidos que no vienen de la federación: mesa de 1 persona y sin importe (la pagan los jugadores en efectivo). Saldrá también en el enlace para apuntarse.</p>
+        <form action={crearPartidoManual} className="mt-2 grid gap-2 sm:grid-cols-3">
+          <div>
+            <label className="etiqueta">Equipo</label>
+            <select name="equipo_id" className="campo" defaultValue="">
+              <option value="">— Otro (escríbelo) —</option>
+              {((equiposR ?? []) as { id: string; nombre: string }[]).map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+            <input name="equipo_nombre" placeholder="Si es otro: nombre del equipo" className="campo mt-1" />
+          </div>
+          <div><label className="etiqueta">Rival</label><input name="rival" required className="campo" placeholder="Escola …" /></div>
+          <div>
+            <label className="etiqueta">Pista</label>
+            <input name="lugar" list="pistas-mesa" className="campo" placeholder="Pista o pabellón" />
+            <datalist id="pistas-mesa">{((pistasR ?? []) as { nombre: string }[]).map((x) => <option key={x.nombre} value={x.nombre} />)}</datalist>
+          </div>
+          <div><label className="etiqueta">Día</label><input type="date" name="dia" required defaultValue={lunes} className="campo" /></div>
+          <div><label className="etiqueta">Hora</label><input type="time" name="hora" required className="campo" /></div>
+          <div className="flex items-end"><Enviar className="btn-primario w-full justify-center">Añadir partido</Enviar></div>
+        </form>
+      </details>
+
       {partidos.length === 0 && <p className="tarjeta p-4 text-sm text-tinta/60">No hay partidos de casa esta semana.</p>}
       <div className="grid gap-3 md:grid-cols-2">
         {partidos.map((p) => {
-          const c = conf(p.id), k = cand(p.id), llena = c.length >= POR_MESA;
+          const c = conf(p.id), k = cand(p.id), llena = c.length >= p.plazas;
           return (
             <article key={p.id} className={`tarjeta p-3 ${p.federada ? "opacity-70" : llena ? "ring-1 ring-green-400" : "ring-1 ring-amber-300"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs capitalize text-tinta/60">{fechaCorta(p.fecha)} · {hora(p.fecha)}{p.lugar ? ` · ${p.lugar}` : ""}</p>
                   <p className="font-semibold">{p.equipo} <span className="font-normal text-tinta/60">vs</span> {p.rival}</p>
+                  {p.manual && <p className="text-[11px] font-semibold text-azul">Añadido a mano · 1 persona · la pagan los jugadores</p>}
                 </div>
                 {p.federada ? <span className="rounded bg-suave px-2 py-0.5 text-[11px] font-semibold uppercase text-tinta/60">Mesa federada</span>
-                  : <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${llena ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{c.length}/{POR_MESA}</span>}
+                  : <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${llena ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{c.length}/{p.plazas}</span>}
+                {p.manual && <form action={borrarPartidoManual}><input type="hidden" name="id" value={p.id} /><Enviar className="text-tinta/40 hover:text-red-700" title="Borrar este partido" confirmar={`¿Borrar ${p.equipo} vs ${p.rival}?`}><Trash2 size={15} /></Enviar></form>}
               </div>
               {!p.federada && (
                 <div className="mt-2 space-y-2 text-sm">

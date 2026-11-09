@@ -2,6 +2,20 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Añadir partido a mano (no federado)": "Afegir partit a mà (no federat)",
+ "Para partidos que no vienen de la federación: mesa de 1 persona y sin importe (la pagan los jugadores en efectivo). Saldrá también en el enlace para apuntarse.": "Per a partits que no vénen de la federació: taula d'1 persona i sense import (la paguen els jugadors en efectiu). També sortirà a l'enllaç per apuntar-se.",
+ "— Otro (escríbelo) —": "— Un altre (escriu-lo) —",
+ "Si es otro: nombre del equipo": "Si és un altre: nom de l'equip",
+ "Rival": "Rival",
+ "Pista": "Pista",
+ "Pista o pabellón": "Pista o pavelló",
+ "Día": "Dia",
+ "Hora": "Hora",
+ "Añadir partido": "Afegir partit",
+ "Añadido a mano · 1 persona · la pagan los jugadores": "Afegit a mà · 1 persona · la paguen els jugadors",
+ "Borrar este partido": "Esborrar aquest partit",
+ "1 persona · la pagan los jugadores en efectivo": "1 persona · la paguen els jugadors en efectiu",
+ "Rellena equipo, rival, día y hora.": "Omple equip, rival, dia i hora.",
  "Activa los avisos en este móvil": "Activa els avisos en aquest mòbil",
  "Te avisaremos si te falta pasar lista o montar el entreno, y de los cambios de partidos.": "T'avisarem si et falta passar llista o muntar l'entrenament, i dels canvis de partits.",
  "Ahora no": "Ara no",
@@ -911,6 +925,8 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Partidos de casa · {} personas por mesa · {} por persona · Los añadidos a mano: 1 persona, la pagan los jugadores", "Partits de casa · {} persones per taula · {} per persona · Els afegits a mà: 1 persona, la paguen els jugadors"],
+ ["¿Borrar {} vs {}?", "Esborrar {} vs {}?"],
  ["Paso {} listo. Ahora grabas el paso {}.", "Pas {} fet. Ara graves el pas {}."],
  ["Aparece desde el paso {}.", "Apareix des del pas {}."],
  ["paso {}", "pas {}"],

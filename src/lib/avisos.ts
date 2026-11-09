@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aISO, fechaCorta, hora, hoyLocal } from "./fechas";
 import { lunesDe, sumarDias } from "./pistas";
-import { partidosDeCasa, POR_MESA } from "./mesas";
+import { partidosDeCasa } from "./mesas";
 import { notificarPerfiles } from "./notificar";
 
 // Recordatorios automáticos (Supabase llama a /api/avisos cada 15 minutos).
@@ -92,11 +92,11 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     if (partidos.length) {
       const { data: aR } = await db.from("mesa_asignaciones").select("partido_id").eq("estado", "confirmado").in("partido_id", partidos.map((p) => p.id));
       const conf = (id: string) => ((aR ?? []) as { partido_id: string }[]).filter((a) => a.partido_id === id).length;
-      const faltan = partidos.filter((p) => conf(p.id) < POR_MESA);
-      const personas = faltan.reduce((s, p) => s + POR_MESA - conf(p.id), 0);
+      const faltan = partidos.filter((p) => conf(p.id) < p.plazas);
+      const personas = faltan.reduce((s, p) => s + p.plazas - conf(p.id), 0);
       await unaVez(`mesas:${lunes}`, () => notificarPerfiles(db, gestores,
         faltan.length ? `Faltan ${personas} persona${personas > 1 ? "s" : ""} para las mesas del finde` : "Mesas del finde completas",
-        faltan.length ? faltan.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} ${p.equipo} (${conf(p.id)}/${POR_MESA})`).join(" · ") : `Las ${partidos.length} mesas del club tienen sus ${POR_MESA} personas.`,
+        faltan.length ? faltan.map((p) => `${fechaCorta(p.fecha)} ${hora(p.fecha)} ${p.equipo} (${conf(p.id)}/${p.plazas})`).join(" · ") : `Las ${partidos.length} mesas tienen a su gente.`,
         `/mesas?semana=${lunes}`));
     }
   }

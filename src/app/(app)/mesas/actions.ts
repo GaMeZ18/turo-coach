@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
-import { normalizarTelefono, POR_MESA } from "@/lib/mesas";
+import { fechaPartidoMesa, normalizarTelefono, PLAZAS_MANUAL, POR_MESA } from "@/lib/mesas";
+import { aISO } from "@/lib/fechas";
 
 async function gestor() {
   const { perfil } = await requireUser();
@@ -16,7 +17,8 @@ export async function confirmar(fd: FormData) {
   const db = await gestor();
   const id = String(fd.get("id")), partido = String(fd.get("partido_id"));
   const { count } = await db.from("mesa_asignaciones").select("id", { count: "exact", head: true }).eq("partido_id", partido).eq("estado", "confirmado");
-  if ((count ?? 0) >= POR_MESA) throw new Error("Esta mesa ya tiene 2 personas confirmadas. Quita a una antes.");
+  const plazas = (await fechaPartidoMesa(db, partido))?.manual ? PLAZAS_MANUAL : POR_MESA;
+  if ((count ?? 0) >= plazas) throw new Error(`Esta mesa ya tiene ${plazas} persona${plazas > 1 ? "s" : ""} confirmada${plazas > 1 ? "s" : ""}. Quita a una antes.`);
   const { error } = await db.from("mesa_asignaciones").update({ estado: "confirmado" }).eq("id", id);
   if (error) throw new Error(error.message);
   refrescar();
@@ -58,8 +60,9 @@ export async function asignar(fd: FormData) {
   }
   const { count } = await db.from("mesa_asignaciones").select("id", { count: "exact", head: true }).eq("partido_id", partido).eq("estado", "confirmado");
   const { data: cfg } = await db.from("mesa_config").select("importe").maybeSingle();
+  const manual = !!(await fechaPartidoMesa(db, partido))?.manual;
   const { error } = await db.from("mesa_asignaciones").upsert(
-    { partido_id: partido, persona_id: persona, estado: (count ?? 0) >= POR_MESA ? "candidato" : "confirmado", importe: cfg?.importe ?? 10 },
+    { partido_id: partido, persona_id: persona, estado: (count ?? 0) >= (manual ? PLAZAS_MANUAL : POR_MESA) ? "candidato" : "confirmado", importe: manual ? 0 : cfg?.importe ?? 10 },
     { onConflict: "partido_id,persona_id" });
   if (error) throw new Error(error.message);
   refrescar();
@@ -113,5 +116,31 @@ export async function editarPersona(fd: FormData) {
     nombre: String(fd.get("nombre") ?? "").trim() || "Sin nombre", telefono: telefono || null, activo: fd.get("activo") === "on",
   }).eq("id", String(fd.get("id")));
   if (error) throw new Error(/duplicate|unique/i.test(error.message) ? "Ese teléfono ya lo tiene otra persona." : error.message);
+  refrescar();
+}
+
+/** Añadir a mano un partido que no viene de la federación (1 persona, sin importe) */
+export async function crearPartidoManual(fd: FormData) {
+  const db = await gestor();
+  const equipoId = String(fd.get("equipo_id") ?? "");
+  let equipo = String(fd.get("equipo_nombre") ?? "").trim();
+  if (equipoId) {
+    const { data } = await db.from("equipos").select("nombre").eq("id", equipoId).maybeSingle();
+    equipo = data?.nombre ?? equipo;
+  }
+  const rival = String(fd.get("rival") ?? "").trim(), dia = String(fd.get("dia") ?? ""), hora = String(fd.get("hora") ?? "");
+  if (!equipo || !rival || !/^\d{4}-\d{2}-\d{2}$/.test(dia) || !/^\d{2}:\d{2}$/.test(hora)) throw new Error("Rellena equipo, rival, día y hora.");
+  const { error } = await db.from("mesa_partidos").insert({
+    fecha: aISO(dia, hora), equipo_id: equipoId || null, equipo_nombre: equipo.slice(0, 60), rival: rival.slice(0, 80),
+    lugar: String(fd.get("lugar") ?? "").trim().slice(0, 80) || null,
+  });
+  if (error) throw new Error(error.message);
+  refrescar();
+}
+
+export async function borrarPartidoManual(fd: FormData) {
+  const db = await gestor();
+  const { error } = await db.from("mesa_partidos").delete().eq("id", String(fd.get("id")));
+  if (error) throw new Error(error.message);
   refrescar();
 }
