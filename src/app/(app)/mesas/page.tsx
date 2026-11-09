@@ -7,7 +7,7 @@ import { lunesDe, sumarDias } from "@/lib/pistas";
 import { partidosDeCasa, euros, POR_MESA, textoPartido, detalleMesa, type Asignacion } from "@/lib/mesas";
 import Enviar from "@/components/Enviar";
 import Copiar from "./Copiar";
-import { alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
+import { alternarEfectivo, alternarFederada, asignar, borrarPartidoManual, confirmar, crearPartidoManual, desconfirmar, guardarImporte, nuevoEnlace, quitar } from "./actions";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Link2, Settings, Wallet, X, Check, Undo2, Plus, Trash2 } from "lucide-react";
 
 export default async function Mesas({ searchParams }: { searchParams: Promise<{ semana?: string }> }) {
@@ -28,7 +28,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   if (!cfg) {
     return <p className="tarjeta p-4 text-sm">Falta preparar la base de datos de mesas (migración 0023_mesas.sql).</p>;
   }
-  const { data: equiposR } = t ? await supabase.from("equipos").select("id, nombre, mesa_federada").eq("temporada_id", t.id).order("nombre") : { data: [] };
+  const { data: equiposR } = t ? await supabase.from("equipos").select("id, nombre, mesa_federada, mesa_efectivo").eq("temporada_id", t.id).order("nombre") : { data: [] };
   const asig = (asigR ?? []) as unknown as Asignacion[];
   const personas = (personasR ?? []) as { id: string; nombre: string; telefono: string | null }[];
   const h = await headers();
@@ -45,7 +45,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
   const pendientes = deClub.filter((p) => conf(p.id).length < p.plazas && p.fecha > new Date().toISOString());
   const invitacion = [`🏀 Mesas CB Turó · semana del ${fechaCorta(desde)}`, "",
     pendientes.length ? "Necesitamos gente para estas mesas:" : "Partidos de casa de la semana:",
-    ...(pendientes.length ? pendientes : deClub).map((p) => `• ${textoPartido(p)}${p.manual ? " (1 persona, la pagan los jugadores)" : ""}`), "",
+    ...(pendientes.length ? pendientes : deClub).map((p) => `• ${textoPartido(p)}${p.efectivo ? " (1 persona, la pagan los jugadores)" : ""}`), "",
     `Mesas del club: ${euros(Number(cfg.importe))} por persona y partido. Apúntate a las que puedas (hasta el viernes):`, enlaceSemana].join("\n");
   const whatsapp = (tel: string, nombre: string, p: { fecha: string; equipo: string; rival: string; lugar: string | null }) =>
     `https://wa.me/${tel.replace(/[^\d]/g, "").replace(/^(?!34)(\d{9})$/, "34$1")}?text=${encodeURIComponent(`Hola ${nombre.split(" ")[0]}! Te confirmo la mesa:\n${detalleMesa(p)}\n¡Gracias!`)}`;
@@ -55,7 +55,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><ClipboardCheck className="text-azul" /> Mesas</h1>
-          <p className="text-sm text-tinta/60">Partidos de casa · {POR_MESA} personas por mesa · {euros(Number(cfg.importe))} por persona · Los añadidos a mano: 1 persona, la pagan los jugadores</p>
+          <p className="text-sm text-tinta/60">Partidos de casa · {POR_MESA} personas por mesa · {euros(Number(cfg.importe))} por persona · CEEB y añadidos a mano: 1 persona, la pagan los jugadores</p>
         </div>
         <Link href="/mesas/pagos" className="btn-secundario"><Wallet size={16} /> Pagos del mes</Link>
       </div>
@@ -112,7 +112,7 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
                 <div>
                   <p className="text-xs capitalize text-tinta/60">{fechaCorta(p.fecha)} · {hora(p.fecha)}{p.lugar ? ` · ${p.lugar}` : ""}</p>
                   <p className="font-semibold">{p.equipo} <span className="font-normal text-tinta/60">vs</span> {p.rival}</p>
-                  {p.manual && <p className="text-[11px] font-semibold text-azul">Añadido a mano · 1 persona · la pagan los jugadores</p>}
+                  {p.efectivo && <p className="text-[11px] font-semibold text-azul">{p.manual ? "Añadido a mano · " : ""}1 persona · la pagan los jugadores</p>}
                 </div>
                 {p.federada ? <span className="rounded bg-suave px-2 py-0.5 text-[11px] font-semibold uppercase text-tinta/60">Mesa federada</span>
                   : <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${llena ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{c.length}/{p.plazas}</span>}
@@ -192,6 +192,17 @@ export default async function Mesas({ searchParams }: { searchParams: Promise<{ 
               <form action={alternarFederada}>
                 <input type="hidden" name="id" value={e.id} /><input type="hidden" name="valor" value={e.mesa_federada ? "0" : "1"} />
                 <button className={`rounded-full border px-3 py-1 text-xs ${e.mesa_federada ? "border-azul bg-azul text-white" : "border-linea bg-white"}`}>{e.nombre}{e.mesa_federada ? " · federada" : ""}</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 font-semibold">Equipos con mesa en efectivo (1 persona, la pagan los jugadores)</p>
+        <ul className="mt-1 flex flex-wrap gap-1.5">
+          {((equiposR ?? []) as { id: string; nombre: string; mesa_federada: boolean; mesa_efectivo?: boolean }[]).filter((e) => !e.mesa_federada).map((e) => (
+            <li key={e.id}>
+              <form action={alternarEfectivo}>
+                <input type="hidden" name="id" value={e.id} /><input type="hidden" name="valor" value={e.mesa_efectivo ? "0" : "1"} />
+                <button className={`rounded-full border px-3 py-1 text-xs ${e.mesa_efectivo ? "border-azul bg-azul text-white" : "border-linea bg-white"}`}>{e.nombre}{e.mesa_efectivo ? " · efectivo" : ""}</button>
               </form>
             </li>
           ))}

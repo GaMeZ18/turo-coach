@@ -24,7 +24,7 @@ export default async function PagosMesas({ searchParams }: { searchParams: Promi
   const desde = aISO(`${mes}-01`, "00:00"), hasta = aISO(`${sumarMes(mes, 1)}-01`, "00:00");
   const ahora = new Date().toISOString();
 
-  const partidos = (await partidosDeCasa(supabase, desde, hasta)).filter((p) => !p.federada && !p.manual);
+  const partidos = (await partidosDeCasa(supabase, desde, hasta)).filter((p) => !p.federada && !p.efectivo);
   const [{ data: asigR }, { data: pagosR }, { data: personasR }] = await Promise.all([
     partidos.length ? supabase.from("mesa_asignaciones").select("id, partido_id, persona_id, importe").eq("estado", "confirmado").in("partido_id", partidos.map((p) => p.id)) : Promise.resolve({ data: [] }),
     supabase.from("mesa_pagos").select("persona_id, importe, pagado_en").eq("mes", mes),

@@ -2,6 +2,10 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Equipos con mesa en efectivo (1 persona, la pagan los jugadores)": "Equips amb taula en efectiu (1 persona, la paguen els jugadors)",
+ "1 persona · la pagan los jugadores": "1 persona · la paguen els jugadors",
+ "Añadido a mano · ": "Afegit a mà · ",
+ " · efectivo": " · efectiu",
  "Alineación de minibàsquet (normativa CEEB)": "Alineació de minibàsquet (normativa CEEB)",
  "Proponer": "Proposar",
  "Copiar": "Copiar",
@@ -979,7 +983,7 @@ export const CA_PATRONES: [string, string][] = [
  ["En acta caben como máximo 12 jugadores (ahora {}). Quita alguno de la convocatoria.", "A l'acta hi caben com a màxim 12 jugadors (ara {}). Treu-ne algun de la convocatòria."],
  ["{}º", "{}è"],
  ["Semana del {}", "Setmana del {}"],
- ["Partidos de casa · {} personas por mesa · {} por persona · Los añadidos a mano: 1 persona, la pagan los jugadores", "Partits de casa · {} persones per taula · {} per persona · Els afegits a mà: 1 persona, la paguen els jugadors"],
+ ["Partidos de casa · {} personas por mesa · {} por persona · CEEB y añadidos a mano: 1 persona, la pagan los jugadores", "Partits de casa · {} persones per taula · {} per persona · CEEB i afegits a mà: 1 persona, la paguen els jugadors"],
  ["¿Borrar {} vs {}?", "Esborrar {} vs {}?"],
  ["Paso {} listo. Ahora grabas el paso {}.", "Pas {} fet. Ara graves el pas {}."],
  ["Aparece desde el paso {}.", "Apareix des del pas {}."],

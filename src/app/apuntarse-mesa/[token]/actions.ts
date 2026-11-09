@@ -50,7 +50,7 @@ export async function apuntarse(token: string, nombre: string, telefono: string,
     await c.db.from("mesa_personas").update({ nombre, activo: true }).eq("id", persona.id);
   }
   const { error } = await c.db.from("mesa_asignaciones").upsert(
-    elegidos.map((partido_id) => ({ partido_id, persona_id: persona!.id, importe: validos.get(partido_id)!.manual ? 0 : c.importe })),
+    elegidos.map((partido_id) => ({ partido_id, persona_id: persona!.id, importe: validos.get(partido_id)!.efectivo ? 0 : c.importe })),
     { onConflict: "partido_id,persona_id", ignoreDuplicates: true });
   if (error) return { error: "No se ha podido guardar. Prueba otra vez." };
   return { ok: true, ...(await misMesas(token, tel)) };

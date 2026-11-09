@@ -33,7 +33,7 @@ export async function confirmar(fd: FormData) {
   const db = await gestor();
   const id = String(fd.get("id")), partido = String(fd.get("partido_id"));
   const { count } = await db.from("mesa_asignaciones").select("id", { count: "exact", head: true }).eq("partido_id", partido).eq("estado", "confirmado");
-  const plazas = (await fechaPartidoMesa(db, partido))?.manual ? PLAZAS_MANUAL : POR_MESA;
+  const plazas = (await fechaPartidoMesa(db, partido))?.efectivo ? PLAZAS_MANUAL : POR_MESA;
   if ((count ?? 0) >= plazas) throw new Error(`Esta mesa ya tiene ${plazas} persona${plazas > 1 ? "s" : ""} confirmada${plazas > 1 ? "s" : ""}. Quita a una antes.`);
   const { error } = await db.from("mesa_asignaciones").update({ estado: "confirmado" }).eq("id", id);
   if (error) throw new Error(error.message);
@@ -80,9 +80,9 @@ export async function asignar(fd: FormData) {
   }
   const { count } = await db.from("mesa_asignaciones").select("id", { count: "exact", head: true }).eq("partido_id", partido).eq("estado", "confirmado");
   const { data: cfg } = await db.from("mesa_config").select("importe").maybeSingle();
-  const manual = !!(await fechaPartidoMesa(db, partido))?.manual;
+  const efectivo = !!(await fechaPartidoMesa(db, partido))?.efectivo;
   const { error } = await db.from("mesa_asignaciones").upsert(
-    { partido_id: partido, persona_id: persona, estado: (count ?? 0) >= (manual ? PLAZAS_MANUAL : POR_MESA) ? "candidato" : "confirmado", importe: manual ? 0 : cfg?.importe ?? 10 },
+    { partido_id: partido, persona_id: persona, estado: (count ?? 0) >= (efectivo ? PLAZAS_MANUAL : POR_MESA) ? "candidato" : "confirmado", importe: efectivo ? 0 : cfg?.importe ?? 10 },
     { onConflict: "partido_id,persona_id" });
   if (error) throw new Error(error.message);
   const { data: nueva } = await db.from("mesa_asignaciones").select("id, estado").eq("partido_id", partido).eq("persona_id", persona).maybeSingle();
@@ -163,6 +163,14 @@ export async function crearPartidoManual(fd: FormData) {
 export async function borrarPartidoManual(fd: FormData) {
   const db = await gestor();
   const { error } = await db.from("mesa_partidos").delete().eq("id", String(fd.get("id")));
+  if (error) throw new Error(error.message);
+  refrescar();
+}
+
+/** Mesa en efectivo sí/no para un equipo (1 persona, la pagan los jugadores) */
+export async function alternarEfectivo(fd: FormData) {
+  const db = await gestor();
+  const { error } = await db.from("equipos").update({ mesa_efectivo: fd.get("valor") === "1" }).eq("id", String(fd.get("id")));
   if (error) throw new Error(error.message);
   refrescar();
 }
