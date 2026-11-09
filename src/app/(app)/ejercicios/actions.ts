@@ -8,7 +8,7 @@ import { rasgosDe } from "@/lib/rasgos-ejercicio";
 
 export type DatosEjercicio = {
   id?: string;
-  tipo: "ejercicio" | "sistema";
+  tipo: "ejercicio" | "sistema" | "fisico";
   titulo: string;
   descripcion: string;
   correcciones: string;
@@ -31,6 +31,10 @@ export type DatosEjercicio = {
   focos?: string[];
   posiciones?: string[];
   formato?: string;
+  // Físico (sin pizarra)
+  series?: string;
+  repeticiones?: string;
+  descanso?: string;
 };
 
 const vacioANull = (s: string) => (s.trim() === "" ? null : s.trim());
@@ -57,7 +61,11 @@ export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
     edades: d.edades ?? [],
     material: vacioANull(d.material ?? ""),
     objetivos: vacioANull(d.objetivos ?? ""),
+    series: vacioANull(d.series ?? ""),
+    repeticiones: vacioANull(d.repeticiones ?? ""),
+    descanso: vacioANull(d.descanso ?? ""),
   };
+  if (d.tipo === "fisico") { fila.pizarra = null; fila.preview = null; }
   // Datos para los filtros: lo que rellene el entrenador y, si falta algo, deducido de la pizarra y el título
   const r = rasgosDe({ ...d, etiquetas: fila.etiquetas });
   const datos = {

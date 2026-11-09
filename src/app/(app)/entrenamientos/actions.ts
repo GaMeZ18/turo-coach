@@ -38,17 +38,18 @@ export async function editarEntreno(formData: FormData) {
       notas: String(formData.get("notas") ?? "").trim() || null,
       // Minutos de físico fuera de pista al empezar: en ese rato la pista no cuenta como ocupada
       fisico_fuera: Math.max(0, Math.min(120, Number(formData.get("fisico_fuera") || 0))),
+      fisico_fuera_fin: Math.max(0, Math.min(120, Number(formData.get("fisico_fuera_fin") || 0))),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
   if (formData.get("fisico_todos") === "on") {
     // Los próximos entrenos del mismo equipo a la misma hora (y mismo día de la semana)
-    const { data: e } = await supabase.from("entrenamientos").select("equipo_id, fecha, fisico_fuera").eq("id", id).single();
+    const { data: e } = await supabase.from("entrenamientos").select("equipo_id, fecha, fisico_fuera, fisico_fuera_fin").eq("id", id).single();
     if (e) {
       const { data: futuros } = await supabase.from("entrenamientos").select("id, fecha").eq("equipo_id", e.equipo_id).gt("fecha", e.fecha);
       const clave = (f: string) => new Date(f).toLocaleString("es-ES", { timeZone: "Europe/Madrid", weekday: "short", hour: "2-digit", minute: "2-digit" });
       const ids = ((futuros ?? []) as { id: string; fecha: string }[]).filter((f) => clave(f.fecha) === clave(e.fecha)).map((f) => f.id);
-      if (ids.length) await supabase.from("entrenamientos").update({ fisico_fuera: e.fisico_fuera }).in("id", ids);
+      if (ids.length) await supabase.from("entrenamientos").update({ fisico_fuera: e.fisico_fuera, fisico_fuera_fin: e.fisico_fuera_fin }).in("id", ids);
     }
   }
   revalidatePath(ruta(id));
@@ -72,7 +73,7 @@ export async function duplicarEntreno(formData: FormData) {
     .from("entrenamientos")
     .insert({
       equipo_id: e.equipo_id, fecha: semana, titulo: e.titulo,
-      duracion_prevista: e.duracion_prevista, lugar: e.lugar, notas: e.notas, fisico_fuera: e.fisico_fuera ?? 0,
+      duracion_prevista: e.duracion_prevista, lugar: e.lugar, notas: e.notas, fisico_fuera: e.fisico_fuera ?? 0, fisico_fuera_fin: e.fisico_fuera_fin ?? 0,
     })
     .select("id")
     .single();
@@ -269,6 +270,7 @@ export async function programarEntrenos(formData: FormData) {
 export type FichaEjercicio = {
   id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null; jugadores_min: number | null;
   descripcion: string | null; correcciones: string | null; objetivos?: string | null; material?: string | null;
+  series?: string | null; repeticiones?: string | null; descanso?: string | null;
   edades?: string[]; etiquetas: string[]; pizarra: unknown; preview: string | null; video_url: string | null;
 };
 export async function fichaEjercicio(id: string): Promise<FichaEjercicio | null> {

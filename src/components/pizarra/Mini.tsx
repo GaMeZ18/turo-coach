@@ -56,7 +56,7 @@ function Pista({ escudo = true }: { escudo?: boolean }) {
 
 /** pasos: [desde, hasta) dibuja solo esos fotogramas, con los jugadores donde están al empezar el primero
  *  (para enseñar la jugada paso a paso en el PDF). Sin pasos: todo el ejercicio sobre la posición inicial. */
-export default function MiniPizarra({ pizarra, className = "", pasos }: { pizarra: unknown; className?: string; pasos?: [number, number] }) {
+export default function MiniPizarra({ pizarra, className = "", pasos, numeros = false }: { pizarra: unknown; className?: string; pasos?: [number, number]; numeros?: boolean }) {
   const p = normalizar(pizarra);
   const est = estados(p);
   const k0 = pasos ? Math.max(0, Math.min(pasos[0], p.fotogramas.length)) : 0;
@@ -76,6 +76,31 @@ export default function MiniPizarra({ pizarra, className = "", pasos }: { pizarr
   };
   const r = vista === "completa" ? 0.45 : 0.5;
   const tipoDe = new Map(p.elementos.map((e) => [e.id, e.tipo]));
+  // Números del orden de las acciones (PDF): los movimientos de un fotograma van a la vez (mismo número);
+  // después, cada pase o tiro lleva el siguiente (1 = pase, 2 = tiro…)
+  const marcas: { x: number; y: number; n: number }[] = [];
+  if (numeros) {
+    let n = 1;
+    for (let k = k0; k < k1; k++) {
+      const f = p.fotogramas[k];
+      const movs = f.movimientos.filter((m) => m.puntos.length >= 4);
+      for (const m of movs) {
+        const i = Math.floor(m.puntos.length / 4) * 2; // hacia la mitad del recorrido
+        const [x, y] = T({ x: m.puntos[i], y: m.puntos[i + 1] });
+        marcas.push({ x, y, n });
+      }
+      if (movs.length) n++;
+      const pos = est[k + 1]?.pos ?? {};
+      for (const a of f.balon) {
+        const de = a.de ? pos[a.de] ?? est[k]?.pos[a.de] : undefined;
+        const hacia = a.tipo === "tiro" ? a.destino : a.a ? pos[a.a] : undefined;
+        if (!de || !hacia) continue;
+        const [x1, y1] = T(de), [x2, y2] = T(hacia);
+        marcas.push({ x: (x1 + x2) / 2, y: (y1 + y2) / 2, n });
+        n++;
+      }
+    }
+  }
 
   return (
     <svg viewBox={caja} className={className} role="img" aria-label="Pizarra">
@@ -179,6 +204,13 @@ export default function MiniPizarra({ pizarra, className = "", pasos }: { pizarr
         if (e.tipo === "balon") return <circle key={e.id} cx={x} cy={y} r="0.22" fill={NARANJA} />;
         return <rect key={e.id} x={x - 0.3} y={y - 0.15} width="0.6" height="0.3" fill={e.color} />;
       })}
+      {/* Orden de las acciones */}
+      {marcas.map((m, i) => (
+        <g key={`n${i}`}>
+          <circle cx={m.x} cy={m.y} r={0.42} fill="#fde047" stroke="#1f2937" strokeWidth={0.06} />
+          <text x={m.x} y={m.y + 0.17} textAnchor="middle" fontSize={0.5} fontWeight="800" fill="#1f2937" fontFamily="system-ui, sans-serif">{m.n}</text>
+        </g>
+      ))}
     </svg>
   );
 }

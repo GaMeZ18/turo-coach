@@ -44,7 +44,11 @@ export default function FormEjercicio({
     focos: inicial?.focos ?? [],
     posiciones: inicial?.posiciones ?? [],
     formato: inicial?.formato ?? "",
+    series: inicial?.series ?? "",
+    repeticiones: inicial?.repeticiones ?? "",
+    descanso: inicial?.descanso ?? "",
   });
+  const fisico = d.tipo === "fisico";
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
   const [error, setError] = useState<string | null>(null);
   const [pendiente, start] = useTransition();
@@ -84,8 +88,9 @@ export default function FormEjercicio({
       const r = await guardarEjercicio({
         ...d,
         etiquetas: etiquetasTxt.split(","),
-        pizarra: tieneDibujo ? pizarra : null,
-        preview,
+        pizarra: tieneDibujo && !fisico ? pizarra : null,
+        preview: fisico ? null : preview,
+        ...(fisico ? { focos: [...new Set([...(d.focos ?? []), "Físico"])] } : {}),
       }, entrenoId);
       if (r?.error) setError(r.error);
     });
@@ -94,15 +99,26 @@ export default function FormEjercicio({
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
-        {listo && <PizarraEditor valor={d.pizarra ?? undefined} onChange={onPizarra} registrarCaptura={registrarCaptura} titulo={d.titulo || "Ejercicio"} />}
+        {fisico ? (
+          <div className="tarjeta space-y-3 p-4">
+            <p className="font-semibold">Ejercicio de físico (sin pizarra)</p>
+            <p className="text-xs text-tinta/60">Explica el ejercicio en la descripción y pon aquí cómo se hace: series, repeticiones o tiempo y descanso.</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div><label className="etiqueta">Series</label><input value={d.series ?? ""} onChange={(e) => set("series", e.target.value)} className="campo" placeholder="4" /></div>
+              <div><label className="etiqueta">Repeticiones o tiempo</label><input value={d.repeticiones ?? ""} onChange={(e) => set("repeticiones", e.target.value)} className="campo" placeholder="12 rep · 30″ · 20 m" /></div>
+              <div><label className="etiqueta">Descanso</label><input value={d.descanso ?? ""} onChange={(e) => set("descanso", e.target.value)} className="campo" placeholder="1′ entre series" /></div>
+            </div>
+            <div><label className="etiqueta">Cómo se hace</label><textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} rows={8} className="campo" placeholder={"Posición inicial, ejecución, qué vigilar…\nVariantes o progresiones."} /></div>
+          </div>
+        ) : listo && <PizarraEditor valor={d.pizarra ?? undefined} onChange={onPizarra} registrarCaptura={registrarCaptura} titulo={d.titulo || "Ejercicio"} />}
       </div>
 
       <div className="space-y-3">
         <div className="flex rounded-lg border border-linea bg-white p-0.5 text-sm">
-          {(["ejercicio", "sistema"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => set("tipo", t)}
+          {(["ejercicio", "sistema", "fisico"] as const).map((t) => (
+            <button key={t} type="button" onClick={() => { set("tipo", t); if (t === "fisico" && !d.categoria) set("categoria", "Físico"); }}
               className={`flex-1 rounded-md py-1.5 ${d.tipo === t ? "bg-club text-white" : "text-tinta/70"}`}>
-              {t === "ejercicio" ? "Ejercicio" : "Sistema de juego"}
+              {t === "ejercicio" ? "Ejercicio" : t === "sistema" ? "Sistema" : "Físico"}
             </button>
           ))}
         </div>
@@ -177,10 +193,10 @@ export default function FormEjercicio({
           <label className="etiqueta">Objetivos</label>
           <textarea value={d.objetivos ?? ""} onChange={(e) => set("objetivos", e.target.value)} rows={2} className="campo" placeholder="Qué se trabaja: p. ej. Tiro tras bloqueo indirecto · Lectura de la ayuda" />
         </div>
-        <div>
+        {!fisico && <div>
           <label className="etiqueta">Descripción</label>
           <textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} rows={5} className="campo" placeholder="Organización, desarrollo, reglas…" />
-        </div>
+        </div>}
         <div>
           <label className="etiqueta">Correcciones / puntos clave</label>
           <textarea value={d.correcciones} onChange={(e) => set("correcciones", e.target.value)} rows={3} className="campo" />

@@ -138,7 +138,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{e.titulo}</span>
                       <span className="block truncate text-[11px] text-tinta/55">
-                        {e.tipo === "sistema" ? "Sistema" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}{!e.en_biblioteca && e.perfiles?.nombre ? ` · ${e.perfiles.nombre}` : ""}{e.visibilidad === "privado" && e.autor_id !== yo ? " · 🔒 privado" : ""}
+                        {e.tipo === "sistema" ? "Sistema" : e.tipo === "fisico" ? "Físico" : e.categoria ?? "Ejercicio"}{e.duracion ? ` · ${e.duracion}′` : ""}{e.edades?.length ? ` · ${e.edades.join(", ")}` : ""}{!e.en_biblioteca && e.perfiles?.nombre ? ` · ${e.perfiles.nombre}` : ""}{e.visibilidad === "privado" && e.autor_id !== yo ? " · 🔒 privado" : ""}
                       </span>
                     </span>
                     {anadidos.includes(e.id) && <Check size={16} className="shrink-0 text-green-700" />}

@@ -8,7 +8,7 @@ import AsistenciaHoja from "./AsistenciaHoja";
 
 type Act = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null; objetivos?: string | null; descripcion?: string | null;
-  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null } | null;
+  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null; series?: string | null; repeticiones?: string | null; descanso?: string | null } | null;
 };
 
 export const metadata = { title: "Entreno · Coach Manager CBTuró" };
@@ -91,6 +91,7 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                     {(a.objetivos ?? ej.objetivos) && <p className="whitespace-pre-line"><strong>Objetivos:</strong> {a.objetivos ?? ej.objetivos}</p>}
                     {(a.descripcion ?? ej.descripcion) && <p className="whitespace-pre-line">{a.descripcion ?? ej.descripcion}</p>}
                     {ej.correcciones && <p className="whitespace-pre-line"><strong>Claves:</strong> {ej.correcciones}</p>}
+                    {(ej.series || ej.repeticiones || ej.descanso) && <p><strong>Series:</strong> {[ej.series && `${ej.series} series`, ej.repeticiones, ej.descanso && `descanso ${ej.descanso}`].filter(Boolean).join(" · ")}</p>}
                     {ej.material && <p><strong>Material:</strong> {ej.material}</p>}
                   </div>
                 </div>
@@ -99,7 +100,7 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                   <div className={`mt-2 grid gap-2 ${pasos.length === 1 ? "grid-cols-2" : "grid-cols-3"}`}>
                     {pasos.map((r, k) => (
                       <figure key={k} className="break-inside-avoid overflow-hidden rounded border border-linea">
-                        <MiniPizarra pizarra={ej.pizarra} pasos={r} className="w-full" />
+                        <MiniPizarra pizarra={ej.pizarra} pasos={r} numeros className="w-full" />
                         <figcaption className="border-t border-linea px-1.5 py-0.5 text-[10px] font-semibold text-tinta/70">Paso {k + 1}{r[1] - r[0] > 1 ? ` (${r[0] + 1}–${r[1]})` : ""}</figcaption>
                       </figure>
                     ))}

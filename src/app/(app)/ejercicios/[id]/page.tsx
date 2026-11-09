@@ -83,6 +83,13 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
               {(e.posiciones ?? []).length > 0 && <p><span className="text-tinta/60">Posiciones:</span> {(e.posiciones as string[]).join(", ")}</p>}
             </div>
           </section>
+      {(e.series || e.repeticiones || e.descanso) ? (
+        <div className="grid grid-cols-3 gap-2 text-center text-sm">
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{e.series || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Series</p></div>
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{e.repeticiones || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Repeticiones / tiempo</p></div>
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{e.descanso || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Descanso</p></div>
+        </div>
+      ) : null}
           {e.material && (
             <section>
               <h2 className="etiqueta">Otro material</h2>

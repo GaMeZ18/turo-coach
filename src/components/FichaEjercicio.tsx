@@ -47,7 +47,7 @@ export default function FichaEjercicio({ id, compacta = false, reproductor = fal
       ) : null}
       {!compacta && (
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-rojo">{f.tipo === "sistema" ? "Sistema" : f.categoria ?? "Ejercicio"}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-rojo">{f.tipo === "sistema" ? "Sistema" : f.tipo === "fisico" ? "Físico" : f.categoria ?? "Ejercicio"}</p>
           <h3 className="text-lg font-semibold leading-tight">{f.titulo}</h3>
         </div>
       )}
@@ -56,6 +56,13 @@ export default function FichaEjercicio({ id, compacta = false, reproductor = fal
         {f.jugadores_min ? <span className="inline-flex items-center gap-1"><Users size={12} /> {f.jugadores_min} jugadores</span> : null}
         {(f.edades ?? []).map((x) => <span key={x} className="rounded-full bg-azul/10 px-1.5 py-0.5 font-medium text-azul">{x}</span>)}
       </div>
+      {(f.series || f.repeticiones || f.descanso) ? (
+        <div className="grid grid-cols-3 gap-2 text-center text-sm">
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{f.series || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Series</p></div>
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{f.repeticiones || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Repeticiones / tiempo</p></div>
+          <div className="rounded-lg bg-suave p-2"><p className="font-bold">{f.descanso || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Descanso</p></div>
+        </div>
+      ) : null}
       {f.objetivos ? (
         <section className="rounded-lg bg-azul/5 p-3">
           <h4 className="etiqueta flex items-center gap-1"><Target size={13} /> Objetivos</h4>
