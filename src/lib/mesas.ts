@@ -114,3 +114,15 @@ export async function companerosMesa(db: SupabaseClient, partidoId: string, pers
   const { data } = await db.from("mesa_asignaciones").select("persona_id, mesa_personas(nombre)").eq("partido_id", partidoId).eq("estado", "confirmado").neq("persona_id", personaId);
   return ((data ?? []) as unknown as { mesa_personas: { nombre: string } | null }[]).map((x) => x.mesa_personas?.nombre).filter(Boolean) as string[];
 }
+
+/** Nombre para comparar personas: sin acentos, mayúsculas ni espacios de más */
+export const nombreClave = (n: string) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Partidos (de la lista) donde ya hay apuntada otra persona con el mismo nombre */
+export async function yaHayMismoNombre(db: SupabaseClient, partidos: string[], nombre: string, personaId?: string) {
+  if (!partidos.length) return new Set<string>();
+  const { data } = await db.from("mesa_asignaciones").select("partido_id, persona_id, mesa_personas(nombre)").in("partido_id", partidos);
+  const clave = nombreClave(nombre);
+  return new Set(((data ?? []) as unknown as { partido_id: string; persona_id: string; mesa_personas: { nombre: string } | null }[])
+    .filter((a) => a.persona_id !== personaId && nombreClave(a.mesa_personas?.nombre ?? "") === clave).map((a) => a.partido_id));
+}

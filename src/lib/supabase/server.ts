@@ -44,11 +44,15 @@ export const gestionaMesas = (p: Perfil) => p.rol === "coordinador" || p.rol ===
  *  Con cache(): layout y página comparten la misma consulta en cada petición. */
 export const requireUser = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // La sesión de la cookie da el id al momento: el perfil se pide a la vez que se comprueba el usuario (más rápido)
+  const { data: { session } } = await supabase.auth.getSession();
+  const idSesion = session?.user?.id;
+  const [{ data: { user } }, pre] = await Promise.all([
+    supabase.auth.getUser(),
+    idSesion ? supabase.from("perfiles").select("id, nombre, email, rol, gestor_mesas").eq("id", idSesion).single() : Promise.resolve(null),
+  ]);
   if (!user) redirect("/login");
-  let { data: perfil, error } = await supabase
+  let { data: perfil, error } = pre && idSesion === user.id ? pre : await supabase
     .from("perfiles")
     .select("id, nombre, email, rol, gestor_mesas")
     .eq("id", user.id)

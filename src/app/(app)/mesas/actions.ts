@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, gestionaMesas, requireUser } from "@/lib/supabase/server";
-import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA } from "@/lib/mesas";
+import { companerosMesa, detalleMesa, fechaPartidoMesa, normalizarTelefono, partidoMesa, PLAZAS_MANUAL, POR_MESA, yaHayMismoNombre } from "@/lib/mesas";
 import { notificarPersonasMesa } from "@/lib/notificar";
 import { adminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -83,6 +83,8 @@ export async function asignar(fd: FormData) {
       persona = data.id;
     }
   }
+  const { data: pe } = await db.from("mesa_personas").select("nombre").eq("id", persona).maybeSingle();
+  if (pe && (await yaHayMismoNombre(db, [partido], pe.nombre, persona)).size) throw new Error(`Ya hay otra persona llamada ${pe.nombre} en esta mesa.`);
   const { count } = await db.from("mesa_asignaciones").select("id", { count: "exact", head: true }).eq("partido_id", partido).eq("estado", "confirmado");
   const { data: cfg } = await db.from("mesa_config").select("importe").maybeSingle();
   const efectivo = !!(await fechaPartidoMesa(db, partido))?.efectivo;

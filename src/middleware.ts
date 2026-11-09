@@ -24,9 +24,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Solo para decidir si mandar al login: se lee la sesión de la cookie (sin ir al servidor de Supabase,
+  // así cada cambio de menú es más rápido). La comprobación de verdad la hacen requireUser y la seguridad de la base de datos.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
   const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/cal/") || path.startsWith("/apuntarse-mesa") || path.startsWith("/api/avisos");

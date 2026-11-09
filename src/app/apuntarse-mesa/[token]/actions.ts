@@ -1,7 +1,7 @@
 "use server";
 
 import { adminClient } from "@/lib/supabase/admin";
-import { abierta, fechaPartidoMesa, normalizarTelefono, partidosDeCasa } from "@/lib/mesas";
+import { abierta, fechaPartidoMesa, normalizarTelefono, partidosDeCasa, yaHayMismoNombre } from "@/lib/mesas";
 import { notificarPerfiles } from "@/lib/notificar";
 import { lunesDe } from "@/lib/pistas";
 
@@ -58,6 +58,10 @@ export async function apuntarse(token: string, nombre: string, telefono: string,
   } else if (persona.nombre !== nombre) {
     await c.db.from("mesa_personas").update({ nombre, activo: true }).eq("id", persona.id);
   }
+  // No puede haber dos personas con el mismo nombre en la misma mesa (p. ej. apuntarse dos veces con otro teléfono)
+  const repetidos = await yaHayMismoNombre(c.db, elegidos, nombre, persona!.id);
+  if (repetidos.size === elegidos.length) return { error: `Ya hay una persona llamada ${nombre} apuntada a ${elegidos.length > 1 ? "esas mesas" : "esa mesa"}. Si eres tú, usa el mismo teléfono que la otra vez.`, ...(await misMesas(token, tel)) };
+  elegidos.splice(0, elegidos.length, ...elegidos.filter((id) => !repetidos.has(id)));
   const { data: yaEstaba } = await c.db.from("mesa_asignaciones").select("partido_id").eq("persona_id", persona!.id).in("partido_id", elegidos);
   const nuevos = elegidos.filter((id) => !((yaEstaba ?? []) as { partido_id: string }[]).some((y) => y.partido_id === id));
   const { error } = await c.db.from("mesa_asignaciones").upsert(

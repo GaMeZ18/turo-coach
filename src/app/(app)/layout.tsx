@@ -13,13 +13,12 @@ import { Bell, LogOut, UserRound } from "lucide-react";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, perfil, user } = await requireUser();
-  const [{ equipos }, activo] = await Promise.all([
+  // Todo a la vez (antes, los avisos sin leer esperaban a los equipos)
+  const [{ equipos }, activo, { count: sinLeerRaw }] = await Promise.all([
     misEquipos(supabase),
     equipoActivo(supabase),
+    supabase.from("notificaciones").select("id", { count: "exact", head: true }).eq("perfil_id", user.id).eq("leida", false),
   ]);
-
-  // Avisos sin leer (si aún no existe la tabla, 0)
-  const { count: sinLeerRaw } = await supabase.from("notificaciones").select("id", { count: "exact", head: true }).eq("perfil_id", user.id).eq("leida", false);
   const sinLeer = sinLeerRaw ?? 0;
 
   return (

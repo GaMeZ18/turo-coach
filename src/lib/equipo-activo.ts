@@ -16,18 +16,19 @@ export type Equipo = {
 
 /** Equipos de la temporada actual. El coordinador ve todos; el entrenador, los suyos primero. */
 export async function equiposDeTemporada(supabase: SupabaseClient) {
-  const { data: temporada } = await supabase
-    .from("temporadas")
-    .select("id, nombre")
-    .eq("actual", true)
-    .maybeSingle();
-  if (!temporada) return { temporada: null, equipos: [] as Equipo[] };
+  // Equipos y temporada en una sola consulta (antes eran dos seguidas)
   const { data } = await supabase
     .from("equipos")
-    .select("*")
-    .eq("temporada_id", temporada.id)
+    .select("*, temporadas!inner(id, nombre, actual)")
+    .eq("temporadas.actual", true)
     .order("nombre");
-  return { temporada, equipos: (data ?? []) as Equipo[] };
+  const filas = (data ?? []) as (Equipo & { temporadas?: { id: string; nombre: string } })[];
+  if (filas.length) {
+    const t = filas[0].temporadas!;
+    return { temporada: { id: t.id, nombre: t.nombre }, equipos: filas.map(({ temporadas: _t, ...e }) => e as Equipo) };
+  }
+  const { data: temporada } = await supabase.from("temporadas").select("id, nombre").eq("actual", true).maybeSingle();
+  return { temporada: temporada ?? null, equipos: [] as Equipo[] };
 }
 
 /** Equipos con los que puede trabajar el usuario: el coordinador, todos; el resto, donde es staff */
