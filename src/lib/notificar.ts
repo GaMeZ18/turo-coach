@@ -24,13 +24,14 @@ async function enviarPush(supabase: SupabaseClient, subs: Sub[], aviso: { titulo
     const carga = JSON.stringify({ titulo, cuerpo, url });
     await Promise.all((subs as { endpoint: string; p256dh: string; auth: string }[]).map(async (s) => {
       try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400 });
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
+        console.error("push:", code, (e as { body?: string }).body ?? String(e));
         if (code === 404 || code === 410) await supabase.rpc("borrar_suscripcion", { p_endpoint: s.endpoint });
       }
     }));
-  } catch {}
+  } catch (e) { console.error("push:", e); }
 }
 
 /** Aviso a unas personas concretas (con el cliente de servidor): queda en «Avisos» y llega al móvil */
@@ -55,11 +56,34 @@ export async function notificarPersonasMesa(db: SupabaseClient, personas: string
     const carga = JSON.stringify({ titulo, cuerpo, url });
     await Promise.all((subs as Sub[]).map(async (s) => {
       try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400 });
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
         if (code === 404 || code === 410) await db.from("mesa_push").delete().eq("endpoint", s.endpoint);
       }
     }));
   } catch {}
+}
+
+/** Prueba: manda un aviso a los dispositivos de una persona y devuelve qué responde cada servicio (sin datos secretos) */
+export async function probarPushDe(db: SupabaseClient, perfilId: string) {
+  const privada = process.env.VAPID_PRIVATE_KEY?.trim();
+  const sujeto = (process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim();
+  const diag = { clavePrivada: !!privada, sujetoValido: /^(mailto:[^\s@]+@[^\s@]+|https:\/\/\S+)$/.test(sujeto), dispositivos: [] as { servicio: string; ok: boolean; estado?: number; detalle?: string }[] };
+  const { data: subs } = await db.from("push_suscripciones").select("endpoint, p256dh, auth").eq("perfil_id", perfilId);
+  if (!privada) return diag;
+  const webpush = (await import("web-push")).default;
+  try { webpush.setVapidDetails(sujeto, VAPID_PUBLICO, privada); } catch (e) { return { ...diag, error: `Claves VAPID no válidas: ${e instanceof Error ? e.message : e}` }; }
+  for (const s of (subs ?? []) as Sub[]) {
+    const servicio = new URL(s.endpoint).host;
+    try {
+      const r = await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        JSON.stringify({ titulo: "Prueba de avisos ✅", cuerpo: "Si ves esto con la app cerrada, los avisos funcionan.", url: "/notificaciones" }), { TTL: 3600, urgency: "high" });
+      diag.dispositivos.push({ servicio, ok: true, estado: r.statusCode });
+    } catch (e) {
+      const x = e as { statusCode?: number; body?: string };
+      diag.dispositivos.push({ servicio, ok: false, estado: x.statusCode, detalle: (x.body || String(e)).slice(0, 200) });
+    }
+  }
+  return diag;
 }

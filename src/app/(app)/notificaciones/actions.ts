@@ -22,3 +22,14 @@ export async function quitarSuscripcion(endpoint: string) {
   const supabase = await createClient();
   await supabase.from("push_suscripciones").delete().eq("endpoint", endpoint);
 }
+
+/** Manda un aviso de prueba a mis dispositivos y dice qué ha pasado */
+export async function probarAvisos() {
+  const { requireUser } = await import("@/lib/supabase/server");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { probarPushDe } = await import("@/lib/notificar");
+  const { user } = await requireUser();
+  const db = adminClient();
+  if (!db) return { error: "Falta la clave de servicio en el servidor." };
+  return await probarPushDe(db, user.id);
+}
