@@ -3,11 +3,5 @@
   "framework": "nextjs",
   "regions": [
     "cdg1"
-  ],
-  "crons": [
-    {
-      "path": "/api/avisos",
-      "schedule": "0 7 * * *"
-    }
   ]
 }

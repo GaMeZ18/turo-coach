@@ -4,7 +4,7 @@ import { enviarAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
 
-/** Recordatorios diarios (lo lanza Vercel Cron cada mañana). Cada aviso se manda una sola vez. */
+/** Recordatorios diarios (lo lanza Supabase cada 15 minutos). Cada aviso se manda una sola vez. */
 export async function GET(req: Request) {
   const secreto = process.env.CRON_SECRET;
   if (secreto && req.headers.get("authorization") !== `Bearer ${secreto}`) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
