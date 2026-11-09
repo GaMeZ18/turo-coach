@@ -1,6 +1,6 @@
 "use client";
 
-const VERSION_EXTENSION = "1.7.5";
+const VERSION_EXTENSION = "1.8.0";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -224,7 +224,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     return () => { clearTimeout(t); clearTimeout(t1); window.removeEventListener("message", alRecibir); };
   }, []);
 
-  // Modo automático (?auto=1): lo abre la extensión los lunes a las 6:00; al acabar se cierra sola
+  // Modo automático (?auto=1): lo abre la extensión cada día a las 6:00; al acabar se cierra sola
   const autoLanzado = useRef(false);
   useEffect(() => {
     if (!autoLanzado.current || (estado !== "hecho" && estado !== "error")) return;

@@ -8,15 +8,14 @@ const FCBQ = "https://www.basquetcatala.cat";
 const APP_POR_DEFECTO = "https://coach.cbturo.com";
 const app = async () => (await chrome.storage.local.get("app")).app || APP_POR_DEFECTO;
 
-// ---------- Actualización automática: cada lunes a las 6:00 ----------
+// ---------- Actualización automática: cada día a las 6:00 ----------
 // El ordenador tiene que estar encendido con el navegador abierto (y la sesión de Coach Manager CBTuró iniciada).
 // Si a esa hora estaba apagado, se hace en cuanto se abra el navegador.
+/** Próximo día a las 6:00 (la actualización automática es diaria) */
 function proximoLunes6() {
   const d = new Date();
   d.setHours(6, 0, 0, 0);
-  const faltan = (1 - d.getDay() + 7) % 7; // 1 = lunes
-  d.setDate(d.getDate() + faltan);
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 7);
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
   return d.getTime();
 }
 /** Campos sueltos de una jugada (texto y números, un nivel de profundidad) para saber quién la hace */
@@ -45,8 +44,8 @@ async function lanzarAuto() {
 }
 async function revisarPendiente() {
   const { ultimaAuto = 0 } = await chrome.storage.local.get("ultimaAuto");
-  // Último lunes a las 6:00
-  const ultimoLunes = proximoLunes6() - 7 * 864e5;
+  // Último día a las 6:00 (si el ordenador estaba apagado, se hace al encenderlo)
+  const ultimoLunes = proximoLunes6() - 864e5;
   if (ultimaAuto < ultimoLunes && Date.now() > ultimoLunes) await lanzarAuto();
 }
 chrome.runtime.onInstalled.addListener(() => { programar(); chrome.storage.local.set({ ultimaAuto: Date.now() }); });

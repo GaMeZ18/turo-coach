@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/", label: "Inicio" },
@@ -21,7 +22,11 @@ const NAV = [
 ];
 
 export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean }) {
-  const ruta = usePathname();
+  const rutaReal = usePathname();
+  // Al tocar un menú se marca al momento (sin esperar a que cargue la página)
+  const [pulsado, setPulsado] = useState<string | null>(null);
+  useEffect(() => setPulsado(null), [rutaReal]);
+  const ruta = pulsado ?? rutaReal;
   const coordinador = rol === "coordinador";
   // Mesas: para coordinadores y para quien tenga el permiso de gestor de mesas (que además es entrenador)
   const conMesas = mesas || coordinador ? [{ href: "/mesas", label: "Mesas" }] : [];
@@ -38,14 +43,22 @@ export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador
         <Link
           key={n.href}
           href={n.href}
+          onClick={() => setPulsado(n.href)}
           className={`relative whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium transition lg:px-2 ${
             activo(n.href) ? "text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
           {n.label}
+          <Cargando />
           {activo(n.href) && <span className="absolute inset-x-2.5 -bottom-1.5 h-[3px] rounded-t bg-oro" />}
         </Link>
       ))}
     </nav>
   );
+}
+
+/** Puntito que late mientras carga la página del menú tocado */
+function Cargando() {
+  const { pending } = useLinkStatus();
+  return pending ? <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 animate-ping rounded-full bg-oro" /> : null;
 }

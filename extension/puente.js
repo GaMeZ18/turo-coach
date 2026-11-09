@@ -3,7 +3,7 @@
 window.addEventListener("message", (e) => {
   if (e.source !== window || !e.data) return;
   if (e.data.tipo === "turo-fcbq-ping") {
-    // Recordar en qué dirección está la app (para la actualización automática de los lunes)
+    // Recordar en qué dirección está la app (para la actualización automática diaria)
     try { chrome.runtime.sendMessage({ tipo: "origen", url: location.origin + (location.pathname.startsWith("/coach") ? "/coach" : "") }); } catch {}
     window.postMessage({ tipo: "turo-fcbq-pong", version: chrome.runtime.getManifest().version }, location.origin);
     return;
