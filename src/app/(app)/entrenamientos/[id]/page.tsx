@@ -43,7 +43,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       .eq("entrenamiento_id", id)
       .order("orden"),
     // Más de 1000 ejercicios: se piden por páginas
-    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, perfiles(nombre)").order("titulo").range(d, h)),
+    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles(nombre)").order("titulo").range(d, h)),
     supabase
       .from("equipo_jugadores")
       .select("dorsal, jugadores(id, nombre, apellidos)")
