@@ -145,7 +145,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
         </form>
       </details>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Actividades
           entrenoId={e.id}
           inicio={e.fecha}

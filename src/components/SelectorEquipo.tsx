@@ -14,7 +14,7 @@ export default function SelectorEquipo({
   return (
     <select
       aria-label="Equipo activo"
-      className="max-w-44 rounded-lg border border-white/30 bg-white/10 px-2 py-1.5 text-sm text-white outline-none [&>option]:text-tinta"
+      className="max-w-[38vw] rounded-lg border border-white/30 sm:max-w-44 bg-white/10 px-2 py-1.5 text-sm text-white outline-none [&>option]:text-tinta"
       value={activoId ?? ""}
       disabled={pendiente}
       onChange={(e) => {

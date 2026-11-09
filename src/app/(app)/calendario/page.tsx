@@ -219,7 +219,7 @@ export default async function CalendarioPage({
         </div>
       )}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Agenda del mes */}
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-tinta/60">Agenda del mes</h2>

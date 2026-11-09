@@ -106,7 +106,7 @@ export default async function ScoutingEquipo({ searchParams }: { searchParams: P
         </div>
       )}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_380px]">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
           {/* Jugadores */}
           <section>

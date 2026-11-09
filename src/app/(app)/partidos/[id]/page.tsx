@@ -150,7 +150,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
       )}
 
       {esStaff ? (
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           {/* Resultado y notas */}
           <form action={guardarResultado} className="tarjeta space-y-3 p-4">

@@ -782,7 +782,7 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
             {pista.hay && pista.quintetos.length > 0 && (
               <div className="border-t border-linea p-2">
                 <p className="mb-1 text-[11px] font-semibold uppercase text-tinta/60">Quintetos</p>
-                <table className="w-full text-xs">
+                <div className="overflow-x-auto"><table className="w-full text-xs">
                   <thead className="text-[10px] uppercase text-tinta/50"><tr><th className="text-left">Quinteto</th><th>Min</th><th>PF</th><th>PC</th><th>+/-</th></tr></thead>
                   <tbody>
                     {pista.quintetos.slice(0, 10).map((q) => (
@@ -793,7 +793,7 @@ export default function Analizador({ videoId, youtubeId, archivo, categorias, cl
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             )}
             {pista.hay && (

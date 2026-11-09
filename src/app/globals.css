@@ -39,6 +39,27 @@ body {
 body {
   -webkit-tap-highlight-color: transparent;
   padding-bottom: env(safe-area-inset-bottom);
+  overflow-wrap: break-word; /* palabras o enlaces largos no ensanchan la pantalla */
+}
+
+/* Responsive: nada puede ensanchar la página en el móvil o la tablet
+   («clip» no rompe la cabecera fija, a diferencia de «hidden») */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+/* En las rejillas, cada hueco puede encogerse (si no, un contenido ancho estira la columna fuera de la pantalla) */
+.grid > * {
+  min-width: 0;
+}
+img,
+video,
+iframe {
+  max-width: 100%;
+}
+pre {
+  white-space: pre-wrap;
 }
 
 /* Títulos con el aire deportivo del club */

@@ -48,13 +48,13 @@ export default function BoxScore({ eq, destacar = false }: { eq: EquipoStats; de
 export function Parciales({ local, visitante }: { local: EquipoStats; visitante: EquipoStats }) {
   if (!local.porPeriodo.length) return null;
   return (
-    <table className="text-sm tabular-nums">
+    <div className="overflow-x-auto"><table className="text-sm tabular-nums">
       <thead><tr className="text-xs text-tinta/50"><th />{local.porPeriodo.map((_, i) => <th key={i} className="px-2 font-normal">{i + 1}º</th>)}<th className="px-2">Total</th></tr></thead>
       <tbody>
         {[local, visitante].map((e) => (
           <tr key={e.nombre}><td className="max-w-40 truncate pr-3 text-xs">{e.nombre}</td>{e.porPeriodo.map((v, i) => <td key={i} className="px-2 text-center">{v}</td>)}<td className="px-2 text-center font-bold">{e.pts}</td></tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }

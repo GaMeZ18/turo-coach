@@ -15,7 +15,7 @@ export default function Importar({ videoId }: { videoId: string }) {
     <div className="relative">
       <button type="button" onClick={() => setAbierto(!abierto)} className="btn-secundario !py-1.5 text-sm"><ScanSearch size={15} /> Detecciones</button>
       {abierto && (
-        <div className="absolute right-0 z-20 mt-1 w-80 rounded-xl border border-linea bg-white p-3 text-sm shadow-xl">
+        <div className="absolute right-0 z-20 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-linea bg-white p-3 text-sm shadow-xl">
           <form action={(fd) => start(async () => {
             const r = await importarDetecciones(fd);
             setMsg(r.error ? { ok: false, t: r.error } : { ok: true, t: `Importados ${r.nuevos} tiros por revisar${r.repetidos ? ` (${r.repetidos} ya estaban)` : ""}.` });

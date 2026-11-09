@@ -17,7 +17,7 @@ function Clasificacion({ liga }: { liga: LigaGuardada }) {
     const { cabeceras, filas } = liga.clasificacion;
     const iEquipo = Math.max(0, cabeceras.findIndex((c) => /^Equip/i.test(c)));
     return (
-      <table className="w-full text-sm tabular-nums">
+      <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm tabular-nums">
         <thead className="bg-suave text-xs uppercase tracking-wide text-tinta/60">
           <tr>{cabeceras.map((c, i) => <th key={i} className={`px-2 py-2 ${i === iEquipo ? "text-left" : "text-center"}`}>{c}</th>)}</tr>
         </thead>
@@ -28,12 +28,12 @@ function Clasificacion({ liga }: { liga: LigaGuardada }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     );
   }
   const filas = calcularClasificacion(liga.resultados);
   return (
-    <table className="w-full text-sm tabular-nums">
+    <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm tabular-nums">
       <thead className="bg-suave text-xs uppercase tracking-wide text-tinta/60">
         <tr>
           <th className="px-2 py-2 text-center">#</th><th className="px-2 py-2 text-left">Equipo</th>
@@ -54,7 +54,7 @@ function Clasificacion({ liga }: { liga: LigaGuardada }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 

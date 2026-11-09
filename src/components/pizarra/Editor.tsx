@@ -108,18 +108,19 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const vistaACancha = (u: number, v: number): Punto => (VD.rotada ? { x: VD.base - v, y: u } : { x: u, y: v });
   const giroTexto = VD.rotada ? 90 : 0; // para que números y textos queden derechos
   const altoDisp = grande ? Math.max(220, caja.alto - 200) : altoMax;
-  const escala = Math.max(5, Math.min(caja.ancho / anchoVista, altoDisp / altoVista));
+  // -2: el borde de 1 px a cada lado. Sin él, la pista medía 2 px más que su hueco y, dentro de una rejilla, iba creciendo sin parar
+  const escala = Math.max(5, Math.min((caja.ancho - 2) / anchoVista, altoDisp / altoVista));
   // Radio de la ficha: 0,5 m, pero nunca menos de ~13 px en pantalla (para poder tocar el número)
   // Proporción parecida a Coach Studio (≈0,38 m), con un mínimo de ~11 px para poder tocarla en el móvil
   const R = Math.max(0.38, 11 / escala) * p.config.tamano;
   const RB = R * 0.5; // radio del balón
   const elSel = p.elementos.find((x) => x.id === sel) ?? null;
   const ocupado = !!anim || !!exportando;
-  const anchoBarra = Math.max(anchoVista * escala, 320);
+  const anchoBarra = Math.min(Math.max(caja.ancho, 1), Math.max(anchoVista * escala + 2, 320));
 
   // ---------- medida del contenedor ----------
   useEffect(() => {
-    const medir = () => setCaja({ ancho: contRef.current?.clientWidth ?? 400, alto: window.innerHeight });
+    const medir = () => setCaja((c) => { const ancho = Math.floor(contRef.current?.clientWidth ?? 400), alto = window.innerHeight; return c.ancho === ancho && c.alto === alto ? c : { ancho, alto }; });
     medir();
     const ro = new ResizeObserver(medir);
     if (contRef.current) ro.observe(contRef.current);
@@ -1059,12 +1060,12 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   // =====================================================================
   return (
     <div
-      className={grande ? "fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-3" : "select-none space-y-2"}
+      className={grande ? "fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-3" : "w-full min-w-0 max-w-full select-none space-y-2"}
       style={grande ? { paddingTop: "max(env(safe-area-inset-top), 8px)" } : undefined}
     >
       <div>
         {/* ===== Pista ===== */}
-        <div ref={contRef} className="relative w-full">
+        <div ref={contRef} className="relative w-full min-w-0 max-w-full">
           <div className="mx-auto overflow-hidden rounded-t-xl border border-b-0 border-linea bg-white" style={{ width: anchoVista * escala + 2 }}>
             {/* Todos los toques y arrastres se gestionan aquí, con eventos de puntero (ratón, dedo y lápiz igual) */}
             <div

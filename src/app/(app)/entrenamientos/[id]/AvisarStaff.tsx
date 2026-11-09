@@ -19,7 +19,7 @@ export default function AvisarStaff({ entrenoId, completo }: { entrenoId: string
         <BellRing size={16} /> Avisar a mi staff
       </button>
       {abierto && (
-        <div className="absolute right-0 z-30 mt-1 w-72 rounded-xl border border-linea bg-white p-3 text-sm shadow-lg">
+        <div className="fixed inset-x-3 top-24 z-40 rounded-xl border border-linea bg-white p-3 text-sm shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-72">
           <div className="flex items-center justify-between"><p className="font-semibold">Avisar al cuerpo técnico</p><button type="button" onClick={() => setAbierto(false)} aria-label="Cerrar"><X size={16} /></button></div>
           {!completo && <p className="mt-1 text-xs text-amber-700">Aún no has completado el tiempo previsto del entreno.</p>}
           <textarea value={mensaje} onChange={(e) => setMensaje(e.target.value)} rows={3} maxLength={300} className="campo mt-2 text-sm" placeholder="Mensaje (opcional): p. ej. «He metido trabajo de rebote, ¿lo veis bien?»" />

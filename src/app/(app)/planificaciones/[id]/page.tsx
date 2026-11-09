@@ -152,7 +152,7 @@ export default async function PlanificacionPage({ params, searchParams }: { para
                       <form action={crearObjetivo} className="mt-1 flex flex-wrap items-start gap-2">
                         <input type="hidden" name="planificacion_id" value={id} />
                         <input type="hidden" name="padre_id" value={o.id} />
-                        <textarea name="nombre" required rows={2} placeholder={"Uno por línea:\nEntrada por la derecha\nEntrada por la izquierda"} className="campo !w-72 !py-1 text-sm" />
+                        <textarea name="nombre" required rows={2} placeholder={"Uno por línea:\nEntrada por la derecha\nEntrada por la izquierda"} className="campo !w-full !max-w-72 !py-1 text-sm" />
                         <Enviar className="btn-primario !py-1 text-xs">Añadir</Enviar>
                       </form>
                     </details>

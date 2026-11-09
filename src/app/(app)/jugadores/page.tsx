@@ -55,8 +55,8 @@ export default async function JugadoresPage() {
       <p className="text-sm text-tinta/60">{equipo.nombre} · {filas.length} jugadores</p>
       {!equipo.congelado && <PlantillaFCBQ key={`${equipo.id}-${candidatos.length}-${cambios.length}`} equipoId={equipo.id} candidatos={candidatos} cambios={cambios} />}
 
-      <div className="tarjeta mt-5 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="tarjeta mt-5 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-sm">
           <thead className="bg-suave text-left text-xs uppercase tracking-wide text-tinta/60">
             <tr>
               <th className="w-14 px-3 py-2">#</th>
