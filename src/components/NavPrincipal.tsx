@@ -21,7 +21,7 @@ const NAV = [
   { href: "/noticias", label: "Noticias" },
 ];
 
-export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean }) {
+export default function NavPrincipal({ rol, mesas = false, material = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean; material?: boolean }) {
   const rutaReal = usePathname();
   // Al tocar un menú se marca al momento (sin esperar a que cargue la página)
   const [pulsado, setPulsado] = useState<string | null>(null);
@@ -30,7 +30,8 @@ export default function NavPrincipal({ rol, mesas = false }: { rol: "coordinador
   const coordinador = rol === "coordinador";
   // Mesas: para coordinadores y para quien tenga el permiso de gestor de mesas (que además es entrenador)
   const conMesas = mesas || coordinador ? [{ href: "/mesas", label: "Mesas" }] : [];
-  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, { href: "/comunicados", label: "Comunicados" }, { href: "/club", label: "Club" }] : [...NAV, ...conMesas];
+  const conMaterial = material ? [{ href: "/material", label: "Material" }] : [];
+  const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, ...conMaterial, { href: "/comunicados", label: "Comunicados" }, { href: "/club", label: "Club" }] : [...NAV, ...conMesas, ...conMaterial];
   const activo = (href: string) => (href === "/" ? ruta === "/" : href === "/mesas" ? ruta === "/mesas" || (ruta.startsWith("/mesas") && !items.some((i) => i.href !== "/mesas" && ruta.startsWith(i.href))) : ruta.startsWith(href));
 
   return (

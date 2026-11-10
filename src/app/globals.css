@@ -130,13 +130,10 @@ html[data-tema="oscuro"] {
   --color-emerald-800: #6ee7b7;
   --color-gray-200: #26304f;
 }
-  html[data-tema="oscuro"] .bg-white { background-color: var(--superficie); }
-  html[data-tema="oscuro"] .bg-white\/90, .bg-white\/80 { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
-  html[data-tema="oscuro"] .hover\:bg-white:hover { background-color: var(--superficie); }
-  html[data-tema="oscuro"] .campo, .tarjeta, .btn-secundario { background-color: var(--superficie); }
-  html[data-tema="oscuro"] .btn-azul, .bg-azul { background-color: #1e3fa8; }
-  html[data-tema="oscuro"] .bg-azul.text-white, .bg-azul .text-white { color: #fff; }
-  html[data-tema="oscuro"] img[src$=".svg"] { filter: none; }
+  html[data-tema="oscuro"] :is(.bg-white, .hover\:bg-white:hover, .campo, .tarjeta, .btn-secundario) { background-color: var(--superficie); }
+  html[data-tema="oscuro"] :is(.bg-white\/90, .bg-white\/80) { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
+  html[data-tema="oscuro"] :is(.btn-azul, .bg-azul) { background-color: #1e3fa8; }
+  html[data-tema="oscuro"] :is(.bg-azul.text-white, .bg-azul .text-white) { color: #fff; }
 }
 @media screen and (prefers-color-scheme: dark) {
 html[data-tema="auto"] {
@@ -159,11 +156,8 @@ html[data-tema="auto"] {
   --color-emerald-800: #6ee7b7;
   --color-gray-200: #26304f;
 }
-  html[data-tema="auto"] .bg-white { background-color: var(--superficie); }
-  html[data-tema="auto"] .bg-white\/90, .bg-white\/80 { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
-  html[data-tema="auto"] .hover\:bg-white:hover { background-color: var(--superficie); }
-  html[data-tema="auto"] .campo, .tarjeta, .btn-secundario { background-color: var(--superficie); }
-  html[data-tema="auto"] .btn-azul, .bg-azul { background-color: #1e3fa8; }
-  html[data-tema="auto"] .bg-azul.text-white, .bg-azul .text-white { color: #fff; }
-  html[data-tema="auto"] img[src$=".svg"] { filter: none; }
+  html[data-tema="auto"] :is(.bg-white, .hover\:bg-white:hover, .campo, .tarjeta, .btn-secundario) { background-color: var(--superficie); }
+  html[data-tema="auto"] :is(.bg-white\/90, .bg-white\/80) { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
+  html[data-tema="auto"] :is(.btn-azul, .bg-azul) { background-color: #1e3fa8; }
+  html[data-tema="auto"] :is(.bg-azul.text-white, .bg-azul .text-white) { color: #fff; }
 }

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import {
+  Package,
   Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge, ClipboardCheck, Megaphone, Newspaper,
 } from "lucide-react";
-import { gestionaMesas, requireUser } from "@/lib/supabase/server";
+import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import InstalarApp from "@/components/InstalarApp";
 
@@ -54,6 +55,7 @@ export default async function Inicio() {
         {[
           ...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []),
           ...(gestionaMesas(perfil) ? [{ href: "/mesas", titulo: "Mesas", texto: "Quién hace cada mesa y pagos del mes", icono: ClipboardCheck }] : []),
+          ...(veMaterial(perfil) ? [{ href: "/material", titulo: "Material", texto: "Inventario de balones, conos… por sitio", icono: Package }] : []),
           ...(perfil.rol === "coordinador" ? [{ href: "/comunicados", titulo: "Comunicados", texto: "Mensajes y noticias a quien elijas", icono: Megaphone }] : []),
           ...MODULOS.map((m) => (m.href === "/video" && perfil.rol !== "coordinador" ? { ...m, href: "" } : m))].map(({ href, titulo, texto, icono: Icono }) => {
           const contenido = (
