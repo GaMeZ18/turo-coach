@@ -162,5 +162,37 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     }
   }
 
+  // 8) Fantasy Turó → a los participantes del staff (con avisos activados): viernes «haz tu equipo», lunes «tus puntos»
+  try {
+    if ((diaSemana === 5 && horaLocal >= 19) || (diaSemana === 1 && horaLocal >= 12)) {
+      const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");
+      const { nombreJornada } = await import("./fantasy/motor");
+      const cfg = await leerConfig();
+      const { liga, participantes } = await cargarLiga(cfg);
+      const conCuenta = participantes.filter((p) => p.perfil_id && (cfg.abierto || p.perfil_id === ADMIN_FANTASY));
+      if (diaSemana === 5 && !cfg.cerrada) {
+        const l = liga.abierta, cierre = liga.cierre(l);
+        if (cierre > new Date(ahora).toISOString()) {
+          for (const p of conCuenta) {
+            if (liga.alineacion(p.id, l)) continue;
+            await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarPerfiles(db, [p.perfil_id!], "🏆 Fantasy: ¡haz tu equipo!",
+              `${nombreJornada(cfg.inicio, l)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy", null, true));
+          }
+        }
+      }
+      if (diaSemana === 1) {
+        const l = liga.terminadas[liga.terminadas.length - 1];
+        const ranking = l ? liga.porJornada.get(l) ?? [] : [];
+        for (const p of conCuenta) {
+          const r = ranking.find((x) => x.id === p.id);
+          if (!l || !r) continue;
+          const pos = liga.general.findIndex((g) => g.id === p.id) + 1;
+          await unaVez(`fantasy-puntos:${l}:${p.id}`, () => notificarPerfiles(db, [p.perfil_id!], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
+            `${nombreJornada(cfg.inicio, l)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion", null, true));
+        }
+      }
+    }
+  } catch { /* el fantasy no debe romper el resto de avisos */ }
+
   return { enviados };
 }

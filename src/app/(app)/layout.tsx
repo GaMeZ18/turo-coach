@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { veFantasy } from "@/lib/fantasy/menu";
 import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
 import { equipoActivo, misEquipos } from "@/lib/equipo-activo";
 import SelectorEquipo from "@/components/SelectorEquipo";
@@ -15,10 +16,11 @@ import { Bell, LogOut, UserRound } from "lucide-react";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, perfil, user } = await requireUser();
   // Todo a la vez (antes, los avisos sin leer esperaban a los equipos)
-  const [{ equipos }, activo, { count: sinLeerRaw }] = await Promise.all([
+  const [{ equipos }, activo, { count: sinLeerRaw }, fantasy] = await Promise.all([
     misEquipos(supabase),
     equipoActivo(supabase),
     supabase.from("notificaciones").select("id", { count: "exact", head: true }).eq("perfil_id", user.id).eq("leida", false),
+    veFantasy(user.id),
   ]);
   const sinLeer = sinLeerRaw ?? 0;
 
@@ -51,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </div>
-        <NavPrincipal rol={perfil.rol} mesas={gestionaMesas(perfil)} material={veMaterial(perfil)} />
+        <NavPrincipal rol={perfil.rol} mesas={gestionaMesas(perfil)} material={veMaterial(perfil)} fantasy={fantasy} />
         <div className="filete" />
       </header>
       <PedirAvisos clavePublica={VAPID_PUBLICO} />
