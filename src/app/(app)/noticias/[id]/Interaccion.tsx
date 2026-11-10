@@ -134,7 +134,7 @@ function BuscadorGif({ onElegir }: { onElegir: (url: string) => void }) {
     }, q ? 350 : 0);
     return () => clearTimeout(t);
   }, [q]);
-  if (sinClave) return null; // sin clave de Giphy: quedan las otras opciones
+  if (sinClave) return <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">El buscador de GIFs aún no está activado (falta la clave de Giphy en el servidor). Mientras, usa las otras opciones de abajo.</p>;
   return (
     <div className="rounded-lg border border-linea bg-white p-2">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar GIF: baloncesto, gracias, ánimo…" className="campo !py-1 text-sm" autoFocus />

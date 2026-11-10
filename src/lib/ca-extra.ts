@@ -2,6 +2,7 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "El buscador de GIFs aún no está activado (falta la clave de Giphy en el servidor). Mientras, usa las otras opciones de abajo.": "El cercador de GIFs encara no està activat (falta la clau de Giphy al servidor). Mentrestant, fes servir les altres opcions de sota.",
  "Buscar GIF: baloncesto, gracias, ánimo…": "Cercar GIF: bàsquet, gràcies, ànims…",
  "Otras opciones: pegar un enlace o subir un GIF": "Altres opcions: enganxar un enllaç o pujar un GIF",
  "Buscando…": "Cercant…",
