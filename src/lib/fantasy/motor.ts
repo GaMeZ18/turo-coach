@@ -22,7 +22,7 @@ export const COMODINES: Record<Comodin, { nombre: string; texto: string }> = {
 type JugStats = { dorsal: string; nombre: string; uuid: string | null; titular: boolean; seg: number; pts: number; t2: number; t3: number; tlm: number; tla: number; fc: number; mm: number };
 type EqStats = { nombre: string; pts: number; jugadores: JugStats[] };
 export type FilaStats = { equipo_id: string; stats_id: string; fecha: string | null; datos: { local: EqStats; visitante: EqStats; fecha?: string | null } };
-export type PartidoCal = { id: string; equipo_id: string; fecha: string; fcbq_stats_id: string | null };
+export type PartidoCal = { id: string; equipo_id: string; fecha: string; fcbq_stats_id: string | null; rival?: string | null; local?: boolean | null; puntos_favor?: number | null; puntos_contra?: number | null };
 export type Equipo = { id: string; nombre: string };
 
 export type JugadorF = { id: string; persona: string; nombre: string; dorsal: string; equipoId: string; equipo: string; chica: boolean };

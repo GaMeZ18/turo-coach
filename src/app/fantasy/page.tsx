@@ -4,10 +4,11 @@ import { VAPID_PUBLICO } from "@/lib/notificar";
 import AvisosFantasy from "./Avisos";
 import InstalarFantasy from "./Instalar";
 import "./fantasy.css";
-import { cargarLiga, quienSoy } from "@/lib/fantasy/datos";
+import { cargarClasificaciones, cargarLiga, posicion, quienSoy } from "@/lib/fantasy/datos";
+import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
-import { sumarDias } from "@/lib/pistas";
-import { fechaCorta, hora, hoyLocal } from "@/lib/fechas";
+import { lunesDe, sumarDias } from "@/lib/pistas";
+import { diaInput, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { CalendarDays, ChevronDown, Lock, Star } from "lucide-react";
 import Alta from "./Alta";
 import Fichajes, { type JugadorMercado } from "./Fichajes";
@@ -74,7 +75,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = ["equipo", "mercado", "clasificacion", "jornada", "insignias", "reglas"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const vista = ["equipo", "mercado", "clasificacion", "jornada", "calendario", "insignias", "reglas"].includes(sp.v ?? "") ? sp.v! : "equipo";
   const part = new Map(participantes.map((p) => [p.id, p]));
   const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
@@ -83,6 +84,14 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   const misInsignias = liga.insignias(yo.id);
   const campeon = q.config.cerrada && q.config.campeon ? part.get(q.config.campeon)?.alias ?? null : null;
 
+  const clasif = vista === "equipo" || vista === "mercado" || vista === "jornada" ? await cargarClasificaciones() : new Map();
+  /** Rival de cada equipo esa semana, con su posición: «vs Nou Barris (5º)» */
+  const rivalDe = (equipoId: string, l: string) => {
+    const p = partidos.filter((x) => x.equipo_id === equipoId && lunesDe(diaInput(x.fecha)) === l).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+    if (!p) return null;
+    const pos = posicion(clasif.get(equipoId), p.rival);
+    return `${p.local ? "vs" : "@"} ${p.rival ?? "?"}${pos ? ` (${pos.pos}º)` : ""}`;
+  };
   const mercadoDe = (l: string): JugadorMercado[] => {
     const pr = liga.precio(l), prAntes = liga.precio(sumarDias(l, -7));
     const ultima = liga.terminadas[liga.terminadas.length - 1] ?? sumarDias(l, -7);
@@ -93,6 +102,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         id: j.id, persona: j.persona, nombre: j.nombre, dorsal: j.dorsal, equipo: j.equipo, equipoId: j.equipoId, chica: j.chica,
         precio: p.precio, media: p.media, pj: p.pj, tendencia: a ? Math.sign(p.precio - a.precio) : 0,
         ultimo: semUlt.get(j.id)?.jugo ? semUlt.get(j.id)!.puntos : null, descansa: desc.has(j.equipoId), bloqueado: bloq.has(j.persona),
+        rival: rivalDe(j.equipoId, l),
       };
     });
   };
@@ -307,7 +317,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         {esp.length > 0 && (
           <div className="fx-card-rojo p-3 text-center">
             <p className="fx-display text-xl">⭐ Partido de la jornada</p>
-            <p className="text-sm">{esp.map((p) => `${eqNom(p.equipo_id)} (${fechaCorta(p.fecha)})`).join(" · ")} puntúa <strong>×1,5</strong></p>
+            <p className="text-sm">{esp.map((p) => `${eqNom(p.equipo_id)} ${p.local ? "vs" : "@"} ${p.rival ?? "?"}${posicion(clasif.get(p.equipo_id), p.rival) ? ` (${posicion(clasif.get(p.equipo_id), p.rival)!.pos}º)` : ""} · ${fechaCorta(p.fecha)} ${hora(p.fecha)}`).join(" · ")} puntúa <strong>×1,5</strong></p>
           </div>
         )}
         {(gg || rev) && (
@@ -346,6 +356,64 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           </section>
         )}
         <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={yo.silenciado} />
+      </div>
+    );
+  }
+
+  if (vista === "calendario") {
+    const clas = await cargarClasificaciones();
+    const ps = partidos.filter((p) => liga.pool.has(p.equipo_id)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const ultimo = ps[ps.length - 1]?.fecha;
+    const hasta = ultimo ? lunesDe(diaInput(ultimo)) : liga.lunesHoy;
+    const semanas: string[] = [];
+    for (let l = lunesDe(q.config.inicio); l <= hasta; l = sumarDias(l, 7)) semanas.push(l);
+    const eqNom = (id: string) => equipos.find((e) => e.id === id)?.nombre ?? "";
+    const cuando = (f: string) => new Date(f).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+    const esp = new Set(Object.values(q.config.especiales).flat());
+    cuerpo = (
+      <div className="space-y-3">
+        <h1 className="fx-display text-2xl">📅 Calendario por jornadas</h1>
+        <p className="text-xs fx-suave">Partidos de los equipos que puntúan en el Fantasy, con la posición de cada uno en su liga. Si la Federació cambia un partido de día, aquí se actualiza solo.</p>
+        {semanas.map((l) => {
+          const lista = ps.filter((p) => lunesDe(diaInput(p.fecha)) === l);
+          const sin = q.config.anuladas.includes(l);
+          const estado = sin ? null : l === liga.abierta ? "Fichando" : l === liga.enJuego ? "En juego" : l < liga.lunesHoy ? "Terminada" : null;
+          return (
+            <details key={l} open={l >= liga.lunesHoy} className={`fx-card overflow-hidden ${l === liga.lunesHoy ? "!border-[var(--fx-oro)] border-2" : ""} ${sin ? "opacity-60" : ""}`}>
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 [&::-webkit-details-marker]:hidden">
+                <span className="fx-display text-lg">{sin ? "🚫 Sin Fantasy" : nombreJornada(q.config.inicio, l, q.config.anuladas)}</span>
+                <span className="text-xs fx-suave">semana del {fechaCorta(`${l}T12:00:00Z`)}</span>
+                {estado && <span className={`ml-auto rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${estado === "En juego" ? "bg-[var(--fx-rojo)]" : estado === "Fichando" ? "bg-[var(--fx-verde)]" : "bg-white/15"}`}>{estado}</span>}
+              </summary>
+              {lista.length === 0 ? <p className="border-t border-[var(--fx-borde)] px-3 py-2 text-sm fx-suave">Sin partidos.</p> : (
+                <ul className="fx-sep border-t border-[var(--fx-borde)]">
+                  {lista.map((p) => {
+                    const c = clas.get(p.equipo_id);
+                    const nos = posicion(c, null, true), ellos = posicion(c, p.rival);
+                    const jugado = p.puntos_favor != null && p.puntos_contra != null;
+                    const gana = jugado && p.puntos_favor! > p.puntos_contra!;
+                    return (
+                      <li key={p.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${esp.has(p.id) ? "bg-[var(--fx-oro)]/10" : ""}`}>
+                        <span className="w-[70px] shrink-0 text-[11px] leading-tight fx-suave">{cuando(p.fecha)}</span>
+                        <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: colorEquipo(eqNom(p.equipo_id)) }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold">
+                            {sigla(eqNom(p.equipo_id))}{nos && <span className="ml-1 text-[11px] font-normal text-[var(--fx-oro)]">{nos.pos}º</span>}
+                            <span className="mx-1.5 text-xs font-normal fx-suave">{p.local ? "vs" : "@"}</span>
+                            {p.rival ?? "Rival"}{ellos && <span className="ml-1 text-[11px] font-normal fx-suave">{ellos.pos}º</span>}
+                          </p>
+                          {esp.has(p.id) && <p className="text-[11px] font-bold text-[var(--fx-oro)]">⭐ Partido de la jornada · ×1,5</p>}
+                        </div>
+                        {jugado && <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-bold ${gana ? "bg-[#155f2d] text-green-100" : "bg-[#5e0f17] text-red-100"}`}>{p.puntos_favor}-{p.puntos_contra}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </details>
+          );
+        })}
+        <p className="text-center text-[11px] fx-suave">«vs» en casa · «@» fuera · el número pequeño es la posición en su liga</p>
       </div>
     );
   }

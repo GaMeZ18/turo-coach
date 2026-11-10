@@ -2,7 +2,7 @@ import Link from "next/link";
 import "../fantasy.css";
 import { Escudo } from "../ui";
 import { redirect } from "next/navigation";
-import { cargarLiga, db, quienSoy } from "@/lib/fantasy/datos";
+import { cargarClasificaciones, cargarLiga, db, posicion, quienSoy } from "@/lib/fantasy/datos";
 import { nombreJornada } from "@/lib/fantasy/motor";
 import { aISO, diaInput, fechaCorta, hora } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
@@ -15,6 +15,7 @@ export default async function AdminFantasy() {
   const q = await quienSoy();
   if (!q.esAdmin) redirect("/fantasy");
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
+  const clas = await cargarClasificaciones();
   const { data: ult } = await db().from("fcbq_stats").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const nombreEq = new Map(equipos.map((e) => [e.id, e.nombre]));
   // Todas las semanas de la temporada: desde el inicio hasta la del último partido del calendario (como mínimo 10 semanas)
@@ -92,7 +93,7 @@ export default async function AdminFantasy() {
                   {sin ? null : ps.length === 0 ? <p className="text-xs text-white/50">Sin partidos.</p> : (
                     <ul className="mt-1 grid gap-1 sm:grid-cols-2">
                       {ps.map((p) => (
-                        <li key={p.id}><Especial lunes={l} partidoId={p.id} activo={(q.config.especiales[l] ?? []).includes(p.id)} texto={`${nombreEq.get(p.equipo_id) ?? ""} · ${fechaCorta(p.fecha)} ${hora(p.fecha)}`} /></li>
+                        <li key={p.id}><Especial lunes={l} partidoId={p.id} activo={(q.config.especiales[l] ?? []).includes(p.id)} texto={`${nombreEq.get(p.equipo_id) ?? ""}${posicion(clas.get(p.equipo_id), null, true) ? ` (${posicion(clas.get(p.equipo_id), null, true)!.pos}º)` : ""} ${p.local ? "vs" : "@"} ${p.rival ?? "?"}${posicion(clas.get(p.equipo_id), p.rival) ? ` (${posicion(clas.get(p.equipo_id), p.rival)!.pos}º)` : ""} · ${fechaCorta(p.fecha)} ${hora(p.fecha)}`} /></li>
                       ))}
                     </ul>
                   )}

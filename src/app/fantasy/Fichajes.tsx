@@ -9,7 +9,7 @@ import { Camiseta, Sigla } from "./ui";
 
 export type JugadorMercado = {
   id: string; persona: string; nombre: string; dorsal: string; equipo: string; equipoId: string; chica: boolean;
-  precio: number; media: number | null; pj: number; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean;
+  precio: number; media: number | null; pj: number; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean; rival: string | null;
 };
 type Equipo = { titulares: string[]; suplente: string | null; capitan: string | null; comodin: Comodin | null };
 
@@ -127,6 +127,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
                     <span>Media {j.media !== null ? n(j.media) : "–"}</span>
                     <span>Últ: {j.ultimo !== null ? n(j.ultimo) : "–"}</span>
                   </p>
+                  {j.rival && <p className="truncate text-[11px] text-white/80">🏀 {j.rival}</p>}
                   {(j.descansa || j.bloqueado) && (
                     <p className="text-[11px] font-semibold">
                       {j.descansa && <span className="mr-2 text-amber-300"><Moon size={10} className="inline" /> Descansa</span>}
@@ -170,7 +171,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
         <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={32} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{j.nombre}</p>
-          <p className="flex gap-2 text-[11px] fx-suave"><Sigla equipo={j.equipo} /> {j.descansa && <span className="font-semibold text-amber-300">Descansa</span>}</p>
+          <p className="flex min-w-0 gap-2 text-[11px] fx-suave"><Sigla equipo={j.equipo} /> {j.descansa ? <span className="font-semibold text-amber-300">Descansa</span> : j.rival && <span className="truncate text-white/80">{j.rival}</span>}</p>
         </div>
         <span className="text-sm font-bold">{j.precio}⭐</span>
         {!suplente && (

@@ -79,7 +79,7 @@ export async function cargarLiga(config: Config) {
   const desde = new Date(Date.parse(config.inicio) - 120 * 864e5).toISOString();
   const [{ data: filas }, { data: partidos }, { data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
     d.from("fcbq_stats").select("equipo_id, stats_id, fecha, datos").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).or("local.ilike.%tur%,visitante.ilike.%tur%").limit(2000),
-    d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("fecha", desde).limit(2000),
+    d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id, rival, local, puntos_favor, puntos_contra").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("fecha", desde).limit(2000),
     d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
     d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste"),
     d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
@@ -102,4 +102,21 @@ export async function cargarLiga(config: Config) {
     await d.from("fantasy_precios").upsert({ jornada: liga.abierta, precios: Object.fromEntries([...p].map(([id, x]) => [id, [x.precio, x.media, x.pj]])) }, { onConflict: "jornada", ignoreDuplicates: true });
   }
   return { liga, participantes, partidos: (partidos ?? []) as PartidoCal[], equipos };
+}
+
+/** Clasificación de la liga de cada equipo (la que trae la extensión de la FCBQ): para saber en qué posición va cada uno */
+export type Clasif = { filas: string[][] };
+export async function cargarClasificaciones(): Promise<Map<string, Clasif>> {
+  const { data } = await db().from("ligas_fcbq").select("equipo_id, clasificacion");
+  return new Map(((data ?? []) as { equipo_id: string; clasificacion: Clasif | null }[]).filter((x) => x.clasificacion?.filas?.length).map((x) => [x.equipo_id, x.clasificacion!]));
+}
+const normEq = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+/** Posición de un equipo en la tabla (por nombre; el Turó se busca por «TURÓ») */
+export function posicion(c: Clasif | undefined, nombre: string | null | undefined, turo = false): { pos: number; total: number } | null {
+  if (!c) return null;
+  const n = nombre ? normEq(nombre) : "";
+  const fila = turo ? c.filas.find((f) => /TUR[OÓ]/i.test(f[1] ?? ""))
+    : c.filas.find((f) => normEq(f[1] ?? "") === n) ?? (n.length > 5 ? c.filas.find((f) => { const m = normEq(f[1] ?? ""); return m.includes(n) || n.includes(m); }) : undefined);
+  const pos = fila ? Number(fila[0]) : NaN;
+  return Number.isFinite(pos) ? { pos, total: c.filas.length } : null;
 }

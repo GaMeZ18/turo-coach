@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BookOpen, ClipboardList, MessageCircle, Settings, Trophy, Users } from "lucide-react";
+import { Award, BookOpen, CalendarDays, ClipboardList, MessageCircle, Settings, Trophy, Users } from "lucide-react";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import AutoRefresco from "@/components/AutoRefresco";
 
@@ -47,6 +47,7 @@ export const VISTAS = [
   { v: "mercado", t: "Mercado", i: ClipboardList },
   { v: "clasificacion", t: "Clasificación", i: Trophy },
   { v: "jornada", t: "Jornada", i: MessageCircle },
+  { v: "calendario", t: "Calendario", i: CalendarDays },
   { v: "insignias", t: "Insignias", i: Award },
   { v: "reglas", t: "Reglas", i: BookOpen },
 ] as const;
@@ -66,9 +67,9 @@ export function Marco({ children, perfil, esAdmin, vista, conMenu = true, tempor
           {perfil && <Link href="/" className="rounded-full border border-white/40 px-2.5 py-0.5 text-xs font-semibold">← App</Link>}
         </div>
         {conMenu && (
-          <nav className="mx-auto grid max-w-3xl grid-cols-6">
+          <nav className="mx-auto flex max-w-3xl overflow-x-auto [scrollbar-width:none]">
             {VISTAS.map(({ v, t, i: I }) => (
-              <Link key={v} href={`/fantasy?v=${v}`} className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-semibold sm:text-xs ${vista === v ? "bg-gradient-to-b from-[#f0323f] to-[#a3121e] text-white" : "text-white/70"}`}>
+              <Link key={v} href={`/fantasy?v=${v}`} className={`flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 px-1 py-1.5 text-[10px] font-semibold sm:text-xs ${vista === v ? "bg-gradient-to-b from-[#f0323f] to-[#a3121e] text-white" : "text-white/70"}`}>
                 <I size={18} />{t}
               </Link>
             ))}
