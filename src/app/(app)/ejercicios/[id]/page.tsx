@@ -17,7 +17,7 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
   const { supabase, user, perfil } = await requireUser();
   const { data: e } = await supabase
     .from("ejercicios")
-    .select("*, perfiles(nombre)")
+    .select("*, perfiles!ejercicios_autor_id_fkey(nombre)")
     .eq("id", id)
     .maybeSingle();
   if (!e) notFound();

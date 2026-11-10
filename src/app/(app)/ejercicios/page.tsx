@@ -25,7 +25,7 @@ export default async function EjerciciosPage({
   const misFavs = new Set((favs ?? []).map((f) => f.ejercicio_id as string));
   let consulta = supabase
     .from("ejercicios")
-    .select("id, titulo, tipo, categoria, etiquetas, duracion, preview, visibilidad, autor_id, pizarra, megusta, perfiles(nombre)")
+    .select("id, titulo, tipo, categoria, etiquetas, duracion, preview, visibilidad, autor_id, pizarra, megusta, perfiles!ejercicios_autor_id_fkey(nombre)")
     .order("updated_at", { ascending: false })
     .limit(120);
   if (tipo) consulta = consulta.eq("tipo", tipo);

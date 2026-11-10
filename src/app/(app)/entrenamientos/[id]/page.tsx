@@ -46,7 +46,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
       .eq("entrenamiento_id", id)
       .order("orden"),
     // Más de 1000 ejercicios: se piden por páginas
-    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles(nombre)").order("titulo").range(d, h)),
+    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles!ejercicios_autor_id_fkey(nombre)").order("titulo").range(d, h)),
     supabase
       .from("equipo_jugadores")
       .select("dorsal, jugadores(id, nombre, apellidos)")
@@ -57,7 +57,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     supabase.from("entreno_objetivos").select("objetivo_id").eq("entrenamiento_id", id),
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
     supabase.from("ejercicio_favoritos").select("ejercicio_id").eq("perfil_id", user.id),
-    supabase.from("entreno_comentarios").select("id, texto, visita, created_at, autor_id, perfiles(nombre)").eq("entrenamiento_id", id).order("created_at"),
+    supabase.from("entreno_comentarios").select("id, texto, visita, created_at, autor_id, perfiles!entreno_comentarios_autor_id_fkey(nombre)").eq("entrenamiento_id", id).order("created_at"),
   ]);
   // ¿Coincide en la pista con otro equipo?
   let choque: string[] = [];

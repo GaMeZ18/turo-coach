@@ -32,14 +32,14 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
   const autor = sp.autor && /^[0-9a-f-]{36}$/i.test(sp.autor) ? sp.autor : "";
   let consulta = supabase
     .from("ejercicios")
-    .select("id, titulo, tipo, categoria, etiquetas, edades, duracion, jugadores_min, preview, pizarra, descripcion, megusta, perfiles(nombre)", { count: "exact" });
+    .select("id, titulo, tipo, categoria, etiquetas, edades, duracion, jugadores_min, preview, pizarra, descripcion, megusta, perfiles!ejercicios_autor_id_fkey(nombre)", { count: "exact" });
   consulta = orden === "valorados" ? consulta.order("megusta", { ascending: false }).order("titulo")
     : orden === "recientes" ? consulta.order("created_at", { ascending: false })
     : consulta.order("categoria").order("titulo");
   // Favoritos: los míos estén o no en la biblioteca
   consulta = fav ? consulta.in("id", misFavs.size ? [...misFavs] : ["00000000-0000-0000-0000-000000000000"])
     : autor ? consulta.eq("autor_id", autor) : consulta.eq("en_biblioteca", true);
-  const { data: autoresR } = await supabase.from("ejercicios").select("autor_id, perfiles(nombre)").not("autor_id", "is", null).limit(5000);
+  const { data: autoresR } = await supabase.from("ejercicios").select("autor_id, perfiles!ejercicios_autor_id_fkey(nombre)").not("autor_id", "is", null).limit(5000);
   const autores = [...((autoresR ?? []) as unknown as { autor_id: string; perfiles: { nombre: string | null } | null }[]).reduce((m, x) => {
     const a = m.get(x.autor_id) ?? { id: x.autor_id, nombre: x.perfiles?.nombre?.trim() || "Sin nombre", n: 0 };
     a.n++; return m.set(x.autor_id, a);

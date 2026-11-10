@@ -19,7 +19,7 @@ export default async function VisitasPage({ searchParams }: { searchParams: Prom
   const { equipos } = await equiposDeTemporada(supabase);
   const soloVisitas = ver !== "todo";
   let q = supabase.from("entreno_comentarios")
-    .select("id, texto, visita, created_at, autor_id, perfiles(nombre), entrenamientos!inner(id, fecha, equipo_id)")
+    .select("id, texto, visita, created_at, autor_id, perfiles!entreno_comentarios_autor_id_fkey(nombre), entrenamientos!inner(id, fecha, equipo_id)")
     .order("created_at", { ascending: false }).limit(300);
   if (soloVisitas) q = q.eq("visita", true);
   const { data } = await q;

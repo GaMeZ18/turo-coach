@@ -9,7 +9,7 @@ export default async function Historial({ registroId }: { registroId: string }) 
   const supabase = await createClient();
   const { data } = await supabase
     .from("historial_cambios")
-    .select("id, accion, detalle, created_at, perfiles(nombre)")
+    .select("id, accion, detalle, created_at, perfiles!historial_cambios_perfil_id_fkey(nombre)")
     .eq("registro_id", registroId)
     .order("created_at", { ascending: false })
     .limit(50);
