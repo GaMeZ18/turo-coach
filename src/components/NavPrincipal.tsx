@@ -30,7 +30,8 @@ export default function NavPrincipal({ rol, mesas = false, material = false, fan
   // Y en un rato libre, los menús que más se usan (así el primer toque ya es instantáneo)
   useEffect(() => {
     const principales = ["/", "/entrenamientos", "/calendario", "/ejercicios", "/partidos", "/biblioteca"].filter((h) => h !== rutaReal);
-    const libre = (fn: () => void) => ("requestIdleCallback" in window ? (window as Window & { requestIdleCallback: (f: () => void) => number }).requestIdleCallback(fn) : window.setTimeout(fn, 1200));
+    const w = window as Window & { requestIdleCallback?: (f: () => void) => number };
+    const libre = (fn: () => void) => (w.requestIdleCallback ? w.requestIdleCallback(fn) : w.setTimeout(fn, 1200));
     const t = window.setTimeout(() => principales.forEach((h, i) => window.setTimeout(() => libre(() => precargar(h)), i * 400)), 1500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
