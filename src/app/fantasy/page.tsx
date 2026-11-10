@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata, Viewport } from "next";
 import { VAPID_PUBLICO } from "@/lib/notificar";
 import AvisosFantasy from "./Avisos";
+import InstalarFantasy from "./Instalar";
 import "./fantasy.css";
 import { cargarLiga, quienSoy } from "@/lib/fantasy/datos";
 import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
@@ -153,6 +154,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         {q.cargaPuntos && (
           <a href="/partidos/importar?auto=1" target="_blank" rel="noopener" className="fx-btn-sec w-full justify-center">🔄 Cargar puntos Fantasy <span className="text-xs fx-suave">(estadísticas de la FCBQ)</span></a>
         )}
+        <InstalarFantasy />
         {!yo.perfil_id && <AvisosFantasy clavePublica={VAPID_PUBLICO} />}
         {l ? (
           <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
