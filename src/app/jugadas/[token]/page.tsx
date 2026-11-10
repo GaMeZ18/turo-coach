@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { adminClient } from "@/lib/supabase/admin";
 import Cabecera from "@/components/publico/Cabecera";
 import Jugadas from "./Jugadas";
+import TodasSeguidas from "@/components/pizarra/TodasSeguidas";
+import { Printer } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,12 @@ export default async function PlaybookPublico({ params }: { params: Promise<{ to
       <main className="mx-auto max-w-3xl px-4 py-5">
         <h1 className="text-2xl font-semibold">Nuestras jugadas</h1>
         <p className="text-sm text-tinta/60">Toca una jugada para verla animada.</p>
+        {d.items.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <a href={`/jugadas/${token}/imprimir`} className="btn-secundario"><Printer size={16} /> PDF paso a paso</a>
+            <TodasSeguidas nombre={`Jugadas · ${d.equipo}`} jugadas={d.items.map((x) => ({ id: x.id, titulo: x.titulo, notas: x.notas, pizarra: x.pizarra }))} />
+          </div>
+        )}
         <Jugadas items={d.items} />
         <p className="pb-6 pt-6 text-center text-xs text-tinta/50">Coach Manager CBTuró · CB Turó de la Peira</p>
       </main>

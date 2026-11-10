@@ -50,6 +50,13 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 type VistaEspecial = null | { tipo: "captura"; seg: number } | { tipo: "todas" };
 
+export interface ControlPizarra {
+  reproducir: () => Promise<void>;
+  parar: () => void;
+  canvas: () => HTMLCanvasElement | undefined;
+  fotogramas: number;
+}
+
 export interface EditorProps {
   valor?: unknown;
   onChange?: (p: Pizarra) => void;
@@ -57,6 +64,8 @@ export interface EditorProps {
   altoMax?: number;
   titulo?: string;
   soloVer?: boolean; // solo reproducir (sin editar): play, pausa, stop y fotogramas
+  /** Para reproducir desde fuera (ver todas las jugadas seguidas o grabarlas en un vídeo) */
+  control?: (api: ControlPizarra | null) => void;
 }
 
 /** Formaciones listas para colocar (u: 0-15 de banda a banda; v: metros desde la línea de fondo de la canasta que se ve) */
@@ -76,7 +85,7 @@ const FORMACIONES: Formacion[] = [
   { nombre: "2-3 (dos bases)", tipo: "atacante", sitios: [[5.0, 8.6], [10.0, 8.6], [1.0, 1.2], [14.0, 1.2], [7.5, 3.6]] },
 ];
 
-export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra", soloVer = false }: EditorProps) {
+export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra", soloVer = false, control }: EditorProps) {
   const [p, setP] = useState<Pizarra>(() => normalizar(valor ?? pizarraVacia()));
   const [historial, setHistorial] = useState<{ p: Pizarra; cursor: number }[]>([]);
   const [cursor, setCursor] = useState(0);
@@ -693,6 +702,18 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     a.click();
     avisar(v.ext === "webm" ? "Vídeo descargado (.webm). Si WhatsApp no lo acepta, usa Safari o Chrome actualizado." : "Vídeo descargado. Ya puedes enviarlo por WhatsApp.");
   };
+
+  // Control desde fuera (siempre con las funciones de este momento)
+  const controlRef = useRef<ControlPizarra | null>(null);
+  controlRef.current = {
+    reproducir: async () => { if (anim) parar(); setEspecial(null); await esperarPintado(); if (n) await reproducir(0); },
+    parar, canvas: () => layerRef.current?.getNativeCanvasElement(), fotogramas: n,
+  };
+  useEffect(() => {
+    if (!control) return;
+    control({ reproducir: () => controlRef.current!.reproducir(), parar: () => controlRef.current!.parar(), canvas: () => controlRef.current!.canvas(), fotogramas: n });
+    return () => control(null);
+  }, [control, n]);
 
   // miniatura del ejercicio: todas las imágenes superpuestas
   useEffect(() => {

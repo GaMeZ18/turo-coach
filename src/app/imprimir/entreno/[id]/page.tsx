@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaLarga, hora } from "@/lib/fechas";
-import { normalizar } from "@/components/pizarra/modelo";
-import qrcode from "qrcode-generator";
+import { pasosDe, qrSvg } from "@/lib/pasos";
 import MiniPizarra from "@/components/pizarra/Mini";
 import BotonImprimir from "./Imprimir";
 import AsistenciaHoja from "./AsistenciaHoja";
@@ -13,22 +12,6 @@ type Act = {
 };
 
 export const metadata = { title: "Entreno · Coach Manager CBTuró" };
-
-/** Código QR (SVG) para abrir el vídeo del ejercicio con el móvil desde el papel */
-function qrSvg(url: string) {
-  try { const q = qrcode(0, "M"); q.addData(url); q.make(); return q.createSvgTag({ cellSize: 2, margin: 0, scalable: true }); } catch { return ""; }
-}
-
-/** Pasos para el PDF: un dibujo por fotograma (si hay muchos, se juntan de 2 en 2 o más para que quepan en 9) */
-function pasosDe(pizarra: unknown): [number, number][] {
-  if (!pizarra) return [];
-  const n = normalizar(pizarra).fotogramas.length;
-  if (n < 2) return [];
-  const grupo = Math.ceil(n / 9);
-  const r: [number, number][] = [];
-  for (let i = 0; i < n; i += grupo) r.push([i, Math.min(n, i + grupo)]);
-  return r;
-}
 
 export default async function ImprimirEntreno({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

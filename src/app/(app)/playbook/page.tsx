@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import { todas } from "@/lib/db";
-import { BookMarked } from "lucide-react";
+import { BookMarked, Printer } from "lucide-react";
+import TodasSeguidas from "@/components/pizarra/TodasSeguidas";
 import EditorPlaybook, { type ItemPlaybook } from "./EditorPlaybook";
 
 export const metadata = { title: "Playbook" };
@@ -28,6 +29,14 @@ export default async function PlaybookPage() {
         Las jugadas y sistemas del equipo. Crea un enlace para los jugadores: lo abren sin cuenta y ven cada jugada animada, sin poder cambiar nada.
         También puedes añadir desde cualquier ejercicio con el botón «Al playbook». <Link href="/ejercicios?tipo=sistema" className="text-azul underline">Ver sistemas</Link>
       </p>
+      <div className="mt-3 flex flex-wrap items-start gap-2">
+        {lista.length > 0 && <Link href="/imprimir/playbook" className="btn-secundario"><Printer size={16} /> PDF paso a paso</Link>}
+      </div>
+      {lista.length > 0 && (
+        <div className="mt-2">
+          <TodasSeguidas nombre={`Jugadas · ${equipo.nombre}`} jugadas={lista.map((x) => ({ id: x.id, titulo: x.ej.titulo, notas: x.notas, pizarra: x.ej.pizarra }))} />
+        </div>
+      )}
       <EditorPlaybook
         equipoId={equipo.id}
         items={lista}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Package,
+  BookMarked,
   Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge, ClipboardCheck, Megaphone, Newspaper,
 } from "lucide-react";
 import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ const MODULOS = [
   { href: "/entrenamientos", titulo: "Entrenamientos", texto: "Prepara la sesión y pasa lista", icono: Timer },
   { href: "/ejercicios", titulo: "Ejercicios y sistemas", texto: "La biblioteca del club y la tuya", icono: TrafficCone },
   { href: "/pizarra", titulo: "Pizarra", texto: "Dibuja y anima jugadas al momento", icono: PenTool },
+  { href: "/playbook", titulo: "Playbook", texto: "Las jugadas del equipo, en PDF, vídeo y enlace", icono: BookMarked },
   { href: "/calendario", titulo: "Calendario", texto: "Partidos, entrenos, eventos y cumpleaños", icono: CalendarDays },
   { href: "/partidos", titulo: "Partidos", texto: "Resultados y convocatorias", icono: Trophy },
   { href: "/pistas", titulo: "Pistas", texto: "Quién entrena en cada pista y a qué hora", icono: MapPin },

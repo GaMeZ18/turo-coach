@@ -2,6 +2,15 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "PDF paso a paso": "PDF pas a pas",
+ "Ver todas seguidas / vídeo": "Veure-les totes seguides / vídeo",
+ "Ver todas": "Veure-les totes",
+ "Vídeo con todas": "Vídeo amb totes",
+ "Parar": "Aturar",
+ "Las jugadas del equipo, en PDF, vídeo y enlace": "Les jugades de l'equip, en PDF, vídeo i enllaç",
+ "← Volver al playbook": "← Tornar al playbook",
+ "Escanéalo para verlas animadas": "Escaneja'l per veure-les animades",
+ "Grabando el vídeo… no cambies de pantalla ni bloquees el móvil.": "Gravant el vídeo… no canviïs de pantalla ni bloquegis el mòbil.",
  "Favorito": "Preferit",
  "Favoritos": "Preferits",
  "Mis favoritos": "Els meus preferits",
