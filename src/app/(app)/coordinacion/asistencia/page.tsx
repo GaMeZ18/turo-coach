@@ -24,7 +24,7 @@ export default async function AsistenciaGeneral({ searchParams }: { searchParams
   const desde = periodo === "temporada" ? null : aISO(sumarDias(hoyLocal(), -Number(periodo || 30)), "00:00");
 
   const [{ data: entR }, { data: asisR }] = ids.length ? await Promise.all([
-    (() => { let q = supabase.from("entrenamientos").select("id, equipo_id, fecha").in("equipo_id", ids).lte("fecha", ahora); if (desde) q = q.gte("fecha", desde); return q; })(),
+    (() => { let q = supabase.from("entrenamientos").select("id, equipo_id, fecha").is("anulado_motivo", null).in("equipo_id", ids).lte("fecha", ahora); if (desde) q = q.gte("fecha", desde); return q; })(),
     todas((a, b) => {
       let q = supabase.from("asistencias").select("jugador_id, estado, motivo, entrenamiento_id, entrenamientos!inner(fecha, equipo_id), jugadores(nombre, apellidos)")
         .in("entrenamientos.equipo_id", ids).lte("entrenamientos.fecha", ahora);

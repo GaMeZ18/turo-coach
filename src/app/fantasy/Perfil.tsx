@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Camera, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { COLORES_AVATAR, EMOJIS_AVATAR } from "@/lib/fantasy/estilo";
-import { guardarPerfil, salir } from "./actions";
+import { darmeDeBaja, guardarPerfil, salir } from "./actions";
 import { Escudo } from "./ui";
 
 export type AvatarDatos = { emoji: string | null; color: string | null; foto: string | null };
@@ -77,6 +77,7 @@ export function EditarPerfil({ alias, mostrar, avatar, publico }: { alias: strin
             })}>{pend && <Loader2 size={16} className="animate-spin" />} Guardar</button>
             {error && <p className="text-sm text-red-300">{error}</p>}
             {publico && <button className="w-full text-center text-xs fx-suave underline" onClick={() => start(async () => { await salir(); })}>Salir en este móvil</button>}
+            <button className="w-full text-center text-xs text-red-300/80 underline" onClick={() => confirm("¿Seguro que quieres darte de baja del Fantasy? Se borran tu equipo, tus puntos y tus mensajes. No se puede deshacer.") && start(async () => { await darmeDeBaja(); })}>Darme de baja del Fantasy</button>
           </div>
         </div>
       )}

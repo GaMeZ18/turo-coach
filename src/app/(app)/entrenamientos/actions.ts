@@ -343,3 +343,36 @@ export async function borrarComentarioEntreno(entrenoId: string, id: string) {
   revalidatePath(ruta(entrenoId));
   return error ? { error: error.message } : {};
 }
+
+/** Anular un entreno (lluvia, vaga…) o volver a activarlo. Opcionalmente avisa al resto del cuerpo técnico. */
+export async function anularEntreno(entrenoId: string, motivo: string | null, avisar: boolean): Promise<{ ok?: boolean; error?: string }> {
+  const { requireUser } = await import("@/lib/supabase/server");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { notificarPerfiles } = await import("@/lib/notificar");
+  const { fechaCorta, hora } = await import("@/lib/fechas");
+  const { supabase, user, perfil } = await requireUser();
+  const m = motivo ? motivo.replace(/\s+/g, " ").trim().slice(0, 80) : null;
+  if (motivo !== null && !m) return { error: "Elige o escribe el motivo." };
+  const { data: e, error } = await supabase.from("entrenamientos")
+    .update({ anulado_motivo: m, anulado_en: m ? new Date().toISOString() : null })
+    .eq("id", entrenoId).select("id, equipo_id, fecha, equipos(nombre)").maybeSingle();
+  if (error) return { error: error.message };
+  if (!e) return { error: "No puedes cambiar este entreno." };
+  revalidatePath(ruta(entrenoId));
+  revalidatePath("/entrenamientos");
+  revalidatePath("/calendario");
+  revalidatePath("/pistas");
+  if (avisar) {
+    const db = adminClient();
+    if (db) {
+      const { data: staff } = await db.from("equipo_staff").select("perfil_id").eq("equipo_id", e.equipo_id);
+      const destino = (staff ?? []).map((s) => s.perfil_id as string).filter((id) => id !== user.id);
+      const equipo = (e.equipos as unknown as { nombre: string } | null)?.nombre ?? "";
+      const quien = perfil.nombre?.split(" ")[0] ?? "Alguien";
+      if (destino.length) await notificarPerfiles(db, destino,
+        m ? `❌ Entreno anulado · ${equipo}` : `✅ Entreno reactivado · ${equipo}`,
+        `${fechaCorta(e.fecha)} a las ${hora(e.fecha)}${m ? ` · Motivo: ${m}` : ""}\n(${quien})`, ruta(entrenoId), e.equipo_id);
+    }
+  }
+  return { ok: true };
+}

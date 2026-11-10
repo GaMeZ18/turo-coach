@@ -16,7 +16,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
   if (!equipo) return <SinEquipo que="su asistencia" />;
 
   const [{ data: entrenos }, { data: plantilla }] = await Promise.all([
-    supabase.from("entrenamientos").select("id, fecha, titulo").eq("equipo_id", equipo.id).lte("fecha", new Date().toISOString()).order("fecha", { ascending: false }).limit(cuantos),
+    supabase.from("entrenamientos").select("id, fecha, titulo").is("anulado_motivo", null).eq("equipo_id", equipo.id).lte("fecha", new Date().toISOString()).order("fecha", { ascending: false }).limit(cuantos),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", equipo.id),
   ]);
   const lista = (entrenos ?? []).reverse();

@@ -2,6 +2,17 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Anular": "Anul·lar",
+ "¿Por qué se anula?": "Per què s'anul·la?",
+ "Otro motivo…": "Un altre motiu…",
+ "Avisar al resto del cuerpo técnico": "Avisar la resta del cos tècnic",
+ "Anular entreno": "Anul·lar entrenament",
+ "Entreno anulado": "Entrenament anul·lat",
+ "Reactivar": "Reactivar",
+ "Avisar al staff": "Avisar l'staff",
+ "No cuenta para avisos, asistencia ni ocupación de pistas.": "No compta per a avisos, assistència ni ocupació de pistes.",
+ "Fantasy Turó": "Fantasy Turó",
+ "Ficha jugadores del club y suma puntos": "Fitxa jugadors del club i suma punts",
  "PDF paso a paso": "PDF pas a pas",
  "Ver todas seguidas / vídeo": "Veure-les totes seguides / vídeo",
  "Ver todas": "Veure-les totes",

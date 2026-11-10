@@ -25,7 +25,7 @@ async function aliasLibre(alias: string, excepto?: string) {
 }
 
 /** Staff con cuenta: solo elige el nombre de su equipo */
-export async function unirseStaff(alias: string, avatar?: Avatar): Promise<R> {
+export async function unirseStaff(alias: string, avatar?: Avatar, nombreReal?: string): Promise<R> {
   const q = await quienSoy();
   if (!q.perfil) return { error: "Tienes que entrar con tu cuenta del club." };
   if (!q.acceso) return { error: "El fantasy aún no está abierto." };
@@ -33,7 +33,11 @@ export async function unirseStaff(alias: string, avatar?: Avatar): Promise<R> {
   const a = limpiar(alias, 30);
   if (!aliasValido(a)) return { error: "El nombre del equipo debe tener entre 3 y 30 letras." };
   if (!(await aliasLibre(a))) return { error: "Ese nombre de equipo ya existe. Elige otro." };
-  const nombre = q.perfil.nombre ?? "Staff";
+  const guardado = q.perfil.nombre && !q.perfil.nombre.includes("@") ? q.perfil.nombre.trim() : "";
+  const nombre = limpiar(nombreReal, 60) || guardado;
+  if (nombre.split(" ").filter(Boolean).length < 2) return { error: "Pon tu nombre y apellido." };
+  // Si en la app no teníamos su nombre, se guarda también en su perfil
+  if (!guardado) await db().from("perfiles").update({ nombre }).eq("id", q.perfil.id);
   const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...avatarValido(avatar) });
   if (error) return { error: error.message };
   revalidatePath("/fantasy");
@@ -70,6 +74,16 @@ export async function entrar(quien: string, pin: string): Promise<R> {
   const t = nuevaSesion();
   await d.from("fantasy_participantes").update({ sesion_hash: hashSesion(t) }).eq("id", p.id);
   await guardarCookie(t);
+  revalidatePath("/fantasy");
+  return { ok: true };
+}
+
+/** Darse de baja: borra su equipo, sus alineaciones y sus mensajes */
+export async function darmeDeBaja(): Promise<R> {
+  const q = await quienSoy();
+  if (!q.participante) return { error: "No estás apuntado." };
+  await db().from("fantasy_participantes").delete().eq("id", q.participante.id);
+  (await cookies()).delete(COOKIE_FANTASY);
   revalidatePath("/fantasy");
   return { ok: true };
 }

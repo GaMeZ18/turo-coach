@@ -17,7 +17,7 @@ export default async function AdminFantasy() {
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
   const { data: ult } = await db().from("fcbq_stats").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const nombreEq = new Map(equipos.map((e) => [e.id, e.nombre]));
-  const jornadas = [...new Set([...liga.cerradas, liga.lunesHoy])].sort().reverse();
+  const jornadas = [...new Set([...liga.cerradas, liga.lunesHoy, ...[7, 14, 21, 28].map((d) => sumarDias(liga.lunesHoy, d))])].sort().reverse();
   const totalDe = new Map(liga.general.map((g) => [g.id, g]));
 
   return (

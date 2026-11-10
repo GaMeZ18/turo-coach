@@ -29,6 +29,8 @@ export default function Alta({ staff, abiertoPublico, premio }: { staff: { nombr
   const [error, setError] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  // ¿Tenemos su nombre y apellido? (algunas cuentas solo tienen el email)
+  const conNombre = !!staff && !staff.nombre.includes("@") && staff.nombre.trim().split(/\s+/).length >= 2;
   const ir = (fn: () => Promise<{ error?: string }>) => start(async () => { setError(null); const r = await fn(); if (r.error) setError(r.error); });
 
   return (
@@ -42,10 +44,12 @@ export default function Alta({ staff, abiertoPublico, premio }: { staff: { nombr
       <div className="overflow-hidden rounded-2xl bg-[#f3f5fb] text-left text-[#121a33] shadow-xl">
         {staff ? (
           <div className="space-y-3 p-4">
-            <p className="text-sm">Hola <strong>{staff.nombre}</strong> 👋 Ponle nombre a tu equipo y elige tu escudo:</p>
+            <p className="text-sm">{conNombre ? <>Hola <strong>{staff.nombre}</strong> 👋 </> : null}Ponle nombre a tu equipo y elige tu escudo:</p>
             <Campo icono={Shield} placeholder="Nombre de tu equipo" maxLength={30} value={f.alias} onChange={set("alias")} />
+            {!conNombre && <Campo icono={User} placeholder="Tu nombre y apellido" maxLength={60} value={f.nombre} onChange={set("nombre")} autoComplete="name" />}
+            <p className="text-[11px] text-[#5b6687]">Los demás verán el nombre de tu equipo en grande y tu nombre con la inicial del apellido (lo puedes cambiar).</p>
             <div className="rounded-xl bg-[#0d1530] p-3"><ElegirAvatar alias={f.alias} valor={av} onChange={setAv} /></div>
-            <button className="fx-btn fx-btn-oro w-full" disabled={pend} onClick={() => ir(() => unirseStaff(f.alias, av))}>{pend && <Loader2 size={16} className="animate-spin" />} ¡Me apunto!</button>
+            <button className="fx-btn fx-btn-oro w-full" disabled={pend} onClick={() => ir(() => unirseStaff(f.alias, av, conNombre ? undefined : f.nombre))}>{pend && <Loader2 size={16} className="animate-spin" />} ¡Me apunto!</button>
           </div>
         ) : !abiertoPublico ? (
           <p className="p-4 text-center text-sm">Las inscripciones aún no están abiertas.</p>

@@ -34,17 +34,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ archivo:
 
   const [entrenos, partidos, eventos] = await Promise.all([
     enlace.alcance === "club" ? Promise.resolve({ data: [] }) :
-      db.from("entrenamientos").select("id, equipo_id, fecha, titulo, duracion_prevista, lugar, notas").in("equipo_id", ids).gte("fecha", desde).lt("fecha", hasta),
+      db.from("entrenamientos").select("id, equipo_id, fecha, titulo, duracion_prevista, lugar, notas, anulado_motivo").in("equipo_id", ids).gte("fecha", desde).lt("fecha", hasta),
     db.from("partidos").select("id, equipo_id, fecha, rival, local, lugar, competicion, jornada, puntos_favor, puntos_contra, estado").in("equipo_id", ids).gte("fecha", desde).lt("fecha", hasta),
     db.from("eventos").select("id, equipo_id, fecha, titulo, tipo, lugar, descripcion").or(`equipo_id.is.null,equipo_id.in.(${ids.join(",")})`).gte("fecha", desde).lt("fecha", hasta),
   ]);
 
   const lista: EventoICS[] = [];
-  for (const e of (entrenos.data ?? []) as { id: string; equipo_id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null; notas: string | null }[]) {
+  for (const e of (entrenos.data ?? []) as { id: string; equipo_id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null; notas: string | null; anulado_motivo: string | null }[]) {
     lista.push({
       uid: `entreno-${e.id}`, inicio: e.fecha, minutos: e.duracion_prevista || 90,
-      titulo: `🏀 Entreno${varios ? ` ${nombreDe(e.equipo_id)}` : ""}${e.titulo ? ` · ${e.titulo}` : ""}`,
-      lugar: e.lugar, descripcion: e.notas, url: `${origen}/entrenamientos/${e.id}`,
+      titulo: `🏀 Entreno${varios ? ` ${nombreDe(e.equipo_id)}` : ""}${e.titulo ? ` · ${e.titulo}` : ""}${e.anulado_motivo ? ` · ANULADO (${e.anulado_motivo})` : ""}`,
+      lugar: e.lugar, descripcion: e.notas, url: `${origen}/entrenamientos/${e.id}`, cancelado: !!e.anulado_motivo,
     });
   }
   for (const p of (partidos.data ?? []) as { id: string; equipo_id: string; fecha: string; rival: string; local: boolean; lugar: string | null; competicion: string | null; jornada: number | null; puntos_favor: number | null; puntos_contra: number | null; estado: string }[]) {

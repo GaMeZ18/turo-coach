@@ -25,7 +25,7 @@ export default async function Coordinacion() {
   const en7 = aISO(sumarDias(hoy, 8), "00:00");
 
   const [{ data: entR }, { data: asisR }, { data: partR }, { data: staffR }, { data: pistasR }, { data: ocupR }] = await Promise.all([
-    supabase.from("entrenamientos").select("id, equipo_id, fecha, duracion_prevista, lugar").in("equipo_id", ids).gte("fecha", hace30).lt("fecha", finSemana),
+    supabase.from("entrenamientos").select("id, equipo_id, fecha, duracion_prevista, lugar").is("anulado_motivo", null).in("equipo_id", ids).gte("fecha", hace30).lt("fecha", finSemana),
     todas((a, b) => supabase.from("asistencias").select("jugador_id, estado, entrenamiento_id, entrenamientos!inner(fecha, equipo_id), jugadores(nombre, apellidos)").gte("entrenamientos.fecha", hace30).lte("entrenamientos.fecha", ahora).order("entrenamiento_id").order("jugador_id").range(a, b)),
     supabase.from("partidos").select("id, equipo_id, fecha, rival, local, lugar, puntos_favor, puntos_contra").in("equipo_id", ids).order("fecha"),
     supabase.from("equipo_staff").select("equipo_id, funcion, perfiles(nombre)").in("equipo_id", ids),

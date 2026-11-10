@@ -44,7 +44,7 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
 
   // Entrenos desde el domingo anterior hasta dentro de 3 horas
   const lunes = lunesDe(hoy);
-  const { data: entR } = await db.from("entrenamientos").select("id, equipo_id, fecha, duracion_prevista")
+  const { data: entR } = await db.from("entrenamientos").select("id, equipo_id, fecha, duracion_prevista").is("anulado_motivo", null)
     .in("equipo_id", ids).gte("fecha", aISO(sumarDias(lunes, -1), "00:00")).lt("fecha", new Date(ahora + 180 * MIN).toISOString()).order("fecha");
   const entrenos = (entR ?? []) as Entreno[];
   const entIds = entrenos.map((e) => e.id);

@@ -9,6 +9,7 @@ import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
 import AvisarStaff from "./AvisarStaff";
+import Anular from "./Anular";
 import Comentarios, { type ComentarioEntreno } from "./Comentarios";
 import Historial from "@/components/Historial";
 import type { Objetivo } from "@/lib/objetivos";
@@ -98,6 +99,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!e.anulado_motivo && <Anular entrenoId={e.id} motivo={null} />}
           <AvisarStaff entrenoId={e.id} completo={((actividades ?? []) as { duracion: number | null }[]).reduce((s, a) => s + (a.duracion ?? 0), 0) >= (e.duracion_prevista ?? 1)} />
           <Link href={`/imprimir/entreno/${e.id}`} className="btn-secundario" title="Imprimir o guardar en PDF"><Printer size={16} /> PDF</Link>
           <form action={duplicarEntreno}>
@@ -111,7 +113,8 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {choque.length > 0 && (
+      {e.anulado_motivo && <Anular entrenoId={e.id} motivo={e.anulado_motivo} />}
+      {choque.length > 0 && !e.anulado_motivo && (
         <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
           ⚠ Coincide en la pista {e.lugar} con: <strong>{choque.join(", ")}</strong>. <Link href="/pistas" className="underline">Ver el reparto de pistas</Link>
         </p>

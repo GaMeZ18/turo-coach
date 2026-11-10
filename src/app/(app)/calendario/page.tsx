@@ -56,7 +56,7 @@ export default async function CalendarioPage({
   const desde = new Date(Date.UTC(y, m - 1, 1) - 8 * 864e5).toISOString();
   const hasta = new Date(Date.UTC(y, m, 1) + 8 * 864e5).toISOString();
 
-  let qEntrenos = supabase.from("entrenamientos").select("id, fecha, titulo, equipo_id, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
+  let qEntrenos = supabase.from("entrenamientos").select("id, fecha, titulo, equipo_id, anulado_motivo, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
   let qPartidos = supabase.from("partidos").select("id, fecha, rival, local, puntos_favor, puntos_contra, estado, equipo_id, equipos(nombre)").gte("fecha", desde).lt("fecha", hasta);
   const soloEquipo = !verTodo && equipo ? equipo.id : filtro;
   if (soloEquipo) {
@@ -75,10 +75,10 @@ export default async function CalendarioPage({
 
   const items: Item[] = [];
   type ConEquipo = { equipos: { nombre: string } | null };
-  for (const e of (entrenos.data ?? []) as unknown as ({ id: string; fecha: string; titulo: string | null; equipo_id: string } & ConEquipo)[]) {
+  for (const e of (entrenos.data ?? []) as unknown as ({ id: string; fecha: string; titulo: string | null; equipo_id: string; anulado_motivo: string | null } & ConEquipo)[]) {
     items.push({
       id: e.id, dia: diaInput(e.fecha), hora: hora(e.fecha), tipo: "entreno", href: `/entrenamientos/${e.id}`, color: color(e.equipo_id),
-      titulo: `${verTodo && e.equipos ? e.equipos.nombre + " · " : ""}${e.titulo ?? "Entreno"}`,
+      titulo: `${e.anulado_motivo ? "❌ " : ""}${verTodo && e.equipos ? e.equipos.nombre + " · " : ""}${e.titulo ?? "Entreno"}${e.anulado_motivo ? ` (anulado: ${e.anulado_motivo})` : ""}`,
     });
   }
   for (const p of (partidos.data ?? []) as unknown as ({ id: string; fecha: string; rival: string; local: boolean; puntos_favor: number | null; puntos_contra: number | null; estado: string; equipo_id: string } & ConEquipo)[]) {
@@ -112,7 +112,7 @@ export default async function CalendarioPage({
   const eqFaltas = !verTodo && equipo ? [equipo] : filtro ? delClub.filter((e) => e.id === filtro) : mios;
   const inicioMes = aISO(`${mes}-01`, "00:00"), finMes = aISO(`${mesSiguiente}-01`, "00:00");
   const { data: entMes } = eqFaltas.length
-    ? await supabase.from("entrenamientos").select("id, fecha, equipo_id").in("equipo_id", eqFaltas.map((e) => e.id)).gte("fecha", inicioMes).lt("fecha", finMes)
+    ? await supabase.from("entrenamientos").select("id, fecha, equipo_id").is("anulado_motivo", null).in("equipo_id", eqFaltas.map((e) => e.id)).gte("fecha", inicioMes).lt("fecha", finMes)
     : { data: [] };
   const entMesL = (entMes ?? []) as { id: string; fecha: string; equipo_id: string }[];
   const { data: asisMes } = entMesL.length

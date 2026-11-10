@@ -23,7 +23,7 @@ export default async function InformeTemporada() {
     { data: convs }, { data: periodos }, { data: stats }, { data: objs }, { data: acts },
   ] = await Promise.all([
     supabase.from("temporadas").select("nombre").eq("id", equipo.temporada_id).maybeSingle(),
-    supabase.from("entrenamientos").select("id, fecha, duracion_prevista").eq("equipo_id", equipo.id).lte("fecha", ahora),
+    supabase.from("entrenamientos").select("id, fecha, duracion_prevista").is("anulado_motivo", null).eq("equipo_id", equipo.id).lte("fecha", ahora),
     supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", equipo.id),
     todas((a, b) => supabase.from("asistencias").select("jugador_id, estado, entrenamiento_id, entrenamientos!inner(equipo_id, fecha)").eq("entrenamientos.equipo_id", equipo.id).lte("entrenamientos.fecha", ahora).order("entrenamiento_id").order("jugador_id").range(a, b)),
     supabase.from("partidos").select("id, fecha, rival, local, puntos_favor, puntos_contra, competicion, jornada").eq("equipo_id", equipo.id).order("fecha"),

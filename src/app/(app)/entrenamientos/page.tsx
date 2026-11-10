@@ -9,7 +9,7 @@ import Enviar from "@/components/Enviar";
 import ListaPistas from "@/components/ListaPistas";
 
 type Entreno = {
-  id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null;
+  id: string; fecha: string; titulo: string | null; duracion_prevista: number; lugar: string | null; anulado_motivo?: string | null;
   entreno_actividades: { duracion: number }[];
 };
 
@@ -21,7 +21,7 @@ export default async function EntrenamientosPage() {
   const { data: plantillas } = await supabase.from("plantillas_entreno").select("id, nombre, equipo_id, duracion_prevista").order("nombre");
   // Próximos en orden y pasados recientes (por separado, para que no se coman unos a otros)
   const ahoraIso = new Date(Date.now() - 3 * 3600 * 1000).toISOString(); // un entreno de hoy sigue en "próximos" un rato
-  const columnas = "id, fecha, titulo, duracion_prevista, lugar, entreno_actividades(duracion)";
+  const columnas = "id, fecha, titulo, duracion_prevista, lugar, anulado_motivo, entreno_actividades(duracion)";
   const [{ data: futuros }, { data: anteriores }] = await Promise.all([
     supabase.from("entrenamientos").select(columnas).eq("equipo_id", equipo.id).gte("fecha", ahoraIso).order("fecha").limit(300),
     supabase.from("entrenamientos").select(columnas).eq("equipo_id", equipo.id).lt("fecha", ahoraIso).order("fecha", { ascending: false }).limit(60),
@@ -38,13 +38,14 @@ export default async function EntrenamientosPage() {
   const Tarjeta = ({ e }: { e: Entreno }) => {
     const total = e.entreno_actividades.reduce((s, a) => s + a.duracion, 0);
     return (
-      <Link href={`/entrenamientos/${e.id}`} className="tarjeta flex items-center gap-4 p-3 transition hover:shadow-md">
+      <Link href={`/entrenamientos/${e.id}`} className={`tarjeta flex items-center gap-4 p-3 transition hover:shadow-md ${e.anulado_motivo ? "opacity-60" : ""}`}>
         <div className="w-16 shrink-0 text-center">
           <div className="text-xs uppercase text-tinta/50">{fechaCorta(e.fecha).split(",")[0]}</div>
           <div className="text-lg font-semibold leading-tight">{hora(e.fecha)}</div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{e.titulo ?? "Entrenamiento"}</div>
+          <div className={`truncate font-medium ${e.anulado_motivo ? "line-through" : ""}`}>{e.titulo ?? "Entrenamiento"}</div>
+          {e.anulado_motivo && <div className="text-xs font-semibold text-red-700">❌ Anulado · {e.anulado_motivo}</div>}
           <div className="text-xs text-tinta/60">
             {fechaCorta(e.fecha)}{e.lugar ? ` · ${e.lugar}` : ""} · {e.entreno_actividades.length} actividades
           </div>
