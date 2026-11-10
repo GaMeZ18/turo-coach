@@ -21,7 +21,7 @@ async function enviarPush(supabase: SupabaseClient, subs: Sub[], aviso: { titulo
   try {
     const webpush = (await import("web-push")).default;
     webpush.setVapidDetails((process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim(), VAPID_PUBLICO, privada);
-    const carga = JSON.stringify({ titulo, cuerpo, url });
+    const carga = JSON.stringify({ titulo: titulo.slice(0, 120), cuerpo: cuerpo.length > 400 ? `${cuerpo.slice(0, 397)}…` : cuerpo, url }); // el móvil admite poco texto; entero queda en Avisos
     await Promise.all((subs as { endpoint: string; p256dh: string; auth: string }[]).map(async (s) => {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
@@ -57,7 +57,7 @@ export async function notificarPersonasMesa(db: SupabaseClient, personas: string
   try {
     const webpush = (await import("web-push")).default;
     webpush.setVapidDetails((process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim(), VAPID_PUBLICO, privada);
-    const carga = JSON.stringify({ titulo, cuerpo, url });
+    const carga = JSON.stringify({ titulo: titulo.slice(0, 120), cuerpo: cuerpo.length > 400 ? `${cuerpo.slice(0, 397)}…` : cuerpo, url }); // el móvil admite poco texto; entero queda en Avisos
     await Promise.all((subs as Sub[]).map(async (s) => {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });

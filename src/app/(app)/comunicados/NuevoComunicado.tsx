@@ -57,11 +57,11 @@ export default function NuevoComunicado({ personas, equipos }: { personas: Perso
       </div>
       <p className="text-xs text-tinta/60">{tipo === "noticia" ? "La noticia se guarda en el apartado Noticias (todos la pueden consultar cuando quieran) y avisa a quien elijas." : "El comunicado llega a Avisos y al móvil. Al leerlo, desaparece de Avisos."}</p>
       <div><label className="etiqueta">Título</label><input name="titulo" required maxLength={120} onFocus={foco} className="campo" placeholder={tipo === "noticia" ? "El Infantil A, campeón del torneo de Nadal 🏆" : "Reunión de entrenadores el jueves"} /></div>
-      <div><label className="etiqueta">{tipo === "noticia" ? "Resumen (lo que sale en el aviso)" : "Mensaje"}</label><textarea name="cuerpo" rows={tipo === "noticia" ? 2 : 4} maxLength={2000} onFocus={foco} className="campo" placeholder="Escribe lo que quieras comunicar…" /></div>
+      <div><label className="etiqueta">{tipo === "noticia" ? "Resumen (lo que sale en el aviso)" : "Mensaje"}</label><textarea name="cuerpo" rows={tipo === "noticia" ? 2 : 4} maxLength={10000} onFocus={foco} className="campo" placeholder="Escribe lo que quieras comunicar…" /></div>
       {tipo === "noticia" && (
         <div>
           <label className="etiqueta">Texto de la noticia</label>
-          <textarea name="contenido" rows={10} maxLength={20000} onFocus={foco} className="campo font-[inherit]" placeholder={"Escribe la noticia completa.\n\nDeja una línea en blanco entre párrafos.\n**Negrita** con dos asteriscos.\n- Listas empezando con guion\n[Texto del enlace](https://cbturo.com) o pega el enlace tal cual."} />
+          <textarea name="contenido" rows={16} maxLength={100000} onFocus={foco} className="campo font-[inherit]" placeholder={"Escribe la noticia completa.\n\nDeja una línea en blanco entre párrafos.\n**Negrita** con dos asteriscos.\n- Listas empezando con guion\n[Texto del enlace](https://cbturo.com) o pega el enlace tal cual."} />
           <p className="mt-1 text-[11px] text-tinta/50">Formato: línea en blanco = párrafo nuevo · **negrita** · «- » para listas · [texto](enlace) · los enlaces pegados se pueden tocar.</p>
         </div>
       )}

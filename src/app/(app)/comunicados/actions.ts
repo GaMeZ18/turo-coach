@@ -15,10 +15,10 @@ async function coordinador() {
 export async function crearComunicado(fd: FormData): Promise<{ ok?: string; error?: string }> {
   const { supabase, user } = await coordinador();
   const titulo = String(fd.get("titulo") ?? "").trim().slice(0, 120);
-  const cuerpo = String(fd.get("cuerpo") ?? "").trim().slice(0, 2000);
+  const cuerpo = String(fd.get("cuerpo") ?? "").trim().slice(0, 10000);
   const url = String(fd.get("url") ?? "").trim() || null;
   const tipo = fd.get("tipo") === "noticia" ? "noticia" : "comunicado";
-  const contenido = String(fd.get("contenido") ?? "").trim().slice(0, 20000);
+  const contenido = String(fd.get("contenido") ?? "").trim().slice(0, 100000);
   const destinatarios = [...new Set(fd.getAll("perfil").map(String).filter(Boolean))];
   const dia = String(fd.get("dia") ?? ""), hora = String(fd.get("hora") ?? "");
   if (!titulo) return { error: "Pon un título." };
