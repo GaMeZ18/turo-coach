@@ -84,7 +84,8 @@ export function construir(filas: FilaStats[], equipos: Equipo[], partidos: Parti
     if (!fecha) continue;
     const lunes = lunesDeFecha(fecha);
     const partidoId = partidoDeStats.get(clave) ?? null;
-    const especial = !!partidoId && (especiales[lunes] ?? []).includes(partidoId);
+    // El partido de la jornada se identifica por el partido, no por la semana: si se aplaza, el ×1,5 se va con él
+    const especial = !!partidoId && Object.values(especiales).some((ids) => ids.includes(partidoId));
     const equipo = nombreEq.get(f.equipo_id)!;
     for (const j of yo.jugadores ?? []) {
       const pers = persona(j);

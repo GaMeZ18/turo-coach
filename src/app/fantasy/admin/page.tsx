@@ -4,8 +4,8 @@ import { Escudo } from "../ui";
 import { redirect } from "next/navigation";
 import { cargarLiga, db, quienSoy } from "@/lib/fantasy/datos";
 import { nombreJornada } from "@/lib/fantasy/motor";
-import { aISO, fechaCorta, hora } from "@/lib/fechas";
-import { sumarDias } from "@/lib/pistas";
+import { aISO, diaInput, fechaCorta, hora } from "@/lib/fechas";
+import { lunesDe, sumarDias } from "@/lib/pistas";
 import { Interruptor, Premio, Inicio, Especial, Anular, Silenciar, Borrar, CerrarTemporada, CopiarEnlace, QuitarFoto, Prueba } from "./Controles";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +17,11 @@ export default async function AdminFantasy() {
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
   const { data: ult } = await db().from("fcbq_stats").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const nombreEq = new Map(equipos.map((e) => [e.id, e.nombre]));
-  // Semanas pasadas jugadas, las marcadas sin Fantasy, esta y las 10 siguientes (para planificar diciembre, festivos…)
-  const jornadas = [...new Set([...liga.cerradas, ...q.config.anuladas.filter((x) => x >= q.config.inicio), liga.lunesHoy, ...Array.from({ length: 10 }, (_, i) => sumarDias(liga.lunesHoy, 7 * (i + 1)))])].sort();
+  // Todas las semanas de la temporada: desde el inicio hasta la del último partido del calendario (como mínimo 10 semanas)
+  const ultimo = partidos.filter((p) => liga.pool.has(p.equipo_id)).map((p) => p.fecha).sort().pop();
+  const hasta = ultimo && lunesDe(diaInput(ultimo)) > sumarDias(liga.lunesHoy, 70) ? lunesDe(diaInput(ultimo)) : sumarDias(liga.lunesHoy, 70);
+  const jornadas: string[] = [];
+  for (let l = lunesDe(q.config.inicio); l <= hasta; l = sumarDias(l, 7)) jornadas.push(l);
   const totalDe = new Map(liga.general.map((g) => [g.id, g]));
 
   return (
