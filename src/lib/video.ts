@@ -9,6 +9,16 @@ export function urlEmbed(url: string | null | undefined): string | null {
       const id = u.searchParams.get("v") ?? u.pathname.split("/").pop();
       return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
     }
+    // TikTok: …/video/1234567890 → reproductor incrustado
+    if (u.hostname.includes("tiktok.com")) {
+      const m = u.pathname.match(/\/video\/(\d+)/);
+      return m ? `https://www.tiktok.com/embed/v2/${m[1]}` : null;
+    }
+    // Instagram: /p/ID, /reel/ID o /tv/ID
+    if (u.hostname.includes("instagram.com")) {
+      const m = u.pathname.match(/\/(p|reel|reels|tv)\/([\w-]+)/);
+      return m ? `https://www.instagram.com/${m[1] === "reels" ? "reel" : m[1]}/${m[2]}/embed` : null;
+    }
     if (u.hostname.includes("vimeo.com")) {
       const id = u.pathname.split("/").filter(Boolean).pop();
       return id ? `https://player.vimeo.com/video/${id}` : null;
@@ -168,3 +178,6 @@ export function analisisPista(eventosDesordenados: EventoVideo[], clips: Clip[],
     marcador: { nos, rival },
   };
 }
+
+/** ¿Es un vídeo vertical de redes (TikTok, Instagram)? Para darle forma de móvil al reproductor */
+export const esVertical = (url: string | null | undefined) => !!url && /tiktok\.com|instagram\.com/i.test(url);

@@ -2,6 +2,15 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Fotos (hasta 4)": "Fotos (fins a 4)",
+ "Añadir foto": "Afegir foto",
+ "Salen en el entreno y en el PDF. Puedes hacer captura de un vídeo y subirla.": "Surten a l'entrenament i al PDF. Pots fer una captura d'un vídeo i pujar-la.",
+ "Vídeo (enlace de TikTok, Instagram, YouTube…)": "Vídeo (enllaç de TikTok, Instagram, YouTube…)",
+ "En la app se ve el vídeo; en el PDF sale un código QR para abrirlo con el móvil.": "A l'app es veu el vídeo; al PDF surt un codi QR per obrir-lo amb el mòbil.",
+ "Vídeo (YouTube, Vimeo, TikTok o Instagram)": "Vídeo (YouTube, Vimeo, TikTok o Instagram)",
+ "Ver el vídeo": "Veure el vídeo",
+ "Escanéalo para ver el vídeo": "Escaneja'l per veure el vídeo",
+ "No se ha podido leer alguna imagen.": "No s'ha pogut llegir alguna imatge.",
  "Quién hace cada mesa y pagos del mes": "Qui fa cada taula i pagaments del mes",
  "Mensajes y noticias a quien elijas": "Missatges i notícies a qui triïs",
  "Lo que publica el club": "El que publica el club",

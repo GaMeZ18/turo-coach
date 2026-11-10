@@ -6,6 +6,7 @@ import type { Pizarra } from "@/components/pizarra/modelo";
 import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
 import { FOCOS, FORMATOS, POSICIONES } from "@/lib/rasgos-ejercicio";
+import SubirImagenes from "@/components/SubirImagenes";
 import { Library } from "lucide-react";
 import { guardarEjercicio, type DatosEjercicio } from "./actions";
 
@@ -47,6 +48,7 @@ export default function FormEjercicio({
     series: inicial?.series ?? "",
     repeticiones: inicial?.repeticiones ?? "",
     descanso: inicial?.descanso ?? "",
+    imagenes: inicial?.imagenes ?? [],
   });
   const fisico = d.tipo === "fisico";
   const [etiquetasTxt, setEtiquetasTxt] = useState((inicial?.etiquetas ?? []).join(", "));
@@ -107,6 +109,16 @@ export default function FormEjercicio({
               <div><label className="etiqueta">Series</label><input value={d.series ?? ""} onChange={(e) => set("series", e.target.value)} className="campo" placeholder="4" /></div>
               <div><label className="etiqueta">Repeticiones o tiempo</label><input value={d.repeticiones ?? ""} onChange={(e) => set("repeticiones", e.target.value)} className="campo" placeholder="12 rep · 30″ · 20 m" /></div>
               <div><label className="etiqueta">Descanso</label><input value={d.descanso ?? ""} onChange={(e) => set("descanso", e.target.value)} className="campo" placeholder="1′ entre series" /></div>
+            </div>
+            <div>
+              <label className="etiqueta">Fotos (hasta 4)</label>
+              <SubirImagenes valor={d.imagenes ?? []} onChange={(v) => set("imagenes", v)} />
+              <p className="mt-1 text-[11px] text-tinta/50">Salen en el entreno y en el PDF. Puedes hacer captura de un vídeo y subirla.</p>
+            </div>
+            <div>
+              <label className="etiqueta">Vídeo (enlace de TikTok, Instagram, YouTube…)</label>
+              <input value={d.video_url} onChange={(e) => set("video_url", e.target.value)} className="campo" placeholder="https://www.tiktok.com/@…/video/…" />
+              <p className="mt-1 text-[11px] text-tinta/50">En la app se ve el vídeo; en el PDF sale un código QR para abrirlo con el móvil.</p>
             </div>
             <div><label className="etiqueta">Cómo se hace</label><textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} rows={8} className="campo" placeholder={"Posición inicial, ejecución, qué vigilar…\nVariantes o progresiones."} /></div>
           </div>
@@ -205,10 +217,10 @@ export default function FormEjercicio({
           <label className="etiqueta">Etiquetas (separadas por comas)</label>
           <input value={etiquetasTxt} onChange={(e) => setEtiquetasTxt(e.target.value)} className="campo" placeholder="toma de decisiones, 1c1, mini" />
         </div>
-        <div>
-          <label className="etiqueta">Vídeo (YouTube o Vimeo)</label>
+        {!fisico && <div>
+          <label className="etiqueta">Vídeo (YouTube, Vimeo, TikTok o Instagram)</label>
           <input value={d.video_url} onChange={(e) => set("video_url", e.target.value)} className="campo" placeholder="https://youtu.be/…" />
-        </div>
+        </div>}
         <label className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm ${d.en_biblioteca ? "border-oro bg-oro/15" : "border-linea bg-white"}`}>
           <input type="checkbox" checked={!!d.en_biblioteca} onChange={(e) => set("en_biblioteca", e.target.checked)} className="mt-0.5 h-4 w-4" />
           <span>

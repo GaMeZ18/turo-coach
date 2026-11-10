@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ExternalLink, Loader2, Target, Timer, Users, PlayCircle } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
 import PizarraEditor from "@/components/pizarra";
+import { esVertical, urlEmbed } from "@/lib/video";
 import { fichaEjercicio, type FichaEjercicio as Ficha } from "@/app/(app)/entrenamientos/actions";
 
 const cache = new Map<string, Ficha | null>();
@@ -56,6 +57,16 @@ export default function FichaEjercicio({ id, compacta = false, reproductor = fal
         {f.jugadores_min ? <span className="inline-flex items-center gap-1"><Users size={12} /> {f.jugadores_min} jugadores</span> : null}
         {(f.edades ?? []).map((x) => <span key={x} className="rounded-full bg-azul/10 px-1.5 py-0.5 font-medium text-azul">{x}</span>)}
       </div>
+      {(f.imagenes ?? []).length > 0 && (
+        <div className={`grid gap-2 ${(f.imagenes ?? []).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {(f.imagenes ?? []).map((src, i) => <img key={i} src={src} alt={`Imagen ${i + 1}`} className="w-full rounded-lg border border-linea object-cover" />)}
+        </div>
+      )}
+      {f.video_url && !f.pizarra && (urlEmbed(f.video_url) ? (
+        <div className={`overflow-hidden rounded-lg border border-linea bg-black ${esVertical(f.video_url) ? "mx-auto aspect-[9/16] w-full max-w-[280px]" : "aspect-video"}`}>
+          <iframe src={urlEmbed(f.video_url)!} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen title="Vídeo" />
+        </div>
+      ) : <a href={f.video_url} target="_blank" rel="noopener" className="text-sm text-azul underline">Ver el vídeo</a>)}
       {(f.series || f.repeticiones || f.descanso) ? (
         <div className="grid grid-cols-3 gap-2 text-center text-sm">
           <div className="rounded-lg bg-suave p-2"><p className="font-bold">{f.series || "—"}</p><p className="text-[10px] uppercase text-tinta/60">Series</p></div>

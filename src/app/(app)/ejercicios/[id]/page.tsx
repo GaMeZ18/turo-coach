@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { urlEmbed } from "@/lib/video";
+import { esVertical, urlEmbed } from "@/lib/video";
 import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actions";
 import VisorPizarra from "./VisorPizarra";
 import { Copy, Library, Pencil, Trash2, PlayCircle } from "lucide-react";
@@ -108,6 +108,11 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
               <p className="whitespace-pre-line text-sm">{e.descripcion}</p>
             </section>
           )}
+          {(e.imagenes ?? []).length > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              {(e.imagenes as string[]).map((src, i) => <a key={i} href={src} target="_blank" rel="noopener"><img src={src} alt={`Imagen ${i + 1}`} className="w-full rounded-lg border border-linea object-cover" /></a>)}
+            </div>
+          )}
           {e.correcciones && (
             <section>
               <h2 className="etiqueta">Correcciones</h2>
@@ -122,10 +127,10 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
             </div>
           )}
           {!video && e.video_url && (
-            <a href={e.video_url} target="_blank" rel="noopener" className="btn-secundario inline-flex text-sm"><PlayCircle size={16} /> Ver vídeos que lo explican (YouTube)</a>
+            <a href={e.video_url} target="_blank" rel="noopener" className="btn-secundario inline-flex text-sm"><PlayCircle size={16} /> Ver el vídeo</a>
           )}
           {video && (
-            <div className="aspect-video overflow-hidden rounded-xl border border-linea bg-black">
+            <div className={`overflow-hidden rounded-xl border border-linea bg-black ${esVertical(e.video_url) ? "mx-auto aspect-[9/16] w-full max-w-[340px]" : "aspect-video"}`}>
               <iframe src={video} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen title="Vídeo del ejercicio" />
             </div>
           )}

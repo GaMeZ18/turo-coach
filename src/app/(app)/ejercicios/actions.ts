@@ -35,6 +35,7 @@ export type DatosEjercicio = {
   series?: string;
   repeticiones?: string;
   descanso?: string;
+  imagenes?: string[]; // fotos del ejercicio (prep. física)
 };
 
 const vacioANull = (s: string) => (s.trim() === "" ? null : s.trim());
@@ -64,6 +65,7 @@ export async function guardarEjercicio(d: DatosEjercicio, entrenoId?: string) {
     series: vacioANull(d.series ?? ""),
     repeticiones: vacioANull(d.repeticiones ?? ""),
     descanso: vacioANull(d.descanso ?? ""),
+    imagenes: (d.imagenes ?? []).filter((x) => /^data:image\/(jpeg|png|webp);base64,/.test(x) && x.length < 600_000).slice(0, 4),
   };
   if (d.tipo === "fisico") { fila.pizarra = null; fila.preview = null; }
   // Datos para los filtros: lo que rellene el entrenador y, si falta algo, deducido de la pizarra y el título

@@ -2,16 +2,22 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaLarga, hora } from "@/lib/fechas";
 import { normalizar } from "@/components/pizarra/modelo";
+import qrcode from "qrcode-generator";
 import MiniPizarra from "@/components/pizarra/Mini";
 import BotonImprimir from "./Imprimir";
 import AsistenciaHoja from "./AsistenciaHoja";
 
 type Act = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null; objetivos?: string | null; descripcion?: string | null;
-  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null; series?: string | null; repeticiones?: string | null; descanso?: string | null } | null;
+  ejercicios: { titulo: string; descripcion: string | null; correcciones: string | null; objetivos?: string | null; material: string | null; pizarra: unknown; preview: string | null; series?: string | null; repeticiones?: string | null; descanso?: string | null; imagenes?: string[] | null; video_url?: string | null } | null;
 };
 
 export const metadata = { title: "Entreno · Coach Manager CBTuró" };
+
+/** Código QR (SVG) para abrir el vídeo del ejercicio con el móvil desde el papel */
+function qrSvg(url: string) {
+  try { const q = qrcode(0, "M"); q.addData(url); q.make(); return q.createSvgTag({ cellSize: 2, margin: 0, scalable: true }); } catch { return ""; }
+}
 
 /** Pasos para el PDF: un dibujo por fotograma (si hay muchos, se juntan de 2 en 2 o más para que quepan en 9) */
 function pasosDe(pizarra: unknown): [number, number][] {
@@ -95,6 +101,20 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                     {ej.material && <p><strong>Material:</strong> {ej.material}</p>}
                   </div>
                 </div>
+                {((ej.imagenes ?? []).length > 0 || (!ej.pizarra && ej.video_url)) && (
+                  // Prep. física: sus fotos y, si tiene vídeo, un QR para verlo con el móvil
+                  <div className="mt-2 flex flex-wrap items-start gap-2">
+                    {(ej.imagenes ?? []).slice(0, 4).map((src, k) => (
+                      <img key={k} src={src} alt="" className="h-36 w-auto max-w-[45%] break-inside-avoid rounded border border-linea object-contain" />
+                    ))}
+                    {!ej.pizarra && ej.video_url && (
+                      <figure className="w-24 break-inside-avoid text-center">
+                        <div className="h-24 w-24" dangerouslySetInnerHTML={{ __html: qrSvg(ej.video_url) }} />
+                        <figcaption className="mt-0.5 text-[9px] leading-tight text-tinta/60">Escanéalo para ver el vídeo</figcaption>
+                      </figure>
+                    )}
+                  </div>
+                )}
                 {pasos.length > 0 && (
                   // La jugada paso a paso: cada dibujo, con los jugadores donde están en ese momento y solo sus movimientos
                   <div className={`mt-2 grid gap-2 ${pasos.length === 1 ? "grid-cols-2" : "grid-cols-3"}`}>
