@@ -97,6 +97,16 @@ export async function guardarAvisoFantasy(sub: { endpoint: string; p256dh: strin
   return error ? { error: error.message } : {};
 }
 
+/** Entrar con la cuenta de Coach Manager desde el propio Fantasy (en iPhone, el icono del Fantasy tiene su propia sesión) */
+export async function entrarConCuenta(email: string, password: string): Promise<R> {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supa = await createClient();
+  const { error } = await supa.auth.signInWithPassword({ email: String(email ?? "").trim().toLowerCase(), password: String(password ?? "") });
+  if (error) return { error: error.code === "invalid_credentials" ? "Email o contraseña incorrectos." : `No se ha podido entrar (${error.message}).` };
+  revalidatePath("/fantasy");
+  return { ok: true };
+}
+
 export async function salir() {
   (await cookies()).delete(COOKIE_FANTASY);
   revalidatePath("/fantasy");

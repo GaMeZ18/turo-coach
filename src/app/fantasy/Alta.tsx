@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Loader2, Lock, Phone, Shield, User } from "lucide-react";
-import { entrar, registrar, unirseStaff } from "./actions";
+import { entrar, entrarConCuenta, registrar, unirseStaff } from "./actions";
 import { ElegirAvatar, type AvatarDatos } from "./Perfil";
 
 function Premio({ premio }: { premio: string }) {
@@ -79,7 +79,35 @@ export default function Alta({ staff, abiertoPublico, premio }: { staff: { nombr
           </>
         )}
       </div>
+      {!staff && <CuentaCoach />}
       {error && <p className="rounded-lg bg-red-900/60 p-3 text-sm text-red-100">{error}</p>}
     </div>
+  );
+}
+
+/** Staff con cuenta de Coach Manager: entrar aquí mismo con su email y contraseña (sin registrarse aparte) */
+function CuentaCoach() {
+  const [abierto, setAbierto] = useState(false);
+  const [email, setEmail] = useState("");
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pend, start] = useTransition();
+  if (!abierto) {
+    return (
+      <button type="button" onClick={() => setAbierto(true)} className="fx-card flex w-full items-center gap-3 p-3 text-left">
+        <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded-lg" />
+        <span className="flex-1 text-sm"><strong>¿Tienes cuenta de Coach Manager?</strong><br /><span className="fx-suave">Entra con ella, no hace falta registrarse.</span></span>
+        <span className="text-[var(--fx-oro)]">›</span>
+      </button>
+    );
+  }
+  return (
+    <form className="fx-card space-y-2 p-4 text-left" onSubmit={(e) => { e.preventDefault(); start(async () => { setError(null); const r = await entrarConCuenta(email, clave); if (r.error) setError(r.error); }); }}>
+      <p className="text-sm font-semibold">Entra con tu cuenta de Coach Manager</p>
+      <input className="fx-input" type="email" name="username" autoComplete="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <input className="fx-input" type="password" name="password" autoComplete="current-password" placeholder="Contraseña" value={clave} onChange={(e) => setClave(e.target.value)} required />
+      <button className="fx-btn w-full" disabled={pend}>{pend && <Loader2 size={16} className="animate-spin" />} Entrar</button>
+      {error && <p className="text-sm text-red-300">{error}</p>}
+    </form>
   );
 }
