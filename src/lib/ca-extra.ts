@@ -2,6 +2,12 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Buscar GIF: baloncesto, gracias, ánimo…": "Cercar GIF: bàsquet, gràcies, ànims…",
+ "Otras opciones: pegar un enlace o subir un GIF": "Altres opcions: enganxar un enllaç o pujar un GIF",
+ "Buscando…": "Cercant…",
+ "Con la tecnología de GIPHY": "Amb la tecnologia de GIPHY",
+ "No se han podido cargar los GIFs.": "No s'han pogut carregar els GIFs.",
+ "Giphy no responde ahora mismo.": "Giphy no respon ara mateix.",
  "Sé el primero en comentar.": "Sigues el primer a comentar.",
  "Escribe un comentario…": "Escriu un comentari…",
  "Comentar": "Comentar",
