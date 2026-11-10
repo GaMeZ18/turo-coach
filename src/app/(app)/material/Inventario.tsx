@@ -69,7 +69,7 @@ export default function Inventario({ lugaresIni, itemsIni }: { lugaresIni: Lugar
       )}
 
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="tarjeta p-3"><div className="text-2xl font-bold">{items.reduce((s, x) => s + x.cantidad, 0)}</div><div className="text-xs text-tinta/60">piezas</div></div>
+        <div className="tarjeta p-3"><div className="text-2xl font-bold">{items.reduce((s, x) => s + x.cantidad, 0)}</div><div className="text-xs text-tinta/60">unidades de material</div></div>
         <div className="tarjeta p-3"><div className={`text-2xl font-bold ${rotosTotal ? "text-red-600" : ""}`}>{rotosTotal}</div><div className="text-xs text-tinta/60">rotas</div></div>
         <div className="tarjeta p-3"><div className={`text-2xl font-bold ${faltan.length ? "text-amber-600" : ""}`}>{faltan.length}</div><div className="text-xs text-tinta/60">por reponer</div></div>
       </div>

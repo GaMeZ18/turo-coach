@@ -2,6 +2,7 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "unidades de material": "unitats de material",
  "Material": "Material",
  "Inventario de balones, conos… por sitio": "Inventari de pilotes, cons… per lloc",
  "Inventario por sitio. Ve a cada sitio, cuenta con + y − y marca lo que esté roto. Solo lo ves tú.": "Inventari per lloc. Ves a cada lloc, compta amb + i − i marca el que estigui trencat. Només ho veus tu.",
