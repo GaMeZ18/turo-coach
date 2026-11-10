@@ -1,14 +1,18 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import "./fantasy.css";
 import { cargarLiga, quienSoy } from "@/lib/fantasy/datos";
-import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin } from "@/lib/fantasy/motor";
+import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
 import { sumarDias } from "@/lib/pistas";
-import { fechaCorta, hora } from "@/lib/fechas";
-import { Trophy, Users, MessageCircle, Award, BookOpen, Settings } from "lucide-react";
+import { fechaCorta, hora, hoyLocal } from "@/lib/fechas";
+import { CalendarDays, ChevronDown, Lock, Star } from "lucide-react";
 import Alta from "./Alta";
 import Fichajes, { type JugadorMercado } from "./Fichajes";
 import Chat from "./Chat";
-import { Pts, MiJornada } from "./Piezas";
+import Celebracion from "./Celebracion";
+import { EditarPerfil } from "./Perfil";
+import { MiJornada } from "./Piezas";
+import { Camiseta, Escudo, Marco, Nombre, pts } from "./ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -16,58 +20,46 @@ export const metadata: Metadata = {
   openGraph: { title: "Fantasy Turó", description: "Ficha a 5 jugadores del club cada jornada y suma puntos con sus estadísticas", images: [{ url: "https://coach.cbturo.com/insignias/29-campeon-del-turo.png" }] },
 };
 
-const VISTAS = [
-  { v: "equipo", t: "Mi equipo", i: Users },
-  { v: "clasificacion", t: "Clasificación", i: Trophy },
-  { v: "jornada", t: "Jornada", i: MessageCircle },
-  { v: "insignias", t: "Insignias", i: Award },
-  { v: "reglas", t: "Reglas", i: BookOpen },
-] as const;
+const temporadaDe = (dia: string) => { const y = Number(dia.slice(0, 4)), m = Number(dia.slice(5, 7)); const a = m >= 8 ? y : y - 1; return `${a}/${String(a + 1).slice(2)}`; };
+const NIVEL: Record<Nivel, { t: string; color: string; borde: string }> = {
+  facil: { t: "Fáciles", color: "#22b04f", borde: "border-[#22b04f]" },
+  media: { t: "Medias", color: "#f6c445", borde: "border-[#f6c445]" },
+  dificil: { t: "Difíciles", color: "#e5333f", borde: "border-[#e5333f]" },
+  legendaria: { t: "Legendarias", color: "#a855f7", borde: "border-[#a855f7]" },
+};
 
-function Marco({ children, perfil, esAdmin, vista, conMenu }: { children: React.ReactNode; perfil: boolean; esAdmin: boolean; vista?: string; conMenu: boolean }) {
+function Acordeon({ titulo, children, abierto = false }: { titulo: React.ReactNode; children: React.ReactNode; abierto?: boolean }) {
   return (
-    <div className="min-h-dvh bg-suave">
-      <header className="sticky top-0 z-20 bg-azul text-white shadow" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-2.5">
-          <img src="/icons/icon-192.png" alt="CB Turó" className="h-9 w-9 rounded-lg" />
-          <div className="flex-1 leading-tight">
-            <p className="font-[family-name:var(--font-escudo)] text-lg tracking-wide">Fantasy Turó</p>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-oro">CB Turó de la Peira</p>
-          </div>
-          {esAdmin && <Link href="/fantasy/admin" className="rounded-lg p-1.5 hover:bg-white/10" title="Administrar"><Settings size={20} /></Link>}
-          {perfil && <Link href="/" className="text-xs text-white/80 hover:underline">← App</Link>}
-        </div>
-        {conMenu && (
-          <nav className="mx-auto flex max-w-4xl overflow-x-auto px-2 pb-1 text-sm [scrollbar-width:none]">
-            {VISTAS.map(({ v, t, i: I }) => (
-              <Link key={v} href={`/fantasy?v=${v}`} className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 font-medium ${vista === v ? "bg-white/15 text-white" : "text-white/70 hover:text-white"}`}><I size={15} /> {t}</Link>
-            ))}
-          </nav>
-        )}
-        <div className="filete" />
-      </header>
-      <main className="mx-auto max-w-4xl px-4 py-5">{children}</main>
-    </div>
+    <details className="fx-card group overflow-hidden" open={abierto}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 font-semibold [&::-webkit-details-marker]:hidden">
+        <span className="flex-1">{titulo}</span><ChevronDown size={18} className="transition group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-[var(--fx-borde)] p-3 text-sm">{children}</div>
+    </details>
   );
 }
 
-export default async function FantasyPage({ searchParams }: { searchParams: Promise<{ v?: string; j?: string }> }) {
+export default async function FantasyPage({ searchParams }: { searchParams: Promise<{ v?: string; j?: string; t?: string; i?: string }> }) {
   const sp = await searchParams;
   const q = await quienSoy();
+  const temporada = temporadaDe(hoyLocal());
+
   if (!q.acceso) {
     return (
-      <Marco perfil={!!q.perfil} esAdmin={false} conMenu={false}>
-        <div className="tarjeta mx-auto max-w-md p-6 text-center">
-          <img src="/insignias/29-campeon-del-turo.png" alt="" className="mx-auto h-28 w-28" />
-          <h1 className="mt-2 text-xl font-bold">Fantasy Turó</h1>
-          <p className="mt-1 text-sm text-tinta/60">¡Muy pronto! Ficha a jugadores del club cada jornada, suma puntos con sus estadísticas y gana premios del Turó.</p>
-        </div>
-      </Marco>
+      <div className="fx flex flex-col items-center justify-center px-6 py-10 text-center">
+        <img src="/marca/escudo-128.png" alt="CB Turó" className="h-28 w-auto drop-shadow-xl" />
+        <h1 className="fx-display mt-4 text-6xl leading-[.9]">Fantasy<br />Turó</h1>
+        <p className="fx-display mt-3 -skew-x-6 bg-gradient-to-r from-[#9e1420] via-[#d81f2f] to-[#9e1420] px-4 py-1 text-lg">Temporada {temporada}</p>
+        <CalendarDays size={44} className="mt-8 text-white/90" />
+        <p className="fx-display mt-2 text-4xl">Próximamente</p>
+        <p className="mt-2 max-w-xs text-sm text-white/85">El Fantasy del CB Turó de la Peira llega muy pronto. ¡Prepara tu plantilla!</p>
+        {q.perfil && <Link href="/" className="mt-8 text-xs text-white/60 underline">← Volver a la app</Link>}
+      </div>
     );
   }
   if (!q.participante) {
     return (
-      <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} conMenu={false}>
+      <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} conMenu={false} temporada={temporada}>
         <Alta staff={q.perfil ? { nombre: q.perfil.nombre ?? "" } : null} abiertoPublico={q.config.abierto} premio={q.config.premio} />
       </Marco>
     );
@@ -75,23 +67,20 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = VISTAS.some((x) => x.v === sp.v) ? sp.v! : "equipo";
-  const alias = new Map(participantes.map((p) => [p.id, p.alias]));
-  const nombreJ = (id: string) => liga.jugadores.get(id)?.nombre ?? "?";
-  const equipoJ = (id: string) => liga.jugadores.get(id)?.equipo ?? "";
+  const vista = ["equipo", "mercado", "clasificacion", "jornada", "insignias", "reglas"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const part = new Map(participantes.map((p) => [p.id, p]));
+  const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
   const miPos = general.findIndex((x) => x.id === yo.id) + 1;
   const miTotal = general.find((x) => x.id === yo.id)?.total ?? 0;
+  const misInsignias = liga.insignias(yo.id);
+  const campeon = q.config.cerrada && q.config.campeon ? part.get(q.config.campeon)?.alias ?? null : null;
 
-  let cuerpo: React.ReactNode = null;
-
-  if (vista === "equipo") {
-    const l = liga.abierta;
+  const mercadoDe = (l: string): JugadorMercado[] => {
     const pr = liga.precio(l), prAntes = liga.precio(sumarDias(l, -7));
     const ultima = liga.terminadas[liga.terminadas.length - 1] ?? sumarDias(l, -7);
-    const semUlt = liga.semana(ultima);
-    const desc = liga.descansan(l), bloq = liga.bloqueados(yo.id, l);
-    const mercado: JugadorMercado[] = [...liga.jugadores.values()].map((j) => {
+    const semUlt = liga.semana(ultima), desc = liga.descansan(l), bloq = liga.bloqueados(yo.id, l);
+    return [...liga.jugadores.values()].map((j) => {
       const p = pr.get(j.id)!, a = prAntes.get(j.id);
       return {
         id: j.id, persona: j.persona, nombre: j.nombre, dorsal: j.dorsal, equipo: j.equipo, equipoId: j.equipoId, chica: j.chica,
@@ -99,129 +88,188 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         ultimo: semUlt.get(j.id)?.jugo ? semUlt.get(j.id)!.puntos : null, descansa: desc.has(j.equipoId), bloqueado: bloq.has(j.persona),
       };
     });
-    const al = liga.alineacion(yo.id, l);
+  };
+  const proxima = new Date(liga.proxima).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+  const Cerrado = ({ breve = false }: { breve?: boolean }) => (
+    <section className="fx-card p-5 text-center">
+      <Lock size={breve ? 32 : 48} className="mx-auto text-white/90" />
+      <p className={`fx-display mt-1 ${breve ? "text-3xl" : "text-4xl"} leading-none`}>Fichajes cerrados</p>
+      <p className="mt-2 text-sm text-white/85">{liga.enJuego ? `La ${nombreJornada(q.config.inicio, liga.enJuego).toLowerCase()} ya está en juego. No puedes hacer cambios.` : "Ahora mismo no se puede fichar."}</p>
+      <p className="text-sm text-white/85">Vuelve el <strong>{proxima}</strong> para preparar la siguiente.</p>
+    </section>
+  );
+
+  let cuerpo: React.ReactNode = null;
+
+  if (vista === "equipo") {
+    const l = liga.abierta;
+    const al = l ? liga.alineacion(yo.id, l) : undefined;
     const enJuego = liga.enJuego;
     const resJuego = enJuego ? liga.resultados.get(`${yo.id}|${enJuego}`) : undefined;
     const alJuego = enJuego ? liga.alineacion(yo.id, enJuego) : undefined;
+    const ant = liga.terminadas[liga.terminadas.length - 1];
+    const resAnt = ant ? liga.resultados.get(`${yo.id}|${ant}`) : undefined;
+    const alAnt = ant ? liga.alineacion(yo.id, ant) : undefined;
     cuerpo = (
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="tarjeta p-3"><p className="text-2xl font-bold">{miPos || "–"}<span className="text-sm font-normal text-tinta/50">/{general.length}</span></p><p className="text-xs text-tinta/60">posición</p></div>
-          <div className="tarjeta p-3"><p className="text-2xl font-bold"><Pts v={miTotal} /></p><p className="text-xs text-tinta/60">puntos</p></div>
-          <div className="tarjeta p-3"><p className="truncate text-base font-bold">{yo.alias}</p><p className="text-xs text-tinta/60">tu equipo</p></div>
+      <div className="space-y-3">
+        <div className="grid grid-cols-[1fr_1fr_1.6fr] gap-2 text-center">
+          <div className="fx-card-oro p-2"><p className="fx-display text-3xl">{miPos || "–"}<span className="text-base text-white/60">/{general.length}</span></p><p className="text-[11px] fx-suave">Posición</p></div>
+          <div className="fx-card-oro p-2"><p className="fx-display text-3xl">{pts(miTotal)}</p><p className="text-[11px] fx-suave">Puntos</p></div>
+          <div className="fx-card-oro flex items-center gap-2 p-2 text-left">
+            <Escudo alias={yo.alias} emoji={yo.emoji} color={yo.color} foto={yo.foto} size={38} />
+            <Nombre alias={yo.alias} mostrar={yo.mostrar} className="flex-1" />
+            <EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} />
+          </div>
         </div>
-        {enJuego && alJuego && resJuego && (
-          <MiJornada titulo={`${nombreJornada(q.config.inicio, enJuego)} · en juego`} res={resJuego} al={alJuego} nombre={nombreJ} equipo={equipoJ} />
-        )}
-        <Fichajes
-          jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercado}
-          actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null}
-          comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>}
-          presupuesto={PRESUPUESTO} cerrada={q.config.cerrada}
-        />
+        {l ? (
+          <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
+            actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null}
+            comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>} presupuesto={PRESUPUESTO} />
+        ) : <Cerrado />}
+        {enJuego && alJuego && resJuego && <MiJornada titulo={`${nombreJornada(q.config.inicio, enJuego)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
+        {enJuego && !alJuego && <p className="fx-card p-3 text-center text-sm fx-suave">No fichaste equipo para esta jornada.</p>}
+        {l && ant && alAnt && resAnt && <MiJornada titulo={`${nombreJornada(q.config.inicio, ant)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
       </div>
     );
   }
 
+  if (vista === "mercado") {
+    const l = liga.abierta;
+    cuerpo = l ? (
+      <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
+        actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null; })()}
+        comodinesUsados={{}} presupuesto={PRESUPUESTO} />
+    ) : <Cerrado />;
+  }
+
   if (vista === "clasificacion") {
+    const porJornada = sp.t === "jornada";
     const jSel = sp.j && liga.cerradas.includes(sp.j) ? sp.j : liga.cerradas[liga.cerradas.length - 1];
-    const ranking = jSel ? liga.porJornada.get(jSel) ?? [] : [];
+    const Fila = ({ pos, id, d, children }: { pos: number | string; id: string; d?: React.ReactNode; children: React.ReactNode }) => {
+      const p = part.get(id);
+      return (
+        <div className={`flex items-center gap-2.5 px-3 py-2 ${id === yo.id ? "bg-gradient-to-r from-[#b3121f] to-[#7a0d16]" : ""}`}>
+          <span className="w-6 text-center font-bold">{pos === 1 ? "🏆" : pos}</span>
+          <Escudo alias={p?.alias ?? "?"} emoji={p?.emoji} color={p?.color} foto={p?.foto} size={30} />
+          <Nombre alias={p?.alias ?? "?"} mostrar={p?.mostrar} className="flex-1" />
+          {d}
+          <span className="w-14 text-right fx-display text-lg">{children}</span>
+        </div>
+      );
+    };
     cuerpo = (
-      <div className="space-y-4">
-        <section className="tarjeta overflow-hidden">
-          <h2 className="border-b border-linea px-3 py-2 font-semibold">Clasificación general</h2>
-          {general.length === 0 ? <p className="p-3 text-sm text-tinta/60">Aún no hay nadie.</p> : (
-            <ol className="divide-y divide-linea">
-              {general.map((g, i) => (
-                <li key={g.id} className={`flex items-center gap-3 px-3 py-2 ${g.id === yo.id ? "bg-oro/15" : ""}`}>
-                  <span className="w-6 text-center font-bold tabular-nums">{i + 1}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{g.alias}{q.config.campeon === g.id && " 🏆"}</span>
-                  <span className="text-xs text-tinta/50">{g.jornadas} j.</span>
-                  <span className="w-16 text-right font-bold tabular-nums"><Pts v={g.total} /></span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-        {liga.cerradas.length > 0 && jSel && (
-          <section className="tarjeta overflow-hidden">
-            <div className="flex flex-wrap items-center gap-2 border-b border-linea px-3 py-2">
-              <h2 className="font-semibold">Por jornada</h2>
-              <div className="ml-auto flex flex-wrap gap-1">
-                {liga.cerradas.map((l) => (
-                  <Link key={l} href={`/fantasy?v=clasificacion&j=${l}`} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${l === jSel ? "bg-azul text-white" : "bg-suave"}`}>{nombreJornada(q.config.inicio, l).replace("Jornada ", "J")}</Link>
-                ))}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/fantasy?v=clasificacion" className="fx-chip text-center !py-2" data-on={porJornada ? "0" : "1"}>General</Link>
+          <Link href="/fantasy?v=clasificacion&t=jornada" className="fx-chip text-center !py-2" data-on={porJornada ? "1" : "0"}>Por jornada</Link>
+        </div>
+        {campeon && <p className="fx-card-oro p-3 text-center fx-display text-xl">🏆 Campeón {temporada}: {campeon}</p>}
+        {!porJornada ? (
+          <>
+            <section className="fx-card fx-sep overflow-hidden">
+              <div className="flex px-3 py-2 text-xs font-bold uppercase fx-suave"><span className="w-6">#</span><span className="ml-10 flex-1">Equipo</span><span className="w-8 text-center">J</span><span className="w-14 text-right">Pts</span></div>
+              {general.map((g, i) => <Fila key={g.id} pos={i + 1} id={g.id} d={<span className="w-8 text-center text-sm fx-suave">{g.jornadas}</span>}>{pts(g.total)}</Fila>)}
+              {!general.length && <p className="p-3 text-sm fx-suave">Aún no hay nadie.</p>}
+            </section>
+            {miPos > 0 && (
+              <div className="fx-card-oro flex items-center justify-center gap-4 p-4 text-center">
+                <span className="text-4xl">🌿</span>
+                <div><p className="text-sm fx-suave">Tu posición</p><p className="fx-display text-5xl leading-none">{miPos}/{general.length}</p><p className="text-sm">{pts(miTotal)} puntos</p></div>
+                <span className="-scale-x-100 text-4xl">🌿</span>
               </div>
+            )}
+          </>
+        ) : !jSel ? <p className="fx-card p-4 text-sm fx-suave">Todavía no se ha jugado ninguna jornada.</p> : (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {liga.cerradas.map((l) => <Link key={l} href={`/fantasy?v=clasificacion&t=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l).replace("Jornada ", "J")}</Link>)}
             </div>
-            {q.config.anuladas.includes(jSel) && <p className="px-3 py-2 text-sm text-amber-700">Jornada anulada: no cuenta para la clasificación.</p>}
-            <ol className="divide-y divide-linea">
-              {participantes.filter((p) => liga.alineacion(p.id, jSel)).sort((a, b) => (liga.resultados.get(`${b.id}|${jSel}`)?.total ?? 0) - (liga.resultados.get(`${a.id}|${jSel}`)?.total ?? 0)).map((p) => {
-                const r = liga.resultados.get(`${p.id}|${jSel}`)!;
-                const al = liga.alineacion(p.id, jSel)!;
-                const pos = ranking.find((x) => x.id === p.id)?.pos;
-                return (
-                  <li key={p.id}>
-                    <details>
-                      <summary className={`flex cursor-pointer list-none items-center gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden ${p.id === yo.id ? "bg-oro/15" : ""}`}>
-                        <span className="w-6 text-center font-bold">{pos ?? "–"}</span>
-                        <span className="min-w-0 flex-1 truncate">{p.alias}{al.comodin && <span className="ml-1 rounded bg-azul/10 px-1 text-[10px] font-semibold text-azul">{COMODINES[al.comodin as Comodin].nombre}</span>}</span>
-                        <span className="text-xs text-tinta/50">{al.coste} ⭐</span>
-                        <span className="w-14 text-right font-bold tabular-nums"><Pts v={r.total} /></span>
+            {q.config.anuladas.includes(jSel) && <p className="rounded-lg bg-amber-900/50 p-2 text-sm text-amber-100">Jornada anulada: no cuenta para la clasificación.</p>}
+            <section className="fx-card fx-sep overflow-hidden">
+              <div className="flex px-3 py-2 text-xs font-bold uppercase fx-suave"><span className="w-6">#</span><span className="ml-10 flex-1">Equipo</span><span className="w-12 text-center">Comodín</span><span className="w-10 text-center">⭐</span><span className="w-14 text-right">Pts</span></div>
+              {participantes.filter((p) => liga.alineacion(p.id, jSel))
+                .sort((a, b) => (liga.resultados.get(`${b.id}|${jSel}`)?.total ?? 0) - (liga.resultados.get(`${a.id}|${jSel}`)?.total ?? 0))
+                .map((p) => {
+                  const r = liga.resultados.get(`${p.id}|${jSel}`)!, al = liga.alineacion(p.id, jSel)!;
+                  const pos = (liga.porJornada.get(jSel) ?? []).find((x) => x.id === p.id)?.pos ?? "–";
+                  return (
+                    <details key={p.id}>
+                      <summary className="list-none [&::-webkit-details-marker]:hidden">
+                        <Fila pos={pos} id={p.id} d={<>
+                          <span className="w-12 text-center">{al.comodin ? <span className="rounded bg-[#3d2a8a] px-1 text-[10px] font-bold text-[var(--fx-oro)]">{al.comodin === "capitan3" ? "C×3" : al.comodin === "banquillo" ? "Supl." : "+10"}</span> : <span className="fx-suave">–</span>}</span>
+                          <span className="w-10 text-center text-sm fx-suave">{al.coste}</span>
+                        </>}>{pts(r.total)}</Fila>
                       </summary>
-                      <div className="px-3 pb-3"><MiJornada res={r} al={al} nombre={nombreJ} equipo={equipoJ} compacto /></div>
+                      <div className="bg-black/20 pb-2"><MiJornada res={r} al={al} jugador={jug} compacto /></div>
                     </details>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+                  );
+                })}
+            </section>
+            <p className="text-center text-xs fx-suave">Toca un equipo para ver su alineación.</p>
+          </>
         )}
       </div>
     );
   }
 
   if (vista === "jornada") {
-    const opciones = [...new Set([...liga.cerradas, liga.abierta])].sort();
-    const jSel = sp.j && opciones.includes(sp.j) ? sp.j : (liga.enJuego ?? liga.cerradas[liga.cerradas.length - 1] ?? liga.abierta);
+    const opciones = [...new Set([...liga.cerradas, ...(liga.abierta ? [liga.abierta] : [])])].sort();
+    const jSel = sp.j && opciones.includes(sp.j) ? sp.j : (liga.enJuego ?? liga.abierta ?? liga.cerradas[liga.cerradas.length - 1] ?? liga.lunesHoy);
     const jugada = liga.cerradas.includes(jSel);
     const ideal = jugada ? liga.ideal(jSel) : [];
     const gg = jugada ? liga.ganga(jSel) : null;
     const rev = liga.revelacion(jSel);
     const esp = (q.config.especiales[jSel] ?? []).map((id) => partidos.find((p) => p.id === id)).filter(Boolean) as typeof partidos;
+    const eqNom = (id: string) => equipos.find((e) => e.id === id)?.nombre ?? "";
+    const sitios = [[50, 22], [20, 40], [80, 40], [32, 74], [68, 74]];
     cuerpo = (
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-1">
-          {opciones.map((l) => (
-            <Link key={l} href={`/fantasy?v=jornada&j=${l}`} className={`rounded-full px-3 py-1 text-xs font-semibold ${l === jSel ? "bg-azul text-white" : "bg-white"}`}>{nombreJornada(q.config.inicio, l)}</Link>
-          ))}
-        </div>
-        <section className="tarjeta p-3 text-sm">
-          <h2 className="font-semibold">{nombreJornada(q.config.inicio, jSel)} · del {fechaCorta(`${jSel}T12:00:00Z`)} al {fechaCorta(`${sumarDias(jSel, 6)}T12:00:00Z`)}</h2>
-          <p className="text-tinta/60">{jugada ? (liga.enJuego === jSel ? "En juego: los puntos se suman en cuanto entran las estadísticas de cada partido." : "Terminada.") : `Fichajes abiertos hasta el ${fechaCorta(liga.cierre(jSel))} a las ${hora(liga.cierre(jSel))}.`}</p>
-          {esp.length > 0 && <p className="mt-1 font-semibold text-rojo">🔥 Jornada especial: {esp.map((p) => `${equipos.find((e) => e.id === p.equipo_id)?.nombre ?? ""} (${fechaCorta(p.fecha)})`).join(", ")} puntúa ×1,5</p>}
-        </section>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {gg && (
-            <section className="tarjeta p-3">
-              <h3 className="text-xs font-bold uppercase text-amber-700">💎 Ganga de la semana</h3>
-              <p className="mt-1 font-semibold">{nombreJ(gg.id)} <span className="text-xs font-normal text-tinta/60">{equipoJ(gg.id)}</span></p>
-              <p className="text-sm"><Pts v={gg.puntos} /> puntos por solo {gg.precio} ⭐</p>
-            </section>
-          )}
-          {rev && (
-            <section className="tarjeta p-3">
-              <h3 className="text-xs font-bold uppercase text-green-700">🚀 Revelación del mes</h3>
-              <p className="mt-1 font-semibold">{nombreJ(rev.id)} <span className="text-xs font-normal text-tinta/60">{equipoJ(rev.id)}</span></p>
-              <p className="text-sm">Ha pasado de {rev.antes} ⭐ a {rev.ahora} ⭐</p>
-            </section>
-          )}
-        </div>
+      <div className="space-y-3">
+        {opciones.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">{opciones.map((l) => <Link key={l} href={`/fantasy?v=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l)}</Link>)}</div>
+        )}
+        <h1 className="fx-display text-2xl">{nombreJornada(q.config.inicio, jSel)} · del {fechaCorta(`${jSel}T12:00:00Z`).replace(".", "")} al {fechaCorta(`${sumarDias(jSel, 6)}T12:00:00Z`).replace(".", "")}</h1>
+        <p className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${jugada ? "bg-[#5e0f17] text-red-100" : "bg-[#155f2d] text-green-100"}`}>
+          {jugada ? (liga.enJuego === jSel ? "🔴 En juego: los puntos se suman en cuanto entran las estadísticas." : "Terminada") : `📅 Fichajes abiertos hasta el ${fechaCorta(liga.cierre(jSel))} a las ${hora(liga.cierre(jSel))}`}
+        </p>
+        {esp.length > 0 && (
+          <div className="fx-card-rojo p-3 text-center">
+            <p className="fx-display text-xl">🔥 Jornada especial</p>
+            <p className="text-sm">{esp.map((p) => `${eqNom(p.equipo_id)} (${fechaCorta(p.fecha)})`).join(" · ")} puntúa <strong>×1,5</strong></p>
+          </div>
+        )}
+        {(gg || rev) && (
+          <div className="grid grid-cols-2 gap-2">
+            {gg ? (
+              <div className="rounded-xl border-2 border-[#3b82f6] bg-gradient-to-b from-[#1b3a8a] to-[#0f1f52] p-3 text-center">
+                <p className="text-xs font-bold">💎 Ganga de la semana</p>
+                <p className="mt-1 font-semibold">{jug(gg.id)?.nombre}</p>
+                <p className="text-xs">{pts(gg.puntos)} pts por solo {gg.precio} ⭐</p>
+              </div>
+            ) : <div />}
+            {rev ? (
+              <div className="rounded-xl border-2 border-[#a855f7] bg-gradient-to-b from-[#4c1d95] to-[#2a0f5a] p-3 text-center">
+                <p className="text-xs font-bold">🚀 Revelación del mes</p>
+                <p className="mt-1 font-semibold">{jug(rev.id)?.nombre}</p>
+                <p className="text-xs">de {rev.antes} ⭐ a {rev.ahora} ⭐</p>
+              </div>
+            ) : <div />}
+          </div>
+        )}
         {ideal.length > 0 && (
-          <section className="tarjeta p-3">
-            <h3 className="font-semibold">⭐ Quinteto ideal</h3>
-            <ol className="mt-1 divide-y divide-linea text-sm">
-              {ideal.map((x) => <li key={x.id} className="flex justify-between py-1.5"><span>{nombreJ(x.id)} <span className="text-xs text-tinta/50">{equipoJ(x.id)}</span></span><span className="font-bold"><Pts v={x.puntos} /></span></li>)}
-            </ol>
+          <section className="fx-card-oro overflow-hidden">
+            <p className="fx-display px-3 py-2 text-xl">⭐ Quinteto ideal</p>
+            <div className="fx-pista mx-3 mb-3 aspect-[4/3]">
+              {ideal.map((x, i) => {
+                const j = jug(x.id);
+                return (
+                  <div key={x.id} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center" style={{ left: `${sitios[i][0]}%`, top: `${sitios[i][1]}%` }}>
+                    <Camiseta dorsal={j?.dorsal ?? ""} equipo={j?.equipo ?? ""} size={42} />
+                    <span className="max-w-24 truncate rounded bg-black/55 px-1 text-[10px] font-semibold">{j?.nombre.split(" ")[0]}</span>
+                    <span className="text-[11px] font-black text-black">{pts(x.puntos)} pts</span>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
         <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={yo.silenciado} />
@@ -230,71 +278,101 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   }
 
   if (vista === "insignias") {
-    const mias = liga.insignias(yo.id);
     const todos = participantes.map((p) => liga.insignias(p.id));
-    const nivel = { facil: "Fáciles", media: "Medias", dificil: "Difíciles", legendaria: "Legendarias" } as const;
+    const det = INSIGNIAS.find((x) => x.codigo === sp.i);
+    if (det) {
+      const tengo = misInsignias.has(det.codigo), cuando = misInsignias.get(det.codigo);
+      const cuantos = todos.filter((m) => m.has(det.codigo)).length;
+      cuerpo = (
+        <div className="space-y-4 text-center">
+          <Link href="/fantasy?v=insignias" className="fx-btn-sec">← Insignias</Link>
+          <img src={det.img} alt="" className={`fx-pop mx-auto h-56 w-56 ${tengo ? "drop-shadow-[0_0_30px_rgba(246,196,69,.45)]" : "opacity-40 grayscale"}`} />
+          <p className="fx-display fx-oro-texto text-4xl">{det.nombre}</p>
+          <p className="text-white/85">{det.texto}</p>
+          {tengo ? (
+            <p className="mx-auto max-w-xs rounded-xl border border-[#22b04f] bg-[#155f2d]/70 p-3 font-semibold">✅ Conseguida{cuando ? ` en la ${nombreJornada(q.config.inicio, cuando)}` : ""}</p>
+          ) : <p className="mx-auto max-w-xs rounded-xl border border-[var(--fx-borde)] p-3 fx-suave">🔒 Todavía no la tienes</p>}
+          <p className="text-sm fx-suave">👥 <strong className="text-white">{cuantos} de {participantes.length}</strong> participantes la tienen.</p>
+        </div>
+      );
+    } else {
+      cuerpo = (
+        <div className="space-y-3">
+          <div className="text-center">
+            <p className="fx-display text-3xl"><Star className="mb-1 inline fill-[var(--fx-oro)] text-[var(--fx-oro)]" size={26} /> Llevas {misInsignias.size} de {INSIGNIAS.length}</p>
+            <div className="mx-auto mt-2 h-2.5 max-w-xs overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#22b04f] to-[#f6c445]" style={{ width: `${(misInsignias.size / INSIGNIAS.length) * 100}%` }} /></div>
+          </div>
+          {(Object.keys(NIVEL) as Nivel[]).map((n) => {
+            const lista = INSIGNIAS.filter((x) => x.nivel === n);
+            return (
+              <details key={n} open className={`overflow-hidden rounded-xl border-2 ${NIVEL[n].borde} bg-[var(--fx-card)]`}>
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-bold [&::-webkit-details-marker]:hidden">
+                  <span className="h-3 w-3 rounded-full" style={{ background: NIVEL[n].color }} /> {NIVEL[n].t} ({lista.length})
+                  <span className="ml-auto text-xs fx-suave">{lista.filter((x) => misInsignias.has(x.codigo)).length} conseguidas</span>
+                </summary>
+                <div className="grid grid-cols-3 gap-2 p-3 pt-0 sm:grid-cols-5">
+                  {lista.map((x) => {
+                    const tengo = misInsignias.has(x.codigo);
+                    return (
+                      <Link key={x.codigo} href={`/fantasy?v=insignias&i=${x.codigo}`} className="text-center">
+                        <img src={x.img} alt={x.nombre} className={`mx-auto aspect-square w-full max-w-24 ${tengo ? "" : "opacity-30 grayscale"}`} loading="lazy" />
+                        <p className={`text-[11px] font-semibold leading-tight ${tengo ? "" : "fx-suave"}`}>{x.nombre}</p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      );
+    }
+  }
+
+  if (vista === "reglas") {
+    const tabla: [string, string, string][] = [["🏀", "Punto anotado", "+0,50"], ["⭐", "Triple (extra)", "+0,50"], ["FT", "Tiro libre anotado", "+0,25"], ["✖", "Tiro libre fallado", "−0,50"],
+      ["⏱", "Cada 5 minutos jugados", "+1,00"], ["👕", "Ser titular", "+1,00"], ["±", "+/- en pista (÷ 4, entre −6 y +6)", "±6"], ["🏆", "Victoria del equipo", "+1,00"],
+      ["🟨", "Faltas (desde la 3ª, cada una)", "−0,50"], ["🟥", "Eliminado (5 faltas)", "−2,00"], ["⬇", "Mínimo por jugador y jornada", "−5"]];
     cuerpo = (
-      <div className="space-y-5">
-        <p className="text-sm text-tinta/70">Llevas <strong>{mias.size}</strong> de {INSIGNIAS.length}. Toca una para ver cómo se consigue.</p>
-        {(Object.keys(nivel) as (keyof typeof nivel)[]).map((n) => (
-          <section key={n}>
-            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-tinta/60">{nivel[n]}</h2>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-              {INSIGNIAS.filter((x) => x.nivel === n).map((x) => {
-                const tengo = mias.has(x.codigo);
-                const cuantos = todos.filter((m) => m.has(x.codigo)).length;
-                return (
-                  <details key={x.codigo} className="group text-center">
-                    <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                      <img src={x.img} alt={x.nombre} className={`mx-auto aspect-square w-full max-w-28 ${tengo ? "" : "opacity-30 grayscale"}`} loading="lazy" />
-                      <p className={`mt-1 text-xs font-semibold ${tengo ? "" : "text-tinta/40"}`}>{x.nombre}</p>
-                    </summary>
-                    <p className="mt-1 rounded-lg bg-white p-2 text-[11px] leading-snug text-tinta/70 shadow-sm">
-                      {x.texto}{tengo && mias.get(x.codigo) ? <><br /><strong className="text-green-700">Conseguida en {nombreJornada(q.config.inicio, mias.get(x.codigo)!)}</strong></> : tengo ? <><br /><strong className="text-green-700">¡Conseguida!</strong></> : null}
-                      <br /><span className="text-tinta/45">La tiene{cuantos === 1 ? "" : "n"} {cuantos} {cuantos === 1 ? "participante" : "participantes"}</span>
-                    </p>
-                  </details>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+      <div className="space-y-2.5">
+        {q.config.premio && (
+          <div className="fx-card-oro flex items-center gap-3 p-3">
+            <img src="/insignias/29-campeon-del-turo.png" alt="" className="h-14 w-14" />
+            <div><p className="fx-display text-sm text-[var(--fx-oro)]">Premio</p><p className="fx-display fx-oro-texto text-2xl leading-none">Campeón</p><p className="text-xs text-white/80">{q.config.premio}</p></div>
+          </div>
+        )}
+        <Acordeon titulo="📅 Cada jornada" abierto>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Una jornada es cada semana. Los fichajes se abren el <strong>lunes a las 9:30</strong> y se cierran cuando empieza el primer partido.</li>
+            <li>Tienes <strong>{PRESUPUESTO} ⭐</strong> para <strong>5 titulares y 1 suplente</strong>. Cada jugador cuesta de 4 a 15 ⭐ según sus últimas 4 jornadas, y el precio no cambia en toda la semana.</li>
+            <li>Máximo <strong>2 titulares del mismo equipo</strong>. El <strong>capitán</strong> puntúa doble.</li>
+            <li>El <strong>suplente</strong> entra solo si un titular no juega.</li>
+            <li>A quien fiches una jornada no lo puedes fichar la siguiente (el suplente, solo si llegó a entrar).</li>
+            <li>Si alguien juega en dos equipos, eliges con cuál puntúa.</li>
+          </ul>
+        </Acordeon>
+        <Acordeon titulo="🏀 Puntuación (estadísticas de la FCBQ)">
+          <table className="w-full"><tbody className="divide-y divide-[var(--fx-borde)]">
+            {tabla.map(([i, a, b]) => <tr key={a}><td className="w-8 py-1.5 text-center">{i}</td><td className="py-1.5">{a}</td><td className={`py-1.5 text-right font-bold ${b.startsWith("−") ? "text-red-300" : "text-green-300"}`}>{b}</td></tr>)}
+          </tbody></table>
+          <p className="mt-2 fx-suave">Los puntos salen en cuanto entran las estadísticas de cada partido. En una jornada especial (derbi), ese partido puntúa ×1,5.</p>
+        </Acordeon>
+        <Acordeon titulo="🃏 Comodines">
+          <ul className="space-y-1">{(Object.keys(COMODINES) as Comodin[]).map((c) => <li key={c}><strong className="text-[var(--fx-oro)]">{COMODINES[c].nombre}:</strong> {COMODINES[c].texto}</li>)}</ul>
+          <p className="mt-2 fx-suave">Cada uno se puede usar una vez por temporada, y solo uno por jornada.</p>
+        </Acordeon>
+        <Acordeon titulo="💬 Normas del chat">
+          <p>Se puede picar, pero siempre con respeto: nada de insultos ni de meterse con jugadores, familias o árbitros. El club puede borrar mensajes y silenciar a quien no cumpla.</p>
+        </Acordeon>
       </div>
     );
   }
 
-  if (vista === "reglas") {
-    cuerpo = (
-      <article className="tarjeta space-y-4 p-4 text-sm leading-relaxed">
-        <h1 className="text-xl font-bold">Reglas del Fantasy Turó</h1>
-        {q.config.premio && <p className="rounded-lg bg-oro/20 p-3 font-semibold">🏆 Premio para el campeón: {q.config.premio}</p>}
-        <section><h2 className="font-semibold">Cada jornada</h2>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Una jornada es cada semana (de lunes a domingo). Fichas hasta que empieza el primer partido del fin de semana.</li>
-            <li>Tienes <strong>{PRESUPUESTO} ⭐</strong> para fichar <strong>5 titulares y 1 suplente</strong>. Los jugadores cuestan entre 4 y 15 ⭐ según cómo vienen jugando (últimas 4 jornadas). El precio no cambia durante la semana.</li>
-            <li>Máximo <strong>2 titulares del mismo equipo</strong>.</li>
-            <li>Eliges un <strong>capitán</strong>: sus puntos cuentan doble.</li>
-            <li>El <strong>suplente</strong> entra solo si un titular no juega.</li>
-            <li>Quien fiches una jornada queda <strong>bloqueado la siguiente</strong> (el suplente, solo si llegó a entrar). ¡Toca rotar!</li>
-            <li>Si alguien juega en dos equipos, eliges con cuál puntúa.</li>
-            <li>Los equipos que descansan esa jornada salen marcados al fichar.</li>
-          </ul>
-        </section>
-        <section><h2 className="font-semibold">Puntos (de las estadísticas de la FCBQ)</h2>
-          <table className="mt-1 w-full text-left text-sm"><tbody className="divide-y divide-linea">
-            {[["Cada punto anotado", "+0,5"], ["Triple", "+0,5 extra"], ["Tiro libre anotado / fallado", "+0,25 / −0,5"], ["Cada 5 minutos en pista", "+1"], ["Titular", "+1"],
-              ["+/- con él en pista", "÷ 4 (entre −6 y +6)"], ["Victoria de su equipo", "+1"], ["Faltas a partir de la 3ª", "−0,5 cada una"], ["Eliminado por 5 faltas", "−2"], ["Mínimo por jugador y jornada", "−5"]]
-              .map(([a, b]) => <tr key={a}><td className="py-1">{a}</td><td className="py-1 text-right font-semibold">{b}</td></tr>)}
-          </tbody></table>
-          <p className="mt-1 text-tinta/60">Los puntos aparecen en cuanto entran las estadísticas de cada partido. En jornadas especiales (derbis), ese partido puntúa ×1,5.</p>
-        </section>
-        <section><h2 className="font-semibold">Comodines (uno de cada por temporada)</h2>
-          <ul className="list-disc space-y-1 pl-5">{(Object.keys(COMODINES) as Comodin[]).map((c) => <li key={c}><strong>{COMODINES[c].nombre}</strong>: {COMODINES[c].texto}</li>)}</ul>
-        </section>
-        <section><h2 className="font-semibold">Chat</h2><p>Respeto siempre. El club puede borrar mensajes y silenciar a quien no cumpla.</p></section>
-      </article>
-    );
-  }
-
-  return <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista} conMenu>{cuerpo}</Marco>;
+  return (
+    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista} temporada={temporada}>
+      {cuerpo}
+      <Celebracion pid={yo.id} temporada={temporada} campeon={campeon}
+        insignias={INSIGNIAS.filter((x) => misInsignias.has(x.codigo)).map(({ codigo, nombre, texto, img }) => ({ codigo, nombre, texto, img }))} />
+    </Marco>
+  );
 }

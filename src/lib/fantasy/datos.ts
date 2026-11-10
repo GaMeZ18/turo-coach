@@ -4,13 +4,16 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { hoyLocal } from "@/lib/fechas";
-import { calcularLiga, type Alineacion, type Comodin, type FilaStats, type PartidoCal } from "./motor";
+import { calcularLiga, type Alineacion, type Comodin, type FilaStats, type PartidoCal, type PreciosFijos } from "./motor";
 
 export const ADMIN_FANTASY = "60fb55be-45e2-4f5d-addc-35aaf44b7610"; // Juan Gámez
 export const COOKIE_FANTASY = "fantasy_sesion";
 
 export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean };
-export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; contacto: string | null; silenciado: boolean; comodines: Partial<Record<Comodin, string>>; created_at: string };
+export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
+export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, comodines, emoji, color, foto, created_at";
+/** "Juan Gámez Gómez" → "Juan G." */
+export const nombreCorto = (n: string) => { const p = n.trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[1][0].toUpperCase()}.` : p[0] ?? ""; };
 
 export function db() {
   const d = adminClient();
@@ -47,7 +50,7 @@ export async function quienSoy() {
   } catch { /* sin sesión */ }
   const d = db();
   let participante: Participante | null = null;
-  const campos = "id, perfil_id, alias, nombre, contacto, silenciado, comodines, created_at";
+  const campos = CAMPOS_PARTICIPANTE;
   if (perfil) {
     const { data } = await d.from("fantasy_participantes").select(campos).eq("perfil_id", perfil.id).maybeSingle();
     participante = (data as Participante | null) ?? null;
@@ -70,13 +73,15 @@ export async function cargarLiga(config: Config) {
   const equipos = ((eqs ?? []) as { id: string; nombre: string }[]).map((e) => ({ id: e.id, nombre: e.nombre }));
   const ids = equipos.map((e) => e.id);
   const desde = new Date(Date.parse(config.inicio) - 120 * 864e5).toISOString();
-  const [{ data: filas }, { data: partidos }, { data: parts }, { data: als }, { data: msgs }] = await Promise.all([
+  const [{ data: filas }, { data: partidos }, { data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
     d.from("fcbq_stats").select("equipo_id, stats_id, fecha, datos").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).or("local.ilike.%tur%,visitante.ilike.%tur%").limit(2000),
     d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("fecha", desde).limit(2000),
-    d.from("fantasy_participantes").select("id, perfil_id, alias, nombre, contacto, silenciado, comodines, created_at").order("created_at"),
+    d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
     d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste"),
     d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
+    d.from("fantasy_precios").select("jornada, precios"),
   ]);
+  const preciosFijos: PreciosFijos = Object.fromEntries((fijos ?? []).map((f) => [f.jornada as string, f.precios as PreciosFijos[string]]));
   const participantes = (parts ?? []) as Participante[];
   const mensajes: Record<string, number> = {};
   for (const m of msgs ?? []) mensajes[m.participante_id as string] = (mensajes[m.participante_id as string] ?? 0) + 1;
@@ -85,7 +90,12 @@ export async function cargarLiga(config: Config) {
     equipos, filas: (filas ?? []) as FilaStats[], partidos: (partidos ?? []) as PartidoCal[],
     especiales: config.especiales, anuladas: config.anuladas,
     alineaciones: (als ?? []) as Alineacion[], participantes: participantes.map((p) => ({ id: p.id, alias: p.alias })),
-    mensajes, cerrada: config.cerrada, campeon: config.campeon,
+    mensajes, cerrada: config.cerrada, campeon: config.campeon, preciosFijos,
   });
+  // Al abrirse una jornada se guardan sus precios: así no cambian aunque luego entren más estadísticas
+  if (liga.abierta && !preciosFijos[liga.abierta]) {
+    const p = liga.precio(liga.abierta);
+    await d.from("fantasy_precios").upsert({ jornada: liga.abierta, precios: Object.fromEntries([...p].map(([id, x]) => [id, [x.precio, x.media, x.pj]])) }, { onConflict: "jornada", ignoreDuplicates: true });
+  }
   return { liga, participantes, partidos: (partidos ?? []) as PartidoCal[], equipos };
 }

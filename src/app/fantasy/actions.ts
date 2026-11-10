@@ -2,10 +2,19 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nuevaSesion, pinOk, quienSoy } from "@/lib/fantasy/datos";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, nuevaSesion, pinOk, quienSoy } from "@/lib/fantasy/datos";
 import { MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
 
 type R = { ok?: boolean; error?: string };
+export type Avatar = { emoji?: string | null; color?: string | null; foto?: string | null };
+/** Emoji corto, color #rrggbb y foto JPEG/PNG/WebP pequeña (ya reducida en el móvil) */
+function avatarValido(a?: Avatar) {
+  if (!a) return {};
+  const emoji = a.emoji && [...a.emoji].length <= 4 && !/[<>]/.test(a.emoji) ? a.emoji : null;
+  const color = a.color && /^#[0-9a-f]{6}$/i.test(a.color) ? a.color : null;
+  const foto = a.foto && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a.foto) && a.foto.length < 90_000 ? a.foto : null;
+  return { emoji, color, foto };
+}
 const limpiar = (s: unknown, max: number) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const aliasValido = (a: string) => a.length >= 3 && a.length <= 30;
 const guardarCookie = async (t: string) => (await cookies()).set(COOKIE_FANTASY, t, { path: "/", httpOnly: true, sameSite: "lax", secure: true, maxAge: 60 * 60 * 24 * 365 });
@@ -16,7 +25,7 @@ async function aliasLibre(alias: string, excepto?: string) {
 }
 
 /** Staff con cuenta: solo elige el nombre de su equipo */
-export async function unirseStaff(alias: string): Promise<R> {
+export async function unirseStaff(alias: string, avatar?: Avatar): Promise<R> {
   const q = await quienSoy();
   if (!q.perfil) return { error: "Tienes que entrar con tu cuenta del club." };
   if (!q.acceso) return { error: "El fantasy aún no está abierto." };
@@ -24,14 +33,15 @@ export async function unirseStaff(alias: string): Promise<R> {
   const a = limpiar(alias, 30);
   if (!aliasValido(a)) return { error: "El nombre del equipo debe tener entre 3 y 30 letras." };
   if (!(await aliasLibre(a))) return { error: "Ese nombre de equipo ya existe. Elige otro." };
-  const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre: q.perfil.nombre ?? "Staff" });
+  const nombre = q.perfil.nombre ?? "Staff";
+  const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...avatarValido(avatar) });
   if (error) return { error: error.message };
   revalidatePath("/fantasy");
   return { ok: true };
 }
 
 /** Registro sin cuenta (jugadores, familias, socios) */
-export async function registrar(d: { alias: string; nombre: string; contacto: string; pin: string }): Promise<R> {
+export async function registrar(d: { alias: string; nombre: string; contacto: string; pin: string } & Avatar): Promise<R> {
   const config = await leerConfig();
   if (!config.abierto) return { error: "El fantasy aún no está abierto." };
   const alias = limpiar(d.alias, 30), nombre = limpiar(d.nombre, 60), contacto = limpiar(d.contacto, 80), pin = String(d.pin ?? "").trim();
@@ -41,7 +51,7 @@ export async function registrar(d: { alias: string; nombre: string; contacto: st
   if (!/^\d{4,6}$/.test(pin)) return { error: "El PIN debe tener de 4 a 6 números." };
   if (!(await aliasLibre(alias))) return { error: "Ese nombre de equipo ya existe. Elige otro." };
   const t = nuevaSesion();
-  const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t) });
+  const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, mostrar: nombreCorto(nombre), contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t), ...avatarValido(d) });
   if (error) return { error: error.message };
   await guardarCookie(t);
   revalidatePath("/fantasy");
@@ -69,13 +79,15 @@ export async function salir() {
   revalidatePath("/fantasy");
 }
 
-export async function cambiarAlias(alias: string): Promise<R> {
+/** Cambiar el nombre del equipo, el nombre visible y el avatar */
+export async function guardarPerfil(d: { alias: string; mostrar: string } & Avatar): Promise<R> {
   const q = await quienSoy();
   if (!q.participante) return { error: "No estás apuntado." };
-  const a = limpiar(alias, 30);
+  const a = limpiar(d.alias, 30), m = limpiar(d.mostrar, 30);
   if (!aliasValido(a)) return { error: "El nombre del equipo debe tener entre 3 y 30 letras." };
+  if (m.length < 2) return { error: "Pon cómo quieres que te vean (p. ej. Juan G.)." };
   if (!(await aliasLibre(a, q.participante.id))) return { error: "Ese nombre de equipo ya existe." };
-  await db().from("fantasy_participantes").update({ alias: a }).eq("id", q.participante.id);
+  await db().from("fantasy_participantes").update({ alias: a, mostrar: m, ...avatarValido(d) }).eq("id", q.participante.id);
   revalidatePath("/fantasy");
   return { ok: true };
 }
@@ -87,7 +99,7 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   if (q.config.cerrada) return { error: "La temporada ya ha terminado." };
   const { liga } = await cargarLiga(q.config);
   const l = liga.abierta;
-  if (new Date().toISOString() >= liga.cierre(l)) return { error: "Los fichajes de esta jornada ya están cerrados." };
+  if (!l || new Date().toISOString() >= liga.cierre(l)) return { error: "Los fichajes están cerrados. Se abren el lunes a las 9:30." };
   const precios = liga.precio(l);
   const ids = [...new Set(d.titulares)];
   if (ids.length !== 5) return { error: "Elige 5 titulares." };
@@ -141,10 +153,12 @@ export async function enviarMensaje(jornada: string, texto: string): Promise<R> 
 export async function leerMensajes(jornada: string) {
   const q = await quienSoy();
   if (!q.acceso || !q.participante) return [];
-  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, fantasy_participantes(alias)")
+  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, fantasy_participantes(alias, mostrar, emoji, color, foto)")
     .eq("jornada", jornada).order("created_at").limit(300);
-  return ((data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; fantasy_participantes: { alias: string } | null }[])
-    .map((m) => ({ id: m.id, texto: m.borrado ? "" : m.texto, borrado: m.borrado, fecha: m.created_at, yo: m.participante_id === q.participante!.id, alias: m.fantasy_participantes?.alias ?? "?" }));
+  type P = { alias: string; mostrar: string | null; emoji: string | null; color: string | null; foto: string | null };
+  return ((data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; fantasy_participantes: P | null }[])
+    .map((m) => ({ id: m.id, texto: m.borrado ? "" : m.texto, borrado: m.borrado, fecha: m.created_at, yo: m.participante_id === q.participante!.id,
+      alias: m.fantasy_participantes?.alias ?? "?", mostrar: m.fantasy_participantes?.mostrar ?? "", emoji: m.fantasy_participantes?.emoji ?? null, color: m.fantasy_participantes?.color ?? null, foto: m.fantasy_participantes?.foto ?? null }));
 }
 
 export async function borrarMensaje(id: string): Promise<R> {
@@ -197,6 +211,12 @@ export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
 export async function adminSilenciar(id: string, silenciar: boolean): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").update({ silenciado: silenciar }).eq("id", id);
+  revalidatePath("/fantasy", "layout");
+  return { ok: true };
+}
+export async function adminQuitarFoto(id: string): Promise<R> {
+  await admin();
+  await db().from("fantasy_participantes").update({ foto: null }).eq("id", id);
   revalidatePath("/fantasy", "layout");
   return { ok: true };
 }

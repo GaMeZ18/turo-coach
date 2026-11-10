@@ -1,46 +1,58 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Check, Loader2, Lock, Moon, Plus, Search, Star, X } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Check, Filter, Loader2, Lock, Moon, Plus, Search, X } from "lucide-react";
 import { guardarEquipo } from "./actions";
 import { COMODINES, MAX_POR_EQUIPO, type Comodin } from "@/lib/fantasy/motor";
+import { Camiseta, Sigla } from "./ui";
 
 export type JugadorMercado = {
   id: string; persona: string; nombre: string; dorsal: string; equipo: string; equipoId: string; chica: boolean;
   precio: number; media: number | null; pj: number; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean;
 };
-type Actual = { titulares: string[]; suplente: string | null; capitan: string; comodin: Comodin | null } | null;
+type Equipo = { titulares: string[]; suplente: string | null; capitan: string | null; comodin: Comodin | null };
 
-const n = (v: number) => v.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+const n = (v: number) => v.toLocaleString("es-ES", { maximumFractionDigits: 1 });
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const ICONO_COMODIN: Record<Comodin, string> = { capitan3: "C×3", banquillo: "SUP", presupuesto: "+10⭐" };
 
-export default function Fichajes({ jornada, nombre, cierre, mercado, actual, comodinesUsados, presupuesto, cerrada }: {
-  jornada: string; nombre: string; cierre: string; mercado: JugadorMercado[]; actual: Actual;
-  comodinesUsados: Partial<Record<Comodin, string>>; presupuesto: number; cerrada: boolean;
+/** El equipo que estás montando se guarda en el móvil mientras pasas de «Mi equipo» al «Mercado» */
+function useBorrador(jornada: string, inicial: Equipo) {
+  const clave = `fx-borrador-${jornada}`;
+  const [e, setE] = useState<Equipo>(inicial);
+  const [listo, setListo] = useState(false);
+  useEffect(() => {
+    try { const g = localStorage.getItem(clave); if (g) setE(JSON.parse(g)); } catch { /* sin almacenamiento */ }
+    setListo(true);
+  }, [clave]);
+  const cambiar = (nuevo: Equipo) => { setE(nuevo); try { localStorage.setItem(clave, JSON.stringify(nuevo)); } catch { /* */ } };
+  const limpiar = () => { try { localStorage.removeItem(clave); } catch { /* */ } };
+  return { e, cambiar, limpiar, listo };
+}
+
+export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actual, comodinesUsados, presupuesto }: {
+  modo: "equipo" | "mercado"; jornada: string; nombre: string; cierre: string; mercado: JugadorMercado[];
+  actual: Equipo | null; comodinesUsados: Partial<Record<Comodin, string>>; presupuesto: number;
 }) {
   const porId = useMemo(() => new Map(mercado.map((j) => [j.id, j])), [mercado]);
-  const [tit, setTit] = useState<string[]>(actual?.titulares.filter((id) => porId.has(id)) ?? []);
-  const [sup, setSup] = useState<string | null>(actual?.suplente && porId.has(actual.suplente) ? actual.suplente : null);
-  const [cap, setCap] = useState<string | null>(actual?.capitan ?? null);
-  const [com, setCom] = useState<Comodin | null>(actual?.comodin ?? null);
-  const [q, setQ] = useState("");
-  const [eq, setEq] = useState("");
-  const [orden, setOrden] = useState<"precio" | "media" | "ultimo" | "nombre">("precio");
+  const guardado: Equipo = actual ?? { titulares: [], suplente: null, capitan: null, comodin: null };
+  const { e, cambiar, limpiar } = useBorrador(jornada, guardado);
+  const tit = e.titulares.filter((id) => porId.has(id)), sup = e.suplente && porId.has(e.suplente) ? e.suplente : null;
+  const [q, setQ] = useState(""); const [eq, setEq] = useState(""); const [orden, setOrden] = useState<"media" | "precio" | "ultimo" | "nombre">("media");
   const [msg, setMsg] = useState<{ ok?: boolean; t: string } | null>(null);
   const [pend, start] = useTransition();
 
-  const limite = presupuesto + (com === "presupuesto" ? 10 : 0);
+  const limite = presupuesto + (e.comodin === "presupuesto" ? 10 : 0);
   const elegidos = [...tit, ...(sup ? [sup] : [])];
   const coste = elegidos.reduce((s, id) => s + (porId.get(id)?.precio ?? 0), 0);
   const queda = limite - coste;
   const personas = new Set(elegidos.map((id) => porId.get(id)?.persona));
-  const delEquipo = (e: string) => tit.filter((id) => porId.get(id)?.equipoId === e).length;
-  const equipos = [...new Map(mercado.map((j) => [j.equipoId, j.equipo])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  const cerrado = new Date().toISOString() >= cierre || cerrada;
-  const fechaCierre = new Date(cierre).toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+  const sinGuardar = JSON.stringify({ ...e, titulares: tit, suplente: sup }) !== JSON.stringify(guardado);
+  const fechaCierre = new Date(cierre).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
   const motivo = (j: JugadorMercado): string | null => {
-    if (j.bloqueado) return "Bloqueado (lo fichaste la jornada anterior)";
+    if (j.bloqueado) return "Bloqueado: lo fichaste la jornada anterior";
     if (personas.has(j.persona) && !elegidos.includes(j.id)) return "Ya lo tienes con otro equipo";
     return null;
   };
@@ -48,130 +60,158 @@ export default function Fichajes({ jornada, nombre, cierre, mercado, actual, com
     setMsg(null);
     const m = motivo(j); if (m) return setMsg({ t: m });
     if (tit.length < 5) {
-      if (delEquipo(j.equipoId) >= MAX_POR_EQUIPO) return setMsg({ t: `Ya tienes ${MAX_POR_EQUIPO} titulares de ${j.equipo}. Puedes ponerlo de suplente cuando tengas los 5.` });
-      setTit([...tit, j.id]); if (!cap) setCap(j.id);
-    } else if (!sup) setSup(j.id);
+      if (tit.filter((id) => porId.get(id)?.equipoId === j.equipoId).length >= MAX_POR_EQUIPO) return setMsg({ t: `Ya tienes ${MAX_POR_EQUIPO} titulares de ${j.equipo}. Ponlo de suplente cuando tengas los 5.` });
+      cambiar({ ...e, titulares: [...tit, j.id], capitan: e.capitan ?? j.id });
+      setMsg({ ok: true, t: `${j.nombre} fichado (${tit.length + 1}/5).` });
+    } else if (!sup) { cambiar({ ...e, suplente: j.id }); setMsg({ ok: true, t: `${j.nombre} de suplente.` }); }
     else setMsg({ t: "Ya tienes los 5 titulares y el suplente. Quita a alguien primero." });
   };
   const quitar = (id: string) => {
-    setTit(tit.filter((x) => x !== id)); if (sup === id) setSup(null);
-    if (cap === id) setCap(tit.find((x) => x !== id) ?? null);
+    const t2 = tit.filter((x) => x !== id);
+    cambiar({ ...e, titulares: t2, suplente: sup === id ? null : sup, capitan: e.capitan === id ? t2[0] ?? null : e.capitan });
   };
   const guardar = () => start(async () => {
     setMsg(null);
-    if (tit.length !== 5) return setMsg({ t: "Te faltan titulares (son 5)." });
-    if (!cap || !tit.includes(cap)) return setMsg({ t: "Elige capitán (toca la C)." });
+    if (tit.length !== 5) return setMsg({ t: `Te faltan ${5 - tit.length} titulares.` });
+    if (!e.capitan || !tit.includes(e.capitan)) return setMsg({ t: "Elige capitán (toca la C)." });
     if (queda < 0) return setMsg({ t: `Te pasas ${-queda} ⭐ del presupuesto.` });
-    const r = await guardarEquipo({ titulares: tit, suplente: sup, capitan: cap, comodin: com });
-    setMsg(r.error ? { t: r.error } : { ok: true, t: "¡Equipo guardado! Lo puedes cambiar hasta el cierre." });
+    const r = await guardarEquipo({ titulares: tit, suplente: sup, capitan: e.capitan, comodin: e.comodin });
+    if (r.error) setMsg({ t: r.error }); else { limpiar(); setMsg({ ok: true, t: "¡Equipo guardado! Lo puedes cambiar hasta el cierre." }); }
   });
 
   const lista = useMemo(() => {
     const t = sinAcentos(q.trim());
     return mercado.filter((j) => (!eq || j.equipoId === eq) && (!t || sinAcentos(`${j.nombre} ${j.equipo} ${j.dorsal}`).includes(t)))
       .sort((a, b) => orden === "precio" ? b.precio - a.precio || (b.media ?? 0) - (a.media ?? 0)
-        : orden === "media" ? (b.media ?? -99) - (a.media ?? -99)
+        : orden === "media" ? (b.media ?? -99) - (a.media ?? -99) || b.precio - a.precio
         : orden === "ultimo" ? (b.ultimo ?? -99) - (a.ultimo ?? -99)
         : a.nombre.localeCompare(b.nombre));
   }, [mercado, q, eq, orden]);
+  const equipos = [...new Map(mercado.map((j) => [j.equipoId, j.equipo])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
 
-  const Hueco = ({ id, i, suplente }: { id?: string; i: number; suplente?: boolean }) => {
-    const j = id ? porId.get(id) : null;
+  const Estrellas = (
+    <div className="fx-card flex items-center gap-2 px-3 py-2">
+      <span className="text-sm">⭐ <strong className={queda < 0 ? "text-red-400" : "text-[var(--fx-oro)]"}>{queda}</strong> libres de {limite}</span>
+      <span className="ml-auto text-xs fx-suave">{tit.length}/5 + {sup ? 1 : 0} sup.</span>
+      {sinGuardar && <span className="rounded bg-[var(--fx-oro)] px-1.5 py-0.5 text-[10px] font-bold text-black">SIN GUARDAR</span>}
+    </div>
+  );
+  const Mensaje = msg && <p className={`rounded-lg p-2 text-sm ${msg.ok ? "bg-green-900/50 text-green-100" : "bg-red-900/60 text-red-100"}`}>{msg.t}</p>;
+
+  if (modo === "mercado") {
     return (
-      <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm ${j ? "border-linea bg-white" : "border-dashed border-linea text-tinta/40"}`}>
-        <span className="w-8 shrink-0 text-center text-[10px] font-bold uppercase text-tinta/50">{suplente ? "SUP" : i + 1}</span>
-        {j ? (
-          <>
-            <span className="min-w-0 flex-1 truncate font-medium">{j.nombre} <span className="text-xs font-normal text-tinta/50">{j.equipo}</span>{j.descansa && <span className="ml-1 text-[10px] font-semibold text-amber-700">DESCANSA</span>}</span>
-            <span className="text-xs font-semibold">{j.precio} ⭐</span>
-            {!suplente && !cerrado && (
-              <button onClick={() => setCap(j.id)} className={`h-6 w-6 rounded text-[11px] font-black ${cap === j.id ? "bg-oro text-tinta" : "bg-suave text-tinta/40"}`} title="Capitán (puntúa doble)">C</button>
-            )}
-            {!suplente && cerrado && cap === j.id && <span className="h-6 w-6 rounded bg-oro text-center text-[11px] font-black leading-6">C</span>}
-            {!cerrado && <button onClick={() => quitar(j.id)} className="text-tinta/40 hover:text-rojo" aria-label="Quitar"><X size={16} /></button>}
-          </>
-        ) : <span className="flex-1">{suplente ? "Suplente (entra si un titular no juega)" : "Vacío"}</span>}
+      <div className="space-y-3">
+        <h1 className="fx-display text-2xl">📋 Mercado · {nombre}</h1>
+        {Estrellas}
+        <div className="flex gap-2">
+          <div className="relative flex-1"><Search size={16} className="absolute left-2.5 top-2.5 fx-suave" /><input className="fx-input !pl-8" placeholder="Buscar jugador…" value={q} onChange={(ev) => setQ(ev.target.value)} /></div>
+          <span className="flex items-center rounded-lg border border-[var(--fx-borde)] px-2"><Filter size={16} /></span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <select className="fx-input" value={eq} onChange={(ev) => setEq(ev.target.value)} aria-label="Equipo"><option value="">Equipo: Todos</option>{equipos.map(([id, nm]) => <option key={id} value={id}>{nm}</option>)}</select>
+          <select className="fx-input" value={orden} onChange={(ev) => setOrden(ev.target.value as typeof orden)} aria-label="Orden">
+            <option value="media">Orden: Mejor media</option><option value="precio">Orden: Más caros</option><option value="ultimo">Orden: Última jornada</option><option value="nombre">Orden: Nombre</option>
+          </select>
+        </div>
+        {Mensaje}
+        <ul className="fx-card fx-sep overflow-hidden">
+          {lista.map((j) => {
+            const dentro = elegidos.includes(j.id), no = motivo(j);
+            return (
+              <li key={j.id} className={`flex items-center gap-2.5 px-3 py-2 ${dentro ? "bg-[var(--fx-oro)]/10" : no ? "opacity-55" : ""}`}>
+                <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={34} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{j.nombre}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-[11px] fx-suave">
+                    <Sigla equipo={j.equipo} />
+                    <span>Media {j.media !== null ? n(j.media) : "–"}</span>
+                    <span>Últ: {j.ultimo !== null ? n(j.ultimo) : "–"}</span>
+                  </p>
+                  {(j.descansa || j.bloqueado) && (
+                    <p className="text-[11px] font-semibold">
+                      {j.descansa && <span className="mr-2 text-amber-300"><Moon size={10} className="inline" /> Descansa</span>}
+                      {j.bloqueado && <span className="text-red-400"><Lock size={10} className="inline" /> Bloqueado</span>}
+                    </p>
+                  )}
+                </div>
+                <span className="flex items-center gap-0.5 text-lg font-bold">
+                  {j.tendencia > 0 ? <span className="text-xs text-green-400">▲</span> : j.tendencia < 0 ? <span className="text-xs text-red-400">▼</span> : null}
+                  {j.precio}<span className="text-base">⭐</span>
+                </span>
+                {dentro ? (
+                  <button onClick={() => quitar(j.id)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--fx-oro)] text-black" aria-label="Quitar"><Check size={18} /></button>
+                ) : j.bloqueado ? (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Lock size={15} /></span>
+                ) : (
+                  <button onClick={() => anadir(j)} disabled={!!no} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--fx-verde)] text-white shadow disabled:opacity-40" aria-label="Fichar"><Plus size={18} /></button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="sticky bottom-3 flex gap-2">
+          <Link href="/fantasy?v=equipo" className="fx-btn flex-1">Ver mi equipo ({tit.length}/5)</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const Fila = ({ id, i, suplente }: { id?: string | null; i: number; suplente?: boolean }) => {
+    const j = id ? porId.get(id) : null;
+    if (!j) return (
+      <Link href="/fantasy?v=mercado" className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--fx-borde)] px-3 py-2.5 text-sm fx-suave">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5"><Plus size={16} /></span>
+        {suplente ? "Elige suplente (entra si un titular no juega)" : `Fichar titular ${i + 1}`}
+      </Link>
+    );
+    const esCap = e.capitan === j.id;
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl bg-[#0c1430] px-2.5 py-2">
+        <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={32} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{j.nombre}</p>
+          <p className="flex gap-2 text-[11px] fx-suave"><Sigla equipo={j.equipo} /> {j.descansa && <span className="font-semibold text-amber-300">Descansa</span>}</p>
+        </div>
+        <span className="text-sm font-bold">{j.precio}⭐</span>
+        {!suplente && (
+          <button onClick={() => cambiar({ ...e, capitan: j.id })} title="Capitán (puntúa doble)"
+            className={`h-7 w-7 rounded-full text-xs font-black ${esCap ? "bg-gradient-to-b from-[#ffe27a] to-[#e2a414] text-black shadow" : "border border-white/30 text-white/50"}`}>C</button>
+        )}
+        <button onClick={() => quitar(j.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fx-rojo)] text-white" aria-label="Quitar"><X size={15} /></button>
       </div>
     );
   };
 
   return (
-    <div className="space-y-4">
-      <section className="tarjeta space-y-2 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-semibold">Tu equipo · {nombre}</h2>
-          <span className={`ml-auto rounded-full px-2.5 py-0.5 text-sm font-bold ${queda < 0 ? "bg-red-100 text-red-700" : "bg-oro/25"}`}>{queda} ⭐ libres <span className="font-normal text-tinta/60">de {limite}</span></span>
-        </div>
-        <p className="text-xs text-tinta/60">{cerrado ? "Fichajes cerrados para esta jornada." : <>Puedes cambiarlo hasta el <strong>{fechaCierre}</strong> (empieza el primer partido).</>}</p>
-        <div className="grid gap-1.5">
-          {[0, 1, 2, 3, 4].map((i) => <Hueco key={i} id={tit[i]} i={i} />)}
-          <Hueco id={sup ?? undefined} i={5} suplente />
-        </div>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {(Object.keys(COMODINES) as Comodin[]).map((c) => {
-            const gastado = !!comodinesUsados[c];
-            return (
-              <button key={c} disabled={gastado || cerrado} onClick={() => setCom(com === c ? null : c)} title={COMODINES[c].texto}
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${com === c ? "border-azul bg-azul text-white" : gastado ? "border-linea text-tinta/30 line-through" : "border-linea bg-white"}`}>
-                🃏 {COMODINES[c].nombre}{gastado ? " · gastado" : ""}
-              </button>
-            );
-          })}
-        </div>
-        {com && <p className="text-xs text-azul">{COMODINES[com].texto} Solo uno por jornada y cada uno una vez por temporada.</p>}
-        {!cerrado && (
-          <button onClick={guardar} disabled={pend} className="btn-primario w-full justify-center">{pend ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Guardar equipo</button>
-        )}
-        {msg && <p className={`rounded-lg p-2 text-sm ${msg.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
-      </section>
-
-      {!cerrado && (
-        <section className="tarjeta overflow-hidden">
-          <div className="flex flex-wrap gap-2 border-b border-linea p-3">
-            <h2 className="w-full font-semibold">Mercado</h2>
-            <div className="relative min-w-40 flex-1">
-              <Search size={15} className="absolute left-2.5 top-2.5 text-tinta/40" />
-              <input className="campo !pl-8" placeholder="Buscar jugador" value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
-            <select className="campo !w-auto" value={eq} onChange={(e) => setEq(e.target.value)} aria-label="Equipo">
-              <option value="">Todos los equipos</option>
-              {equipos.map(([id, nm]) => <option key={id} value={id}>{nm}</option>)}
-            </select>
-            <select className="campo !w-auto" value={orden} onChange={(e) => setOrden(e.target.value as typeof orden)} aria-label="Ordenar">
-              <option value="precio">Más caros</option><option value="media">Mejor media</option><option value="ultimo">Última jornada</option><option value="nombre">Nombre</option>
-            </select>
-          </div>
-          <ul className="divide-y divide-linea">
-            {lista.map((j) => {
-              const dentro = elegidos.includes(j.id);
-              const no = motivo(j);
-              return (
-                <li key={j.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${dentro ? "bg-oro/10" : no ? "opacity-50" : ""}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{j.nombre} <span className="text-xs font-normal text-tinta/50">#{j.dorsal}</span></p>
-                    <p className="truncate text-xs text-tinta/55">
-                      {j.equipo}
-                      {j.media !== null ? ` · media ${n(j.media)}` : " · sin datos"}
-                      {j.ultimo !== null ? ` · última ${n(j.ultimo)}` : ""}
-                      {j.descansa && <span className="ml-1 font-semibold text-amber-700"><Moon size={10} className="inline" /> descansa</span>}
-                      {j.bloqueado && <span className="ml-1 font-semibold text-red-600"><Lock size={10} className="inline" /> bloqueado</span>}
-                    </p>
-                  </div>
-                  <span className="flex w-14 items-center justify-end gap-0.5 font-bold">
-                    {j.tendencia > 0 ? <ArrowUp size={12} className="text-green-600" /> : j.tendencia < 0 ? <ArrowDown size={12} className="text-red-600" /> : null}
-                    {j.precio}<Star size={12} className="fill-amber-400 text-amber-500" />
-                  </span>
-                  {dentro ? (
-                    <button onClick={() => quitar(j.id)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-azul text-white" aria-label="Quitar"><Check size={16} /></button>
-                  ) : (
-                    <button onClick={() => anadir(j)} disabled={!!no} className="flex h-8 w-8 items-center justify-center rounded-lg border border-linea bg-white disabled:opacity-40" aria-label="Fichar"><Plus size={16} /></button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-    </div>
+    <section className="space-y-2.5">
+      <div className="fx-cab-rojo flex items-center rounded-xl px-3 py-2">
+        <p className="fx-display text-lg">Tu equipo · {nombre}</p>
+      </div>
+      <p className="text-xs fx-suave">ⓘ Puedes cambiarlo hasta el <strong className="text-white">{fechaCierre}</strong> (empieza el primer partido).</p>
+      {Estrellas}
+      <div className="space-y-1.5">
+        {[0, 1, 2, 3, 4].map((i) => <Fila key={i} id={tit[i]} i={i} />)}
+        <p className="pt-1 text-xs font-bold uppercase fx-suave">Suplente</p>
+        <Fila id={sup} i={5} suplente />
+      </div>
+      <p className="pt-1 text-xs font-bold uppercase fx-suave">Comodines</p>
+      <div className="grid grid-cols-3 gap-2">
+        {(Object.keys(COMODINES) as Comodin[]).map((c) => {
+          const gastado = !!comodinesUsados[c], on = e.comodin === c;
+          return (
+            <button key={c} disabled={gastado} onClick={() => cambiar({ ...e, comodin: on ? null : c })} title={COMODINES[c].texto}
+              className={`flex flex-col items-center gap-1 rounded-xl border-2 p-2 text-center ${on ? "border-[var(--fx-oro)] bg-[#3b2d0b]" : gastado ? "border-white/10 bg-white/5 opacity-50" : "border-[#6d4fd8] bg-gradient-to-b from-[#3d2a8a] to-[#1d1450]"}`}>
+              <span className="fx-display text-xl text-[var(--fx-oro)]">{ICONO_COMODIN[c]}</span>
+              <span className="text-[10px] font-semibold leading-tight">{COMODINES[c].nombre}</span>
+              <span className={`rounded px-1.5 text-[9px] font-bold uppercase ${on ? "bg-[var(--fx-oro)] text-black" : gastado ? "bg-white/20" : "bg-[var(--fx-verde)]"}`}>{on ? "Activado" : gastado ? "Gastado" : "Disponible"}</span>
+            </button>
+          );
+        })}
+      </div>
+      {e.comodin && <p className="text-xs text-[var(--fx-oro)]">{COMODINES[e.comodin].texto} Cada comodín se puede usar una vez por temporada.</p>}
+      {Mensaje}
+      <button onClick={guardar} disabled={pend} className="fx-btn w-full">{pend ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Guardar equipo</button>
+      <Link href="/fantasy?v=mercado" className="fx-btn-sec w-full justify-center">Ir al mercado</Link>
+    </section>
   );
 }

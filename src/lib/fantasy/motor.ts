@@ -8,6 +8,8 @@ export const PRECIO_MIN = 4;
 export const PRECIO_MAX = 15;
 export const PRECIO_SIN_DATOS = 6;
 export const MAX_POR_EQUIPO = 2;
+export const HORA_APERTURA = "09:30"; // los lunes se abren los fichajes de la jornada (con las estadísticas del finde ya cargadas)
+export type PreciosFijos = Record<string, Record<string, [number, number | null, number]>>;
 
 export type Comodin = "capitan3" | "banquillo" | "presupuesto";
 export const COMODINES: Record<Comodin, { nombre: string; texto: string }> = {
@@ -251,6 +253,7 @@ export type Entrada = {
   especiales: Record<string, string[]>; anuladas: string[];
   alineaciones: Alineacion[]; participantes: { id: string; alias: string }[];
   mensajes: Record<string, number>; cerrada: boolean; campeon: string | null;
+  preciosFijos?: PreciosFijos;
 };
 
 export function calcularLiga(e: Entrada) {
@@ -258,15 +261,25 @@ export function calcularLiga(e: Entrada) {
   const pool = new Set([...jugadores.values()].map((j) => j.equipoId));
   const lunesHoy = lunesDe(e.hoy);
   const cierreHoy = cierreDe(lunesHoy, e.partidos, pool);
-  // Jornada en la que se ficha: la de esta semana hasta el primer partido; después, la siguiente
-  const abierta = e.ahora < cierreHoy ? lunesHoy : sumarDias(lunesHoy, 7);
+  const aperturaHoy = aISO(lunesHoy, HORA_APERTURA);
+  // Se ficha la jornada de esta semana desde el lunes 9:30 hasta el primer partido; luego, fichajes cerrados hasta el lunes
+  const abierta: string | null = e.ahora >= aperturaHoy && e.ahora < cierreHoy && !e.cerrada ? lunesHoy : null;
   const enJuego = e.ahora >= cierreHoy ? lunesHoy : null;
+  const proxima = e.ahora < aperturaHoy ? aperturaHoy : aISO(sumarDias(lunesHoy, 7), HORA_APERTURA);
   const todas = jornadasHasta(e.inicio, lunesHoy).filter((l) => l >= lunesDe(e.inicio));
   const cerradas = todas.filter((l) => l < lunesHoy || (l === lunesHoy && enJuego)); // con alineaciones ya fijas
   const terminadas = todas.filter((l) => l < lunesHoy);
 
   const preciosDe = new Map<string, ReturnType<typeof precios>>();
-  const precio = (l: string) => { if (!preciosDe.has(l)) preciosDe.set(l, precios(l, jugadores, actuaciones)); return preciosDe.get(l)!; };
+  const precio = (l: string) => {
+    if (!preciosDe.has(l)) {
+      const calc = precios(l, jugadores, actuaciones);
+      const fijo = e.preciosFijos?.[l];
+      if (fijo) for (const [id, [p, m, pj]] of Object.entries(fijo)) if (calc.has(id)) calc.set(id, { precio: p, media: m, pj });
+      preciosDe.set(l, calc);
+    }
+    return preciosDe.get(l)!;
+  };
   const semanas = new Map<string, ReturnType<typeof puntosSemana>>();
   const semana = (l: string) => { if (!semanas.has(l)) semanas.set(l, puntosSemana(l, actuaciones)); return semanas.get(l)!; };
   // Equipos que aún tienen partido sin estadísticas esa jornada
@@ -382,7 +395,7 @@ export function calcularLiga(e: Entrada) {
   };
 
   return {
-    jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas,
+    jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas, proxima, lunesHoy,
     cierre: (l: string) => cierreDe(l, e.partidos, pool),
     descansan: (l: string) => descansan(l, e.partidos, pool),
     precio, semana, pendientes, resultados, porJornada, general, bloqueados, revelacion, insignias,

@@ -1,65 +1,81 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock, Phone, Shield, User } from "lucide-react";
 import { entrar, registrar, unirseStaff } from "./actions";
+import { ElegirAvatar, type AvatarDatos } from "./Perfil";
+
+function Premio({ premio }: { premio: string }) {
+  return (
+    <div className="fx-card-oro flex items-center gap-3 p-3 text-left">
+      <img src="/insignias/29-campeon-del-turo.png" alt="" className="h-14 w-14" />
+      <div><p className="fx-display text-sm text-[var(--fx-oro)]">Premio</p><p className="fx-display fx-oro-texto text-2xl leading-none">Campeón</p><p className="text-xs text-white/80">{premio}</p></div>
+    </div>
+  );
+}
+
+const Campo = ({ icono: I, ...p }: { icono: typeof User } & React.InputHTMLAttributes<HTMLInputElement>) => (
+  <label className="flex items-center gap-2 rounded-lg border border-[#d5dbea] bg-white px-2.5 py-2 text-[#121a33]">
+    <I size={16} className="shrink-0 text-[#6b7799]" />
+    <input {...p} className="w-full bg-transparent text-sm outline-none placeholder:text-[#8a94b3]" />
+  </label>
+);
 
 /** Apuntarse: el staff solo pone el nombre de su equipo; el resto se registra con un PIN */
 export default function Alta({ staff, abiertoPublico, premio }: { staff: { nombre: string } | null; abiertoPublico: boolean; premio: string | null }) {
   const [modo, setModo] = useState<"registro" | "entrar">("registro");
   const [f, setF] = useState({ alias: "", nombre: "", contacto: "", pin: "", quien: "" });
+  const [av, setAv] = useState<AvatarDatos>({ emoji: "🏀", color: "#d81f2f", foto: null });
   const [error, setError] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const ir = (fn: () => Promise<{ error?: string }>) => start(async () => { setError(null); const r = await fn(); if (r.error) setError(r.error); });
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
-      <div className="tarjeta p-5 text-center">
-        <img src="/insignias/29-campeon-del-turo.png" alt="" className="mx-auto h-24 w-24" />
-        <h1 className="mt-1 text-2xl font-bold">Fantasy Turó</h1>
-        <p className="mt-1 text-sm text-tinta/70">Cada jornada fichas a 5 jugadores del club con 50 ⭐ y sumas puntos con sus estadísticas de la federación.</p>
-        {premio && <p className="mt-2 rounded-lg bg-oro/20 p-2 text-sm font-semibold">🏆 Premio: {premio}</p>}
-      </div>
+    <div className="mx-auto max-w-md space-y-4 text-center">
+      <img src="/insignias/29-campeon-del-turo.png" alt="" className="fx-pop mx-auto -mb-2 h-20 w-20" />
+      <h1 className="fx-display fx-oro-texto text-4xl">Fantasy Turó</h1>
+      <p className="-mt-3 text-sm text-white/80">CB Turó de la Peira</p>
+      <p className="text-sm text-white/85">Ficha a 5 jugadores con 50 ⭐, compite jornada a jornada y demuestra que eres el mejor mánager del Turó.</p>
+      {premio && <Premio premio={premio} />}
 
-      {staff ? (
-        <div className="tarjeta space-y-3 p-4">
-          <p className="text-sm">Hola <strong>{staff.nombre}</strong>. Solo tienes que ponerle nombre a tu equipo:</p>
-          <input className="campo" placeholder="Ej.: Los Triples de la Peira" maxLength={30} value={f.alias} onChange={set("alias")} />
-          <button className="btn-primario w-full justify-center" disabled={pend} onClick={() => ir(() => unirseStaff(f.alias))}>{pend && <Loader2 size={16} className="animate-spin" />} ¡Me apunto!</button>
-        </div>
-      ) : !abiertoPublico ? (
-        <p className="tarjeta p-4 text-center text-sm text-tinta/60">Las inscripciones aún no están abiertas.</p>
-      ) : (
-        <div className="tarjeta p-4">
-          <div className="mb-3 flex overflow-hidden rounded-lg border border-linea text-sm font-semibold">
-            <button className={`flex-1 py-2 ${modo === "registro" ? "bg-azul text-white" : ""}`} onClick={() => setModo("registro")}>Soy nuevo</button>
-            <button className={`flex-1 py-2 ${modo === "entrar" ? "bg-azul text-white" : ""}`} onClick={() => setModo("entrar")}>Ya tengo equipo</button>
+      <div className="overflow-hidden rounded-2xl bg-[#f3f5fb] text-left text-[#121a33] shadow-xl">
+        {staff ? (
+          <div className="space-y-3 p-4">
+            <p className="text-sm">Hola <strong>{staff.nombre}</strong> 👋 Ponle nombre a tu equipo y elige tu escudo:</p>
+            <Campo icono={Shield} placeholder="Nombre de tu equipo" maxLength={30} value={f.alias} onChange={set("alias")} />
+            <div className="rounded-xl bg-[#0d1530] p-3"><ElegirAvatar alias={f.alias} valor={av} onChange={setAv} /></div>
+            <button className="fx-btn fx-btn-oro w-full" disabled={pend} onClick={() => ir(() => unirseStaff(f.alias, av))}>{pend && <Loader2 size={16} className="animate-spin" />} ¡Me apunto!</button>
           </div>
-          {modo === "registro" ? (
-            <div className="space-y-2">
-              <label className="etiqueta">Nombre de tu equipo (lo ven todos)</label>
-              <input className="campo" placeholder="Ej.: Los Triples de la Peira" maxLength={30} value={f.alias} onChange={set("alias")} />
-              <label className="etiqueta">Tu nombre y apellido (solo lo ve el club)</label>
-              <input className="campo" maxLength={60} value={f.nombre} onChange={set("nombre")} autoComplete="name" />
-              <label className="etiqueta">Teléfono o email (por si ganas el premio)</label>
-              <input className="campo" maxLength={80} value={f.contacto} onChange={set("contacto")} />
-              <label className="etiqueta">Elige un PIN de 4 a 6 números (para entrar desde otro móvil)</label>
-              <input className="campo" inputMode="numeric" maxLength={6} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, "") })} />
-              <button className="btn-primario w-full justify-center" disabled={pend} onClick={() => ir(() => registrar(f))}>{pend && <Loader2 size={16} className="animate-spin" />} Crear mi equipo</button>
+        ) : !abiertoPublico ? (
+          <p className="p-4 text-center text-sm">Las inscripciones aún no están abiertas.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 text-sm font-bold">
+              <button className={`py-2.5 ${modo === "registro" ? "bg-gradient-to-b from-[#f0323f] to-[#b3121f] text-white" : "bg-[#0d1530] text-white/70"}`} onClick={() => setModo("registro")}>Soy nuevo</button>
+              <button className={`py-2.5 ${modo === "entrar" ? "bg-gradient-to-b from-[#f0323f] to-[#b3121f] text-white" : "bg-[#0d1530] text-white/70"}`} onClick={() => setModo("entrar")}>Ya tengo equipo</button>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <label className="etiqueta">Nombre de tu equipo, teléfono o email</label>
-              <input className="campo" value={f.quien} onChange={set("quien")} />
-              <label className="etiqueta">PIN</label>
-              <input className="campo" inputMode="numeric" maxLength={6} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, "") })} />
-              <button className="btn-primario w-full justify-center" disabled={pend} onClick={() => ir(() => entrar(f.quien, f.pin))}>{pend && <Loader2 size={16} className="animate-spin" />} Entrar</button>
-            </div>
-          )}
-        </div>
-      )}
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            {modo === "registro" ? (
+              <div className="space-y-2 p-4">
+                <Campo icono={Shield} placeholder="Nombre de tu equipo" maxLength={30} value={f.alias} onChange={set("alias")} />
+                <Campo icono={User} placeholder="Tu nombre real (nombre y apellido)" maxLength={60} value={f.nombre} onChange={set("nombre")} autoComplete="name" />
+                <Campo icono={Phone} placeholder="Teléfono o email" maxLength={80} value={f.contacto} onChange={set("contacto")} />
+                <Campo icono={Lock} placeholder="PIN (4–6 números)" inputMode="numeric" maxLength={6} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, "") })} />
+                <p className="text-[11px] text-[#5b6687]">Los demás verán el nombre de tu equipo en grande y tu nombre con la inicial del apellido (lo puedes cambiar). El teléfono o email solo lo ve el club, por si ganas.</p>
+                <div className="rounded-xl bg-[#0d1530] p-3 text-white"><p className="mb-2 text-xs text-white/70">Tu escudo: un emoji o tu foto</p><ElegirAvatar alias={f.alias} valor={av} onChange={setAv} /></div>
+                <button className="fx-btn fx-btn-oro w-full" disabled={pend} onClick={() => ir(() => registrar({ ...f, ...av }))}>{pend && <Loader2 size={16} className="animate-spin" />} Crear mi equipo</button>
+              </div>
+            ) : (
+              <div className="space-y-2 p-4">
+                <Campo icono={Shield} placeholder="Nombre de tu equipo, teléfono o email" value={f.quien} onChange={set("quien")} />
+                <Campo icono={Lock} placeholder="PIN" inputMode="numeric" maxLength={6} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, "") })} />
+                <button className="fx-btn fx-btn-oro w-full" disabled={pend} onClick={() => ir(() => entrar(f.quien, f.pin))}>{pend && <Loader2 size={16} className="animate-spin" />} Entrar</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {error && <p className="rounded-lg bg-red-900/60 p-3 text-sm text-red-100">{error}</p>}
     </div>
   );
 }

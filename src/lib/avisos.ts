@@ -171,8 +171,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
       const { liga, participantes } = await cargarLiga(cfg);
       const conCuenta = participantes.filter((p) => p.perfil_id && (cfg.abierto || p.perfil_id === ADMIN_FANTASY));
       if (diaSemana === 5 && !cfg.cerrada) {
-        const l = liga.abierta, cierre = liga.cierre(l);
-        if (cierre > new Date(ahora).toISOString()) {
+        const l = liga.abierta, cierre = l ? liga.cierre(l) : "";
+        if (l && cierre > new Date(ahora).toISOString()) {
           for (const p of conCuenta) {
             if (liga.alineacion(p.id, l)) continue;
             await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarPerfiles(db, [p.perfil_id!], "🏆 Fantasy: ¡haz tu equipo!",

@@ -1,46 +1,49 @@
-import type { Alineacion, Resultado } from "@/lib/fantasy/motor";
+import type { Alineacion, JugadorF, Resultado } from "@/lib/fantasy/motor";
 import { COMODINES, type Comodin } from "@/lib/fantasy/motor";
+import { Camiseta, Sigla, pts } from "./ui";
 
-/** Puntos con decimales a la española (12,5) */
-export function Pts({ v }: { v: number }) {
-  return <>{v.toLocaleString("es-ES", { maximumFractionDigits: 2 })}</>;
-}
-
-/** El equipo de una jornada con los puntos de cada uno */
-export function MiJornada({ titulo, res, al, nombre, equipo, compacto = false }: {
-  titulo?: string; res: Resultado; al: Alineacion; nombre: (id: string) => string; equipo: (id: string) => string; compacto?: boolean;
+/** El equipo de una jornada con los puntos de cada uno (como en el mockup) */
+export function MiJornada({ titulo, res, al, jugador, compacto = false }: {
+  titulo?: string; res: Resultado; al: Alineacion; jugador: (id: string) => JugadorF | undefined; compacto?: boolean;
 }) {
+  const Fila = ({ id, puntos, jugo, porJugar, extra = 0, capitan = false, entro }: { id: string; puntos: number; jugo: boolean; porJugar: boolean; extra?: number; capitan?: boolean; entro?: boolean }) => {
+    const j = jugador(id);
+    return (
+      <li className="flex items-center gap-2.5 px-3 py-2">
+        <Camiseta dorsal={j?.dorsal ?? ""} equipo={j?.equipo ?? ""} size={30} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold">{j?.nombre ?? "?"}</span>
+          {j && <Sigla equipo={j.equipo} />}
+        </span>
+        {capitan && extra > 0 && <span className="text-sm font-bold text-[var(--fx-oro)]">+{pts(extra)}</span>}
+        {capitan && <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-b from-[#ffe27a] to-[#e2a414] text-[11px] font-black text-black">C</span>}
+        {entro !== undefined ? (
+          entro ? <span className="fx-pill-verde">Entra · {pts(puntos)} pts</span> : porJugar ? <span className="text-xs fx-suave">Por jugar</span> : jugo ? <span className="text-xs fx-suave">No entra ({pts(puntos)})</span> : <span className="text-xs fx-suave">—</span>
+        ) : jugo ? <span className={puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(puntos)} pts</span>
+          : porJugar ? <span className="rounded-lg border border-white/20 px-2 py-0.5 text-xs font-semibold text-white/70">Por jugar</span>
+          : <span className="fx-pill-rojo">No jugó</span>}
+      </li>
+    );
+  };
   return (
-    <section className={compacto ? "" : "tarjeta p-3"}>
+    <section className={compacto ? "" : "fx-card overflow-hidden"}>
       {titulo && (
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">{titulo}</h2>
-          <span className="text-xl font-bold"><Pts v={res.total} /> <span className="text-xs font-normal text-tinta/50">pts</span></span>
+        <div className="fx-cab-rojo flex items-center px-3 py-2">
+          <p className="fx-display flex-1 text-lg">{titulo}</p>
+          <p className="fx-display text-lg">Total: {pts(res.total)} pts</p>
         </div>
       )}
-      {al.comodin && <p className="text-xs font-semibold text-azul">Comodín: {COMODINES[al.comodin as Comodin].nombre}</p>}
-      <ul className="mt-1 divide-y divide-linea text-sm">
-        {res.filas.map((f) => (
-          <li key={f.id} className="flex items-center gap-2 py-1.5">
-            <span className="min-w-0 flex-1 truncate">
-              {f.capitan && <span className="mr-1 rounded bg-oro px-1 text-[10px] font-bold text-tinta">C</span>}
-              {nombre(f.id)} <span className="text-xs text-tinta/50">{equipo(f.id)} · {f.precio} ⭐</span>
-            </span>
-            <span className={`w-20 text-right font-semibold tabular-nums ${!f.jugo ? "text-tinta/40" : f.puntos < 0 ? "text-red-600" : ""}`}>
-              {f.jugo ? <><Pts v={f.puntos} />{f.extra ? <span className="text-xs text-amber-700"> +<Pts v={f.extra} /></span> : null}</> : f.porJugar ? "por jugar" : "no jugó"}
-            </span>
-          </li>
-        ))}
-        {res.suplente && (
-          <li className="flex items-center gap-2 py-1.5 text-tinta/70">
-            <span className="min-w-0 flex-1 truncate"><span className="mr-1 rounded bg-suave px-1 text-[10px] font-bold">SUP</span>{nombre(res.suplente.id)} <span className="text-xs text-tinta/50">{equipo(res.suplente.id)} · {res.suplente.precio} ⭐</span></span>
-            <span className="w-20 text-right font-semibold tabular-nums">
-              {res.suplente.entro ? <span className="text-green-700">entra · <Pts v={res.suplente.puntos} /></span> : res.suplente.porJugar ? "por jugar" : res.suplente.jugo ? <span className="text-tinta/40">(<Pts v={res.suplente.puntos} />)</span> : "—"}
-            </span>
-          </li>
-        )}
+      {al.comodin && <p className="px-3 pt-2 text-xs font-semibold text-[var(--fx-oro)]">🃏 {COMODINES[al.comodin as Comodin].nombre}</p>}
+      <ul className="fx-sep">
+        {res.filas.map((f) => <Fila key={f.id} id={f.id} puntos={f.puntos} jugo={f.jugo} porJugar={f.porJugar} extra={f.extra} capitan={f.capitan} />)}
       </ul>
-      {compacto && <p className="mt-1 text-right text-xs text-tinta/50">Total <strong><Pts v={res.total} /></strong></p>}
+      {res.suplente && (
+        <>
+          <p className="bg-white/5 px-3 py-1 text-xs font-bold uppercase fx-suave">Suplente</p>
+          <ul><Fila id={res.suplente.id} puntos={res.suplente.puntos} jugo={res.suplente.jugo} porJugar={res.suplente.porJugar} entro={res.suplente.entro} /></ul>
+        </>
+      )}
+      {compacto && <p className="px-3 pb-2 text-right text-sm">Total <strong className="text-[var(--fx-oro)]">{pts(res.total)}</strong></p>}
     </section>
   );
 }
