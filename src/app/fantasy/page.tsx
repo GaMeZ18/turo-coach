@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Fantasy Turó", description: "La liga fantasy del CB Turó de la Peira", robots: { index: false },
   manifest: "/fantasy/manifest.webmanifest", appleWebApp: { capable: true, title: "Fantasy Turó", statusBarStyle: "black-translucent" },
+  icons: { icon: [{ url: "/fantasy/favicon-64.png", sizes: "64x64", type: "image/png" }], apple: [{ url: "/fantasy/apple-touch-icon.png", sizes: "180x180" }] },
   openGraph: { title: "Fantasy Turó", description: "Ficha a 5 jugadores del club cada jornada y suma puntos con sus estadísticas", images: [{ url: "https://coach.cbturo.com/insignias/29-campeon-del-turo.png" }] },
 };
 

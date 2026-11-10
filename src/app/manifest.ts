@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#002b8e",
     // Mantener pulsado el icono de la app (Android) muestra estos accesos; se pueden arrastrar a la pantalla de inicio
     shortcuts: [
-      { name: "Fantasy Turó", short_name: "Fantasy", url: "/fantasy", icons: [{ src: "/insignias/29-campeon-del-turo.png", sizes: "256x256" }] },
+      { name: "Fantasy Turó", short_name: "Fantasy", url: "/fantasy", icons: [{ src: "/fantasy/icon-192.png", sizes: "192x192" }] },
       { name: "Pizarra", url: "/pizarra", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Entrenamientos", url: "/entrenamientos", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Ejercicios", url: "/ejercicios", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
