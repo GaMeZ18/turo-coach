@@ -149,7 +149,6 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             </div>
           </div>
         </section>
-        </div>
         {q.config.prueba && <p className="rounded-lg bg-amber-900/50 p-2 text-center text-sm text-amber-100">🧪 Jornada de prueba en marcha (se borra desde el panel).</p>}
         {q.cargaPuntos && (
           <a href="/partidos/importar?auto=1" target="_blank" rel="noopener" className="fx-btn-sec w-full justify-center">🔄 Cargar puntos Fantasy <span className="text-xs fx-suave">(estadísticas de la FCBQ)</span></a>
