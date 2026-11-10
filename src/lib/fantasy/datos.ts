@@ -43,7 +43,8 @@ export async function quienSoy() {
   let perfil: { id: string; nombre: string | null; rol: string | null } | null = null;
   try {
     const supa = await createClient();
-    const { data: { user } } = await supa.auth.getUser();
+    const { data: cl } = await supa.auth.getClaims();
+    const user = cl?.claims?.sub ? { id: cl.claims.sub as string, email: (cl.claims.email as string | undefined) ?? null } : null;
     if (user) {
       const { data } = await supa.from("perfiles").select("id, nombre, rol").eq("id", user.id).maybeSingle();
       perfil = { id: user.id, nombre: data?.nombre ?? user.email ?? null, rol: data?.rol ?? null };

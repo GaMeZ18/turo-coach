@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const NAV = [
@@ -24,6 +24,17 @@ const NAV = [
 
 export default function NavPrincipal({ rol, mesas = false, material = false, fantasy = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean; material?: boolean; fantasy?: boolean }) {
   const rutaReal = usePathname();
+  const router = useRouter();
+  // Precarga completa (con datos) de un menú: al acercar el dedo o el ratón ya se está pidiendo
+  const precargar = (href: string) => { try { router.prefetch(href, { kind: "full" } as never); } catch { /* */ } };
+  // Y en un rato libre, los menús que más se usan (así el primer toque ya es instantáneo)
+  useEffect(() => {
+    const principales = ["/", "/entrenamientos", "/calendario", "/ejercicios", "/partidos", "/biblioteca"].filter((h) => h !== rutaReal);
+    const libre = (fn: () => void) => ("requestIdleCallback" in window ? (window as Window & { requestIdleCallback: (f: () => void) => number }).requestIdleCallback(fn) : window.setTimeout(fn, 1200));
+    const t = window.setTimeout(() => principales.forEach((h, i) => window.setTimeout(() => libre(() => precargar(h)), i * 400)), 1500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Al tocar un menú se marca al momento (sin esperar a que cargue la página)
   const [pulsado, setPulsado] = useState<string | null>(null);
   useEffect(() => setPulsado(null), [rutaReal]);
@@ -46,6 +57,8 @@ export default function NavPrincipal({ rol, mesas = false, material = false, fan
           key={n.href}
           href={n.href}
           onClick={() => setPulsado(n.href)}
+          onPointerEnter={() => precargar(n.href)}
+          onTouchStart={() => precargar(n.href)}
           className={`relative whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium transition lg:px-2 ${
             activo(n.href) ? "text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}

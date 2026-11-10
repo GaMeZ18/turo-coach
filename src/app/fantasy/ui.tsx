@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Award, BookOpen, ClipboardList, MessageCircle, Settings, Trophy, Users } from "lucide-react";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
+import AutoRefresco from "@/components/AutoRefresco";
 
 /** Camiseta con el dorsal, del color del equipo */
 export function Camiseta({ dorsal, equipo, size = 30 }: { dorsal: string | number; equipo: string; size?: number }) {
@@ -75,6 +76,7 @@ export function Marco({ children, perfil, esAdmin, vista, conMenu = true, tempor
         )}
       </header>
       <main className="mx-auto max-w-3xl px-3 py-4">{children}</main>
+      <AutoRefresco oscuro />
     </div>
   );
 }

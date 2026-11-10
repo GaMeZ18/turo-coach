@@ -47,13 +47,16 @@ export const gestionaMesas = (p: Perfil) => p.rol === "coordinador" || p.rol ===
  *  Con cache(): layout y página comparten la misma consulta en cada petición. */
 export const requireUser = cache(async () => {
   const supabase = await createClient();
-  // La sesión de la cookie da el id al momento: el perfil se pide a la vez que se comprueba el usuario (más rápido)
+  // La sesión de la cookie da el id al momento: el perfil se pide a la vez que se comprueba el usuario (más rápido).
+  // getClaims comprueba la firma del token en el propio servidor (sin ir al de Supabase en cada cambio de menú).
   const { data: { session } } = await supabase.auth.getSession();
   const idSesion = session?.user?.id;
-  const [{ data: { user } }, pre] = await Promise.all([
-    supabase.auth.getUser(),
+  const [claimsR, pre] = await Promise.all([
+    supabase.auth.getClaims(),
     idSesion ? supabase.from("perfiles").select("id, nombre, email, rol, gestor_mesas").eq("id", idSesion).single() : Promise.resolve(null),
   ]);
+  const c = claimsR.data?.claims;
+  const user = c?.sub ? { id: c.sub as string, email: (c.email as string | undefined) ?? session?.user?.email ?? null } : null;
   if (!user) redirect("/login");
   let { data: perfil, error } = pre && idSesion === user.id ? pre : await supabase
     .from("perfiles")
