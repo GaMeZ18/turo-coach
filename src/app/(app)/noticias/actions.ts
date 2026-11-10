@@ -23,7 +23,7 @@ export async function comentar(noticiaId: string, texto: string, gif: string | n
   const { supabase, user } = await requireUser();
   const t = texto.trim().slice(0, 500);
   const g = gif?.trim() || null;
-  if (!t && !g) return { error: "Escribe algo o pon un GIF." };
+  if (!t && !g) return { error: "Escribe un comentario." };
   if (g && !gifValido(g)) return { error: "Ese GIF no vale: pega el enlace de la imagen (.gif) o sube uno de menos de 1 MB." };
   const { error } = await supabase.from("noticia_comentarios").insert({ noticia_id: noticiaId, perfil_id: user.id, texto: t, gif: g });
   if (error) return { error: "No se ha podido publicar. Prueba otra vez." };
