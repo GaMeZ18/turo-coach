@@ -225,9 +225,8 @@ export async function adminConfig(c: { abierto?: boolean; premio?: string; inici
 export async function adminEspecial(lunes: string, partidoId: string, poner: boolean): Promise<R> {
   const q = await admin();
   const esp = { ...q.config.especiales };
-  const lista = new Set(esp[lunes] ?? []);
-  if (poner) lista.add(partidoId); else lista.delete(partidoId);
-  esp[lunes] = [...lista];
+  // Un solo «partido de la jornada» por semana: elegir otro sustituye al anterior; tocar el elegido lo quita
+  esp[lunes] = poner ? [partidoId] : (esp[lunes] ?? []).filter((x) => x !== partidoId);
   if (!esp[lunes].length) delete esp[lunes];
   await db().from("fantasy_config").update({ especiales: esp }).eq("id", 1);
   revalidatePath("/fantasy", "layout");

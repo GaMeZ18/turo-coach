@@ -55,8 +55,8 @@ export function Especial({ lunes, partidoId, activo, texto }: { lunes: string; p
   const a = useAccion();
   return (
     <label className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${activo ? "bg-red-900/50 font-semibold text-red-100" : "bg-white/10"}`}>
-      <input type="checkbox" checked={activo} disabled={a.pend} onChange={(e) => a.run(() => adminEspecial(lunes, partidoId, e.target.checked))} />
-      {activo ? "🔥 " : ""}{texto}
+      <input type="radio" name={`partido-jornada-${lunes}`} checked={activo} disabled={a.pend} onChange={() => {}} onClick={() => a.run(() => adminEspecial(lunes, partidoId, !activo))} />
+      {activo ? "⭐ " : ""}{texto}{activo && <span className="ml-auto text-[10px] font-bold uppercase">Partido de la jornada · ×1,5</span>}
     </label>
   );
 }

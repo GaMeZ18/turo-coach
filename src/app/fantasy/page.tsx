@@ -306,7 +306,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         </p>
         {esp.length > 0 && (
           <div className="fx-card-rojo p-3 text-center">
-            <p className="fx-display text-xl">🔥 Jornada especial</p>
+            <p className="fx-display text-xl">⭐ Partido de la jornada</p>
             <p className="text-sm">{esp.map((p) => `${eqNom(p.equipo_id)} (${fechaCorta(p.fecha)})`).join(" · ")} puntúa <strong>×1,5</strong></p>
           </div>
         )}
@@ -429,7 +429,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <table className="w-full"><tbody className="divide-y divide-[var(--fx-borde)]">
             {tabla.map(([i, a, b]) => <tr key={a}><td className="w-8 py-1.5 text-center">{i}</td><td className="py-1.5">{a}</td><td className={`py-1.5 text-right font-bold ${b.startsWith("−") ? "text-red-300" : "text-green-300"}`}>{b}</td></tr>)}
           </tbody></table>
-          <p className="mt-2 fx-suave">Los puntos salen en cuanto entran las estadísticas de cada partido. En una jornada especial (derbi), ese partido puntúa ×1,5.</p>
+          <p className="mt-2 fx-suave">Los puntos salen en cuanto entran las estadísticas de cada partido. Cada jornada puede tener un <strong>partido de la jornada</strong>: los jugadores de ese partido puntúan ×1,5.</p>
         </Acordeon>
         <Acordeon titulo="🃏 Comodines">
           <ul className="space-y-1">{(Object.keys(COMODINES) as Comodin[]).map((c) => <li key={c}><strong className="text-[var(--fx-oro)]">{COMODINES[c].nombre}:</strong> {COMODINES[c].texto}</li>)}</ul>

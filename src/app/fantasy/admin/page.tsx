@@ -70,7 +70,7 @@ export default async function AdminFantasy() {
 
         <section className="fx-card overflow-hidden">
           <h2 className="border-b border-[var(--fx-borde)] px-4 py-2 font-semibold">Jornadas</h2>
-          <p className="px-4 pt-2 text-xs text-white/60">Marca un partido como <strong>especial</strong> (derbi) para que puntúe ×1,5. Anula una jornada si faltan estadísticas o hubo algún problema.</p>
+          <p className="px-4 pt-2 text-xs text-white/60">Elige el <strong>partido de la jornada</strong> (el que quieras, uno por jornada): sus jugadores puntúan ×1,5. Anula una jornada si faltan estadísticas o hubo algún problema.</p>
           <ul className="divide-y divide-[var(--fx-borde)]">
             {jornadas.map((l) => {
               const ini = aISO(l, "00:00"), fin = aISO(sumarDias(l, 7), "00:00");

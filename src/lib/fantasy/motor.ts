@@ -237,7 +237,7 @@ export const INSIGNIAS: { codigo: string; nombre: string; nivel: Nivel; texto: s
   ["mvp", "MVP", "dificil", "Gana una jornada."],
   ["low-cost", "Low cost", "dificil", "Gana una jornada gastando 40 ⭐ o menos."],
   ["racha", "Racha", "dificil", "3 jornadas seguidas en el top 3."],
-  ["rey-del-derbi", "Rey del derbi", "dificil", "Gana una jornada especial."],
+  ["rey-del-derbi", "Rey del derbi", "dificil", "Gana una jornada que tenga partido de la jornada."],
   ["comodin-maestro", "Comodín maestro", "dificil", "Usa «Capitán ×3» y que tu capitán sume 25 o más."],
   ["150", "150", "dificil", "Haz 150 puntos en una jornada."],
   ["sin-ceros", "Sin ceros", "dificil", "10 jornadas en las que ningún titular se queda a 0 o menos."],
