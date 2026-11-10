@@ -7,10 +7,10 @@ import { Newspaper } from "lucide-react";
 export default async function Noticias() {
   const { supabase, perfil } = await requireUser();
   const ahora = new Date().toISOString();
-  const r1 = await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles(nombre), noticia_comentarios(count), noticia_reacciones(count)").lte("publicada_en", ahora).order("publicada_en", { ascending: false }).limit(100);
+  const r1 = await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles!noticias_autor_id_fkey(nombre), noticia_comentarios(count), noticia_reacciones(count)").lte("publicada_en", ahora).order("publicada_en", { ascending: false }).limit(100);
   // Si los contadores fallan por lo que sea, las noticias se enseñan igual (sin contadores)
   const data: unknown[] | null = r1.error
-    ? (await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles(nombre)").lte("publicada_en", ahora).order("publicada_en", { ascending: false }).limit(100)).data
+    ? (await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles!noticias_autor_id_fkey(nombre)").lte("publicada_en", ahora).order("publicada_en", { ascending: false }).limit(100)).data
     : r1.data;
   const lista = (data ?? []) as unknown as { id: string; titulo: string; resumen: string; contenido: string; publicada_en: string; perfiles: { nombre: string | null } | null; noticia_comentarios?: { count: number }[]; noticia_reacciones?: { count: number }[] }[];
   return (

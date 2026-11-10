@@ -12,7 +12,7 @@ export default async function Noticia({ params }: { params: Promise<{ id: string
   const { id } = await params;
   const { supabase, perfil, user } = await requireUser();
   const [{ data }, { data: reR }, { data: coR }] = await Promise.all([
-    supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles(nombre)").eq("id", id).maybeSingle(),
+    supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles!noticias_autor_id_fkey(nombre)").eq("id", id).maybeSingle(),
     supabase.from("noticia_reacciones").select("emoji, perfil_id, perfiles(nombre)").eq("noticia_id", id),
     supabase.from("noticia_comentarios").select("id, perfil_id, texto, gif, created_at, perfiles(nombre)").eq("noticia_id", id).order("created_at"),
   ]);
