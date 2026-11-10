@@ -46,7 +46,7 @@ export const VISTAS = [
   { v: "equipo", t: "Mi equipo", i: Users },
   { v: "mercado", t: "Mercado", i: ClipboardList },
   { v: "clasificacion", t: "Clasificación", i: Trophy },
-  { v: "jornada", t: "Jornada", i: MessageCircle },
+  { v: "jornada", t: "Chat", i: MessageCircle },
   { v: "calendario", t: "Calendario", i: CalendarDays },
   { v: "insignias", t: "Insignias", i: Award },
   { v: "reglas", t: "Reglas", i: BookOpen },
