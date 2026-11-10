@@ -4,8 +4,8 @@ import { requireUser } from "@/lib/supabase/server";
 import { fechaCorta, hora } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";
 import NuevoComunicado from "./NuevoComunicado";
-import { borrarComunicado } from "./actions";
-import { Megaphone, Clock, CheckCircle2, Trash2 } from "lucide-react";
+import { borrarComunicado, enviarAhora, reenviarComunicado } from "./actions";
+import { Megaphone, Clock, CheckCircle2, Trash2, RotateCw, Send } from "lucide-react";
 
 /** Comunicados de coordinación: mensajes a quien elijas, ahora o programados (solo coordinadores) */
 export default async function Comunicados() {
@@ -45,14 +45,28 @@ export default async function Comunicados() {
                     Para {c.destinatarios.length} persona{c.destinatarios.length === 1 ? "" : "s"}: {c.destinatarios.slice(0, 6).map(nombreDe).join(", ")}{c.destinatarios.length > 6 ? "…" : ""} · por {c.perfiles?.nombre ?? "—"}
                   </p>
                 </div>
-                {c.enviado_en ? (
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800"><CheckCircle2 size={13} /> {fechaCorta(c.enviado_en)} {hora(c.enviado_en)}</span>
-                ) : (
-                  <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  {c.enviado_en ? (
+                    <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800"><CheckCircle2 size={13} /> {fechaCorta(c.enviado_en)} {hora(c.enviado_en)}</span>
+                  ) : (
                     <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800"><Clock size={13} /> {c.programado_para ? `${fechaCorta(c.programado_para)} ${hora(c.programado_para)}` : "pendiente"}</span>
-                    <form action={borrarComunicado}><input type="hidden" name="id" value={c.id} /><Enviar className="text-tinta/40 hover:text-red-700" title="Cancelar" confirmar="¿Cancelar este comunicado programado?"><Trash2 size={15} /></Enviar></form>
+                  )}
+                  <div className="flex items-center gap-1">
+                    {c.enviado_en ? (
+                      <form action={reenviarComunicado}><input type="hidden" name="id" value={c.id} />
+                        <Enviar className="btn-secundario !px-2 !py-1 text-xs" title="Volver a enviarlo a las mismas personas" confirmar={`¿Volver a enviar «${c.titulo}» a ${c.destinatarios.length} persona${c.destinatarios.length === 1 ? "" : "s"}?`}><RotateCw size={13} /> Reenviar</Enviar>
+                      </form>
+                    ) : (
+                      <form action={enviarAhora}><input type="hidden" name="id" value={c.id} />
+                        <Enviar className="btn-secundario !px-2 !py-1 text-xs" title="Enviarlo ya, sin esperar a la hora programada"><Send size={13} /> Enviar ya</Enviar>
+                      </form>
+                    )}
+                    <form action={borrarComunicado}><input type="hidden" name="id" value={c.id} />
+                      <Enviar className="btn-secundario !px-2 !py-1 text-xs text-red-700" title="Borrar"
+                        confirmar={c.enviado_en ? `¿Borrar «${c.titulo}»? Se quitará también de Avisos de quien lo recibió${c.noticia_id ? " y de Noticias" : ""}.` : "¿Cancelar este comunicado programado?"}><Trash2 size={13} /> Borrar</Enviar>
+                    </form>
                   </div>
-                )}
+                </div>
               </div>
             </li>
           ))}

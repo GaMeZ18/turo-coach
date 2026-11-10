@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/server";
 import { enviarComunicado } from "@/lib/comunicados";
+import { adminClient } from "@/lib/supabase/admin";
 import { aISO } from "@/lib/fechas";
 
 async function coordinador() {
@@ -44,12 +45,45 @@ export async function crearComunicado(fd: FormData): Promise<{ ok?: string; erro
   return { ok: "Programado. Se enviará a la hora elegida." };
 }
 
+/** Borrar un comunicado (enviado o programado). Si ya se envió, se quita también de «Avisos» de quien lo recibió,
+ *  y si era una noticia, de la sección Noticias. */
 export async function borrarComunicado(fd: FormData) {
   const { supabase } = await coordinador();
-  const { data: c } = await supabase.from("comunicados").select("noticia_id").eq("id", String(fd.get("id"))).is("enviado_en", null).maybeSingle();
-  await supabase.from("comunicados").delete().eq("id", String(fd.get("id"))).is("enviado_en", null);
-  if (c?.noticia_id) await supabase.from("noticias").delete().eq("id", c.noticia_id);
+  const id = String(fd.get("id"));
+  const { data: c } = await supabase.from("comunicados").select("titulo, tipo, destinatarios, enviado_en, noticia_id").eq("id", id).maybeSingle();
+  if (!c) return;
+  if (c.enviado_en) {
+    const db = adminClient();
+    if (db) {
+      const t = new Date(c.enviado_en).getTime();
+      await db.from("notificaciones").delete()
+        .in("perfil_id", c.destinatarios as string[])
+        .in("titulo", [c.titulo, `📰 ${c.titulo}`])
+        .gte("created_at", new Date(t - 5 * 60000).toISOString()).lte("created_at", new Date(t + 5 * 60000).toISOString());
+    }
+  }
+  await supabase.from("comunicados").delete().eq("id", id);
+  if (c.noticia_id && fd.get("conNoticia") !== "0") await supabase.from("noticias").delete().eq("id", c.noticia_id);
   revalidatePath("/comunicados");
+  revalidatePath("/noticias");
+}
+
+/** Volver a enviar un comunicado (a las mismas personas, ahora): queda como uno nuevo en el historial */
+export async function reenviarComunicado(fd: FormData) {
+  const { supabase, user } = await coordinador();
+  const { data: c } = await supabase.from("comunicados").select("titulo, cuerpo, url, destinatarios, tipo, noticia_id").eq("id", String(fd.get("id"))).maybeSingle();
+  if (!c) return;
+  const { data: n } = await supabase.from("comunicados").insert({ autor_id: user.id, titulo: c.titulo, cuerpo: c.cuerpo, url: c.url, destinatarios: c.destinatarios, tipo: c.tipo, noticia_id: c.noticia_id }).select("id").single();
+  if (n) await enviarComunicado(n.id);
+  revalidatePath("/comunicados");
+}
+
+/** Mandar ya uno programado */
+export async function enviarAhora(fd: FormData) {
+  await coordinador();
+  await enviarComunicado(String(fd.get("id")));
+  revalidatePath("/comunicados");
+  revalidatePath("/noticias");
 }
 
 export async function borrarNoticia(fd: FormData) {

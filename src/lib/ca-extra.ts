@@ -2,6 +2,11 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Reenviar": "Reenviar",
+ "Enviar ya": "Enviar ja",
+ "Borrar": "Esborrar",
+ "Volver a enviarlo a las mismas personas": "Tornar-lo a enviar a les mateixes persones",
+ "Enviarlo ya, sin esperar a la hora programada": "Enviar-lo ja, sense esperar l'hora programada",
  "Cómo llegar": "Com arribar-hi",
  "Fotos (hasta 4)": "Fotos (fins a 4)",
  "Añadir foto": "Afegir foto",
