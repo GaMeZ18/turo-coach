@@ -62,8 +62,8 @@ export function Especial({ lunes, partidoId, activo, texto }: { lunes: string; p
 }
 export function Anular({ lunes, anulada }: { lunes: string; anulada: boolean }) {
   const a = useAccion();
-  return <button className={`rounded px-2 py-0.5 text-xs font-semibold ${anulada ? "bg-amber-900/60 text-amber-100" : "bg-white/10"}`} disabled={a.pend}
-    onClick={() => (anulada || confirm("¿Anular esta jornada? No contará para nadie.")) && a.run(() => adminAnular(lunes, !anulada))}>{anulada ? "Anulada · reactivar" : "Anular"}</button>;
+  return <button className={`rounded px-2 py-0.5 text-xs font-semibold ${anulada ? "bg-green-900/60 text-green-100" : "bg-white/10"}`} disabled={a.pend}
+    onClick={() => (anulada || confirm("¿Dejar esta semana sin Fantasy? No se fichará ni se puntuará (si ya había equipos, no contarán).")) && a.run(() => adminAnular(lunes, !anulada))}>{anulada ? "✅ Volver a jugarla" : "🚫 Sin Fantasy"}</button>;
 }
 export function Silenciar({ id, silenciado }: { id: string; silenciado: boolean }) {
   const a = useAccion();

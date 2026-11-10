@@ -177,7 +177,7 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
           for (const p of conCuenta) {
             if (liga.alineacion(p.id, l)) continue;
             await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarFantasy(db, [p], "🏆 Fantasy: ¡haz tu equipo!",
-              `${nombreJornada(cfg.inicio, l)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
+              `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
           }
         }
       }
@@ -189,7 +189,7 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
           if (!l || !r) continue;
           const pos = liga.general.findIndex((g) => g.id === p.id) + 1;
           await unaVez(`fantasy-puntos:${l}:${p.id}`, () => notificarFantasy(db, [p], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
-            `${nombreJornada(cfg.inicio, l)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
+            `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
         }
       }
     }

@@ -100,8 +100,8 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   const Cerrado = ({ breve = false }: { breve?: boolean }) => (
     <section className="fx-card p-5 text-center">
       <Lock size={breve ? 32 : 48} className="mx-auto text-white/90" />
-      <p className={`fx-display mt-1 ${breve ? "text-3xl" : "text-4xl"} leading-none`}>Fichajes cerrados</p>
-      <p className="mt-2 text-sm text-white/85">{liga.enJuego ? `La ${nombreJornada(q.config.inicio, liga.enJuego).toLowerCase()} ya está en juego. No puedes hacer cambios.` : "Ahora mismo no se puede fichar."}</p>
+      <p className={`fx-display mt-1 ${breve ? "text-3xl" : "text-4xl"} leading-none`}>{liga.descansoHoy ? "Semana sin Fantasy" : "Fichajes cerrados"}</p>
+      <p className="mt-2 text-sm text-white/85">{liga.descansoHoy ? "Esta semana casi no hay partidos, así que no se juega. ¡Descansa tú también! 😴" : liga.enJuego ? `La ${nombreJornada(q.config.inicio, liga.enJuego, q.config.anuladas).toLowerCase()} ya está en juego. No puedes hacer cambios.` : "Ahora mismo no se puede fichar."}</p>
       <p className="text-sm text-white/85">Vuelve el <strong>{proxima}</strong> para preparar la siguiente.</p>
     </section>
   );
@@ -118,7 +118,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const resAnt = ant ? liga.resultados.get(`${yo.id}|${ant}`) : undefined;
     const ultJ = enJuego && resJuego ? enJuego : resAnt ? ant : null;
     const ultPts = ultJ === enJuego && resJuego ? resJuego.total : resAnt ? resAnt.total : null;
-    const ultNombre = ultJ ? `${nombreJornada(q.config.inicio, ultJ).replace("Jornada", "jornada")}${ultJ === enJuego ? " (en juego)" : ""}` : "última jornada";
+    const ultNombre = ultJ ? `${nombreJornada(q.config.inicio, ultJ, q.config.anuladas).replace("Jornada", "jornada")}${ultJ === enJuego ? " (en juego)" : ""}` : "última jornada";
     const alAnt = ant ? liga.alineacion(yo.id, ant) : undefined;
     cuerpo = (
       <div className="space-y-3">
@@ -158,13 +158,13 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <InstalarFantasy />
         {!yo.perfil_id && <AvisosFantasy clavePublica={VAPID_PUBLICO} />}
         {l ? (
-          <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
+          <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
             actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null}
             comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>} presupuesto={PRESUPUESTO} />
         ) : <Cerrado />}
-        {enJuego && alJuego && resJuego && <MiJornada titulo={`${nombreJornada(q.config.inicio, enJuego)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
+        {enJuego && alJuego && resJuego && <MiJornada titulo={`${nombreJornada(q.config.inicio, enJuego, q.config.anuladas)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
         {enJuego && !alJuego && <p className="fx-card p-3 text-center text-sm fx-suave">No fichaste equipo para esta jornada.</p>}
-        {l && ant && alAnt && resAnt && <MiJornada titulo={`${nombreJornada(q.config.inicio, ant)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
+        {l && ant && alAnt && resAnt && <MiJornada titulo={`${nombreJornada(q.config.inicio, ant, q.config.anuladas)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
       </div>
     );
   }
@@ -172,7 +172,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   if (vista === "mercado") {
     const l = liga.abierta;
     cuerpo = l ? (
-      <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
+      <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
         actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null; })()}
         comodinesUsados={{}} presupuesto={PRESUPUESTO} />
     ) : <Cerrado />;
@@ -221,11 +221,11 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         ) : !jSel ? <p className="fx-card p-4 text-sm fx-suave">Todavía no se ha jugado ninguna jornada.</p> : (
           <>
             <div className="flex flex-wrap gap-1.5">
-              {chips.map((l) => <Link key={l} href={`/fantasy?v=clasificacion&t=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l).replace("Jornada ", "J")}{l === liga.abierta ? " · fichando" : ""}</Link>)}
+              {chips.map((l) => <Link key={l} href={`/fantasy?v=clasificacion&t=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l, q.config.anuladas).replace("Jornada ", "J")}{l === liga.abierta ? " · fichando" : ""}</Link>)}
             </div>
             {enCurso ? (
               <>
-                <p className="text-sm fx-suave">Equipos fichados para la {nombreJornada(q.config.inicio, jSel).toLowerCase()} (se pueden cambiar hasta el cierre).</p>
+                <p className="text-sm fx-suave">Equipos fichados para la {nombreJornada(q.config.inicio, jSel, q.config.anuladas).toLowerCase()} (se pueden cambiar hasta el cierre).</p>
                 <section className="fx-card fx-sep overflow-hidden">
                   {participantes.filter((p) => liga.alineacion(p.id, jSel)).map((p) => {
                     const al = liga.alineacion(p.id, jSel)!;
@@ -298,9 +298,9 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     cuerpo = (
       <div className="space-y-3">
         {opciones.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">{opciones.map((l) => <Link key={l} href={`/fantasy?v=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l)}</Link>)}</div>
+          <div className="flex flex-wrap gap-1.5">{opciones.map((l) => <Link key={l} href={`/fantasy?v=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l, q.config.anuladas)}</Link>)}</div>
         )}
-        <h1 className="fx-display text-2xl">{nombreJornada(q.config.inicio, jSel)} · del {fechaCorta(`${jSel}T12:00:00Z`).replace(".", "")} al {fechaCorta(`${sumarDias(jSel, 6)}T12:00:00Z`).replace(".", "")}</h1>
+        <h1 className="fx-display text-2xl">{nombreJornada(q.config.inicio, jSel, q.config.anuladas)} · del {fechaCorta(`${jSel}T12:00:00Z`).replace(".", "")} al {fechaCorta(`${sumarDias(jSel, 6)}T12:00:00Z`).replace(".", "")}</h1>
         <p className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${jugada ? "bg-[#5e0f17] text-red-100" : "bg-[#155f2d] text-green-100"}`}>
           {jugada ? (liga.enJuego === jSel ? "🔴 En juego: los puntos se suman en cuanto entran las estadísticas." : "Terminada") : `📅 Fichajes abiertos hasta el ${fechaCorta(liga.cierre(jSel))} a las ${hora(liga.cierre(jSel))}`}
         </p>
@@ -363,7 +363,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <p className="fx-display fx-oro-texto text-4xl">{det.nombre}</p>
           <p className="text-white/85">{det.texto}</p>
           {tengo ? (
-            <p className="mx-auto max-w-xs rounded-xl border border-[#22b04f] bg-[#155f2d]/70 p-3 font-semibold">✅ Conseguida{cuando ? ` en la ${nombreJornada(q.config.inicio, cuando)}` : ""}</p>
+            <p className="mx-auto max-w-xs rounded-xl border border-[#22b04f] bg-[#155f2d]/70 p-3 font-semibold">✅ Conseguida{cuando ? ` en la ${nombreJornada(q.config.inicio, cuando, q.config.anuladas)}` : ""}</p>
           ) : <p className="mx-auto max-w-xs rounded-xl border border-[var(--fx-borde)] p-3 fx-suave">🔒 Todavía no la tienes</p>}
           <p className="text-sm fx-suave">👥 <strong className="text-white">{cuantos} de {participantes.length}</strong> participantes la tienen.</p>
         </div>

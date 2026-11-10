@@ -17,7 +17,8 @@ export default async function AdminFantasy() {
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
   const { data: ult } = await db().from("fcbq_stats").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const nombreEq = new Map(equipos.map((e) => [e.id, e.nombre]));
-  const jornadas = [...new Set([...liga.cerradas, liga.lunesHoy, ...[7, 14, 21, 28].map((d) => sumarDias(liga.lunesHoy, d))])].sort().reverse();
+  // Semanas pasadas jugadas, las marcadas sin Fantasy, esta y las 10 siguientes (para planificar diciembre, festivos…)
+  const jornadas = [...new Set([...liga.cerradas, ...q.config.anuladas.filter((x) => x >= q.config.inicio), liga.lunesHoy, ...Array.from({ length: 10 }, (_, i) => sumarDias(liga.lunesHoy, 7 * (i + 1)))])].sort();
   const totalDe = new Map(liga.general.map((g) => [g.id, g]));
 
   return (
@@ -70,20 +71,22 @@ export default async function AdminFantasy() {
 
         <section className="fx-card overflow-hidden">
           <h2 className="border-b border-[var(--fx-borde)] px-4 py-2 font-semibold">Jornadas</h2>
-          <p className="px-4 pt-2 text-xs text-white/60">Elige el <strong>partido de la jornada</strong> (el que quieras, uno por jornada): sus jugadores puntúan ×1,5. Anula una jornada si faltan estadísticas o hubo algún problema.</p>
+          <p className="px-4 pt-2 text-xs text-white/60">Elige el <strong>partido de la jornada</strong> (el que quieras, uno por jornada): sus jugadores puntúan ×1,5. Marca <strong>«Sin Fantasy»</strong> las semanas con pocos partidos (o si hubo algún problema): esa semana no se ficha ni se puntúa, no cuenta en la numeración y el bloqueo de jugadores pasa a la siguiente.</p>
           <ul className="divide-y divide-[var(--fx-borde)]">
             {jornadas.map((l) => {
               const ini = aISO(l, "00:00"), fin = aISO(sumarDias(l, 7), "00:00");
               const ps = partidos.filter((p) => liga.pool.has(p.equipo_id) && p.fecha >= ini && p.fecha < fin).sort((a, b) => a.fecha.localeCompare(b.fecha));
-              const jugada = liga.cerradas.includes(l);
+              const sin = q.config.anuladas.includes(l);
+              const equiposQueJuegan = new Set(ps.map((p) => p.equipo_id)).size;
               return (
-                <li key={l} className="px-4 py-3 text-sm">
+                <li key={l} className={`px-4 py-3 text-sm ${sin ? "bg-white/5 opacity-70" : ""} ${l === liga.lunesHoy ? "border-l-4 border-[var(--fx-oro)]" : ""}`}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{nombreJornada(q.config.inicio, l)}</span>
-                    <span className="text-xs text-white/60">{fechaCorta(`${l}T12:00:00Z`)} · cierre {fechaCorta(liga.cierre(l))} {hora(liga.cierre(l))} · {(liga.porJornada.get(l) ?? []).length} equipos fantasy</span>
-                    {jugada && <span className="ml-auto"><Anular lunes={l} anulada={q.config.anuladas.includes(l)} /></span>}
+                    <span className="font-semibold">{sin ? "🚫 Sin Fantasy" : nombreJornada(q.config.inicio, l, q.config.anuladas)}</span>
+                    <span className="text-xs text-white/60">semana del {fechaCorta(`${l}T12:00:00Z`)} · {ps.length} {ps.length === 1 ? "partido" : "partidos"} de {equiposQueJuegan} {equiposQueJuegan === 1 ? "equipo" : "equipos"}{!sin && ps.length > 0 ? ` · cierre ${fechaCorta(liga.cierre(l))} ${hora(liga.cierre(l))}` : ""}{(liga.porJornada.get(l) ?? []).length ? ` · ${(liga.porJornada.get(l) ?? []).length} equipos fantasy` : ""}</span>
+                    {equiposQueJuegan > 0 && equiposQueJuegan <= 2 && !sin && <span className="rounded bg-amber-900/60 px-1.5 text-[10px] font-bold text-amber-100">POCOS PARTIDOS</span>}
+                    <span className="ml-auto"><Anular lunes={l} anulada={sin} /></span>
                   </div>
-                  {ps.length === 0 ? <p className="text-xs text-white/50">Sin partidos.</p> : (
+                  {sin ? null : ps.length === 0 ? <p className="text-xs text-white/50">Sin partidos.</p> : (
                     <ul className="mt-1 grid gap-1 sm:grid-cols-2">
                       {ps.map((p) => (
                         <li key={p.id}><Especial lunes={l} partidoId={p.id} activo={(q.config.especiales[l] ?? []).includes(p.id)} texto={`${nombreEq.get(p.equipo_id) ?? ""} · ${fechaCorta(p.fecha)} ${hora(p.fecha)}`} /></li>

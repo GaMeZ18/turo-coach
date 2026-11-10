@@ -119,7 +119,11 @@ export function jornadasHasta(inicio: string, hasta: string) {
   for (let l = lunesDe(inicio); l <= hasta; l = sumarDias(l, 7)) r.push(l);
   return r;
 }
-export const nombreJornada = (inicio: string, lunes: string) => `Jornada ${Math.round((Date.parse(lunes) - Date.parse(lunesDe(inicio))) / 6048e5) + 1}`;
+/** «Jornada N»: las semanas sin Fantasy no cuentan en la numeración */
+export const nombreJornada = (inicio: string, lunes: string, sinFantasy: string[] = []) => {
+  const semanas = Math.round((Date.parse(lunes) - Date.parse(lunesDe(inicio))) / 6048e5) + 1;
+  return `Jornada ${semanas - sinFantasy.filter((x) => x >= lunesDe(inicio) && x < lunes).length}`;
+};
 
 // ---------- Precios ----------
 export function precios(lunes: string, jugadores: Map<string, JugadorF>, actuaciones: Actuacion[]) {
@@ -263,10 +267,16 @@ export function calcularLiga(e: Entrada) {
   const cierreHoy = cierreDe(lunesHoy, e.partidos, pool);
   const aperturaHoy = aISO(lunesHoy, HORA_APERTURA);
   // Se ficha la jornada de esta semana desde el lunes 9:30 hasta el primer partido; luego, fichajes cerrados hasta el lunes
-  const abierta: string | null = e.ahora >= aperturaHoy && e.ahora < cierreHoy && !e.cerrada ? lunesHoy : null;
-  const enJuego = e.ahora >= cierreHoy ? lunesHoy : null;
-  const proxima = e.ahora < aperturaHoy ? aperturaHoy : aISO(sumarDias(lunesHoy, 7), HORA_APERTURA);
-  const todas = jornadasHasta(e.inicio, lunesHoy).filter((l) => l >= lunesDe(e.inicio));
+  // Semanas «sin Fantasy» (las marca el administrador; antes se llamaban anuladas): no se ficha ni puntúa
+  const sinFantasy = new Set(e.anuladas);
+  const descansoHoy = sinFantasy.has(lunesHoy);
+  const abierta: string | null = e.ahora >= aperturaHoy && e.ahora < cierreHoy && !e.cerrada && !descansoHoy ? lunesHoy : null;
+  const enJuego = e.ahora >= cierreHoy && !descansoHoy ? lunesHoy : null;
+  // Próxima apertura de fichajes: el siguiente lunes de una semana con Fantasy
+  let lunesProx = e.ahora < aperturaHoy ? lunesHoy : sumarDias(lunesHoy, 7);
+  for (let i = 0; i < 26 && sinFantasy.has(lunesProx); i++) lunesProx = sumarDias(lunesProx, 7);
+  const proxima = aISO(lunesProx, HORA_APERTURA);
+  const todas = jornadasHasta(e.inicio, lunesHoy).filter((l) => l >= lunesDe(e.inicio) && !sinFantasy.has(l));
   const cerradas = todas.filter((l) => l < lunesHoy || (l === lunesHoy && enJuego)); // con alineaciones ya fijas
   const terminadas = todas.filter((l) => l < lunesHoy);
 
@@ -320,7 +330,9 @@ export function calcularLiga(e: Entrada) {
     .sort((a, b) => b.total - a.total || a.alias.localeCompare(b.alias));
 
   const bloqueados = (pid: string, l: string) => {
-    const prev = sumarDias(l, -7);
+    // La jornada anterior que se jugó (saltando las semanas sin Fantasy)
+    let prev = sumarDias(l, -7);
+    for (let i = 0; i < 26 && sinFantasy.has(prev); i++) prev = sumarDias(prev, -7);
     return bloqueadosTras(alDe.get(`${pid}|${prev}`), resultados.get(`${pid}|${prev}`) ?? (alDe.get(`${pid}|${prev}`) ? puntuar(alDe.get(`${pid}|${prev}`)!, semana(prev), pendientes(prev), jugadores) : undefined), jugadores);
   };
 
@@ -395,7 +407,7 @@ export function calcularLiga(e: Entrada) {
   };
 
   return {
-    jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas, proxima, lunesHoy,
+    jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas, proxima, lunesHoy, descansoHoy,
     cierre: (l: string) => cierreDe(l, e.partidos, pool),
     descansan: (l: string) => descansan(l, e.partidos, pool),
     precio, semana, pendientes, resultados, porJornada, general, bloqueados, revelacion, insignias,
