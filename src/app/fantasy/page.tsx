@@ -114,17 +114,41 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const alJuego = enJuego ? liga.alineacion(yo.id, enJuego) : undefined;
     const ant = liga.terminadas[liga.terminadas.length - 1];
     const resAnt = ant ? liga.resultados.get(`${yo.id}|${ant}`) : undefined;
+    const ultJ = enJuego && resJuego ? enJuego : resAnt ? ant : null;
+    const ultPts = ultJ === enJuego && resJuego ? resJuego.total : resAnt ? resAnt.total : null;
+    const ultNombre = ultJ ? `${nombreJornada(q.config.inicio, ultJ).replace("Jornada", "jornada")}${ultJ === enJuego ? " (en juego)" : ""}` : "última jornada";
     const alAnt = ant ? liga.alineacion(yo.id, ant) : undefined;
     cuerpo = (
       <div className="space-y-3">
-        <div className="grid grid-cols-[1fr_1fr_1.6fr] gap-2 text-center">
-          <div className="fx-card-oro p-2"><p className="fx-display text-3xl">{miPos || "–"}<span className="text-base text-white/60">/{general.length}</span></p><p className="text-[11px] fx-suave">Posición</p></div>
-          <div className="fx-card-oro p-2"><p className="fx-display text-3xl">{pts(miTotal)}</p><p className="text-[11px] fx-suave">Puntos</p></div>
-          <div className="fx-card-oro flex items-center gap-2 p-2 text-left">
-            <Escudo alias={yo.alias} emoji={yo.emoji} color={yo.color} foto={yo.foto} size={38} />
-            <Nombre alias={yo.alias} mostrar={yo.mostrar} className="flex-1" />
-            <EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} />
+        <section className="relative overflow-hidden rounded-2xl border-2 border-[var(--fx-oro)] bg-gradient-to-br from-[#1d2f70] via-[#111a3a] to-[#3d0d19] p-4 shadow-[0_0_28px_-10px_rgba(246,196,69,.7)]">
+          <img src="/marca/escudo-128.png" alt="" aria-hidden className="pointer-events-none absolute -right-6 -top-4 h-36 w-auto rotate-12 opacity-[0.08]" />
+          <div className="absolute right-2 top-2"><EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} /></div>
+          <div className="relative flex items-center gap-3 pr-6">
+            <Escudo alias={yo.alias} emoji={yo.emoji} color={yo.color} foto={yo.foto} size={64} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--fx-oro)]">Mi equipo</p>
+              <h2 className="fx-display break-words text-[1.7rem] leading-[1.05]">{yo.alias}</h2>
+              {yo.mostrar && <p className="mt-0.5 text-sm text-white/70">{yo.mostrar}</p>}
+            </div>
           </div>
+          <div className="relative mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-black/30 px-1 py-2 ring-1 ring-white/10">
+              <p className="text-lg leading-none">{miPos === 1 ? "🥇" : miPos === 2 ? "🥈" : miPos === 3 ? "🥉" : "🏅"}</p>
+              <p className="fx-display mt-0.5 text-3xl leading-none">{miPos ? `${miPos}º` : "–"}</p>
+              <p className="text-[11px] fx-suave">de {general.length}</p>
+            </div>
+            <div className="rounded-xl bg-black/30 px-1 py-2 ring-1 ring-[var(--fx-oro)]/40">
+              <p className="text-lg leading-none">⭐</p>
+              <p className="fx-display fx-oro-texto mt-0.5 text-3xl leading-none">{pts(miTotal)}</p>
+              <p className="text-[11px] fx-suave">puntos</p>
+            </div>
+            <div className="rounded-xl bg-black/30 px-1 py-2 ring-1 ring-white/10">
+              <p className="text-lg leading-none">{ultPts === null ? "📅" : "🔥"}</p>
+              <p className="fx-display mt-0.5 text-3xl leading-none">{ultPts === null ? "–" : pts(ultPts)}</p>
+              <p className="text-[11px] fx-suave">{ultNombre}</p>
+            </div>
+          </div>
+        </section>
         </div>
         {q.config.prueba && <p className="rounded-lg bg-amber-900/50 p-2 text-center text-sm text-amber-100">🧪 Jornada de prueba en marcha (se borra desde el panel).</p>}
         {q.cargaPuntos && (
