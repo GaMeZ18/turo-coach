@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, Link2, Loader2 } from "lucide-react";
-import { adminAnular, adminQuitarFoto, adminBorrarParticipante, adminCerrarTemporada, adminConfig, adminEspecial, adminSilenciar } from "../actions";
+import { adminAnular, adminQuitarFoto, adminBorrarParticipante, adminCrearPrueba, adminBorrarPrueba, adminCerrarTemporada, adminConfig, adminEspecial, adminSilenciar } from "../actions";
 
 function useAccion() {
   const [pend, start] = useTransition();
@@ -89,4 +89,24 @@ export function CerrarTemporada({ cerrada, lider }: { cerrada: boolean; lider: s
 export function QuitarFoto({ id }: { id: string }) {
   const a = useAccion();
   return <button className="rounded px-2 py-0.5 text-xs text-white/60 hover:text-white" disabled={a.pend} onClick={() => confirm("¿Quitar la foto de este participante?") && a.run(() => adminQuitarFoto(id))}>Quitar foto</button>;
+}
+export function Prueba({ activa, jornada }: { activa: boolean; jornada: string | null }) {
+  const a = useAccion();
+  return (
+    <div className="space-y-2">
+      {activa ? (
+        <>
+          <p className="rounded-lg bg-amber-900/50 p-2 text-sm text-amber-100">🧪 Prueba en marcha con la semana del {jornada}: hay 4 equipos de prueba (y uno automático para ti si no tenías). Mira «Mi equipo», «Clasificación», «Jornada» e «Insignias».</p>
+          <button className="fx-btn w-full" disabled={a.pend} onClick={() => confirm("¿Borrar la prueba? Se quitan los equipos de prueba y todo vuelve como estaba.") && a.run(() => adminBorrarPrueba())}>
+            {a.pend && <Loader2 size={16} className="animate-spin" />} Borrar prueba
+          </button>
+        </>
+      ) : (
+        <button className="fx-btn fx-btn-oro w-full" disabled={a.pend} onClick={() => a.run(() => adminCrearPrueba())}>
+          {a.pend && <Loader2 size={16} className="animate-spin" />} 🧪 Crear jornada de prueba
+        </button>
+      )}
+      {a.error && <p className="text-sm text-red-300">{a.error}</p>}
+    </div>
+  );
 }

@@ -126,6 +126,10 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             <EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} />
           </div>
         </div>
+        {q.config.prueba && <p className="rounded-lg bg-amber-900/50 p-2 text-center text-sm text-amber-100">🧪 Jornada de prueba en marcha (se borra desde el panel).</p>}
+        {q.cargaPuntos && (
+          <a href="/partidos/importar?auto=1" target="_blank" rel="noopener" className="fx-btn-sec w-full justify-center">🔄 Cargar puntos Fantasy <span className="text-xs fx-suave">(estadísticas de la FCBQ)</span></a>
+        )}
         {!yo.perfil_id && <AvisosFantasy clavePublica={VAPID_PUBLICO} />}
         {l ? (
           <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
@@ -150,7 +154,10 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   if (vista === "clasificacion") {
     const porJornada = sp.t === "jornada";
-    const jSel = sp.j && liga.cerradas.includes(sp.j) ? sp.j : liga.cerradas[liga.cerradas.length - 1];
+    // También la jornada que se está fichando: se ven los equipos de los demás antes del cierre
+    const chips = [...new Set([...liga.cerradas, ...(liga.abierta ? [liga.abierta] : [])])].sort();
+    const jSel = sp.j && chips.includes(sp.j) ? sp.j : (liga.abierta ?? liga.cerradas[liga.cerradas.length - 1]);
+    const enCurso = !!jSel && jSel === liga.abierta;
     const Fila = ({ pos, id, d, children }: { pos: number | string; id: string; d?: React.ReactNode; children: React.ReactNode }) => {
       const p = part.get(id);
       return (
@@ -188,8 +195,41 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         ) : !jSel ? <p className="fx-card p-4 text-sm fx-suave">Todavía no se ha jugado ninguna jornada.</p> : (
           <>
             <div className="flex flex-wrap gap-1.5">
-              {liga.cerradas.map((l) => <Link key={l} href={`/fantasy?v=clasificacion&t=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l).replace("Jornada ", "J")}</Link>)}
+              {chips.map((l) => <Link key={l} href={`/fantasy?v=clasificacion&t=jornada&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l).replace("Jornada ", "J")}{l === liga.abierta ? " · fichando" : ""}</Link>)}
             </div>
+            {enCurso ? (
+              <>
+                <p className="text-sm fx-suave">Equipos fichados para la {nombreJornada(q.config.inicio, jSel).toLowerCase()} (se pueden cambiar hasta el cierre).</p>
+                <section className="fx-card fx-sep overflow-hidden">
+                  {participantes.filter((p) => liga.alineacion(p.id, jSel)).map((p) => {
+                    const al = liga.alineacion(p.id, jSel)!;
+                    return (
+                      <details key={p.id}>
+                        <summary className="list-none [&::-webkit-details-marker]:hidden">
+                          <Fila pos="·" id={p.id} d={al.comodin ? <span className="rounded bg-[#3d2a8a] px-1 text-[10px] font-bold text-[var(--fx-oro)]">{al.comodin === "capitan3" ? "C×3" : al.comodin === "banquillo" ? "Supl." : "+10"}</span> : null}>{al.coste}⭐</Fila>
+                        </summary>
+                        <ul className="fx-sep bg-black/20">
+                          {[...al.titulares, ...(al.suplente ? [al.suplente] : [])].map((t, i) => {
+                            const j = jug(t.id);
+                            return (
+                              <li key={t.id} className="flex items-center gap-2.5 px-3 py-1.5 text-sm">
+                                <Camiseta dorsal={j?.dorsal ?? ""} equipo={j?.equipo ?? ""} size={26} />
+                                <span className="min-w-0 flex-1 truncate">{j?.nombre ?? "?"} <span className="text-[11px] fx-suave">{j?.equipo}</span></span>
+                                {i === 5 && <span className="text-[10px] font-bold fx-suave">SUP</span>}
+                                {t.id === al.capitan && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--fx-oro)] text-[10px] font-black text-black">C</span>}
+                                <span className="text-xs">{t.precio}⭐</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </details>
+                    );
+                  })}
+                  {!participantes.some((p) => liga.alineacion(p.id, jSel)) && <p className="p-3 text-sm fx-suave">Nadie ha fichado todavía.</p>}
+                </section>
+                <p className="text-center text-xs fx-suave">Toca un equipo para ver a quién ha fichado.</p>
+              </>
+            ) : (<>
             {q.config.anuladas.includes(jSel) && <p className="rounded-lg bg-amber-900/50 p-2 text-sm text-amber-100">Jornada anulada: no cuenta para la clasificación.</p>}
             <section className="fx-card fx-sep overflow-hidden">
               <div className="flex px-3 py-2 text-xs font-bold uppercase fx-suave"><span className="w-6">#</span><span className="ml-10 flex-1">Equipo</span><span className="w-12 text-center">Comodín</span><span className="w-10 text-center">⭐</span><span className="w-14 text-right">Pts</span></div>
@@ -212,6 +252,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                 })}
             </section>
             <p className="text-center text-xs fx-suave">Toca un equipo para ver su alineación.</p>
+            </>)}
           </>
         )}
       </div>
@@ -384,7 +425,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   return (
     <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista} temporada={temporada}>
       {cuerpo}
-      <Celebracion pid={yo.id} temporada={temporada} campeon={campeon}
+      <Celebracion pid={`${yo.id}-${q.config.inicio}`} temporada={temporada} campeon={campeon}
         insignias={INSIGNIAS.filter((x) => misInsignias.has(x.codigo)).map(({ codigo, nombre, texto, img }) => ({ codigo, nombre, texto, img }))} />
     </Marco>
   );

@@ -9,7 +9,8 @@ import { calcularLiga, type Alineacion, type Comodin, type FilaStats, type Parti
 export const ADMIN_FANTASY = "60fb55be-45e2-4f5d-addc-35aaf44b7610"; // Juan Gámez
 export const COOKIE_FANTASY = "fantasy_sesion";
 
-export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean };
+export type Prueba = { inicio: string; jornada: string; especial: string | null; alineacionAdmin: boolean };
+export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null };
 export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
 export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, comodines, emoji, color, foto, created_at";
 /** "Juan Gámez Gómez" → "Juan G." */
@@ -32,20 +33,20 @@ export function pinOk(pin: string, guardado: string | null) {
 export const nuevaSesion = () => randomBytes(24).toString("hex");
 
 export async function leerConfig(): Promise<Config> {
-  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada").eq("id", 1).single();
-  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada };
+  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada, prueba").eq("id", 1).single();
+  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada, prueba: (data?.prueba as Prueba | null) ?? null };
 }
 
 /** Quién está mirando: usuario de la app (staff) y/o participante del fantasy */
 export async function quienSoy() {
   const config = await leerConfig();
-  let perfil: { id: string; nombre: string | null } | null = null;
+  let perfil: { id: string; nombre: string | null; rol: string | null } | null = null;
   try {
     const supa = await createClient();
     const { data: { user } } = await supa.auth.getUser();
     if (user) {
-      const { data } = await supa.from("perfiles").select("id, nombre").eq("id", user.id).maybeSingle();
-      perfil = { id: user.id, nombre: data?.nombre ?? user.email ?? null };
+      const { data } = await supa.from("perfiles").select("id, nombre, rol").eq("id", user.id).maybeSingle();
+      perfil = { id: user.id, nombre: data?.nombre ?? user.email ?? null, rol: data?.rol ?? null };
     }
   } catch { /* sin sesión */ }
   const d = db();
@@ -63,7 +64,9 @@ export async function quienSoy() {
     }
   }
   const esAdmin = perfil?.id === ADMIN_FANTASY;
-  return { config, perfil, participante, esAdmin, acceso: config.abierto || esAdmin };
+  // Cargar puntos (estadísticas de la FCBQ): el administrador y los coordinadores
+  const cargaPuntos = esAdmin || perfil?.rol === "coordinador";
+  return { config, perfil, participante, esAdmin, cargaPuntos, acceso: config.abierto || esAdmin };
 }
 
 /** Todo lo necesario para calcular la liga */

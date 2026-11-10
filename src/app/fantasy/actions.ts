@@ -268,3 +268,87 @@ export async function adminCerrarTemporada(cerrar: boolean): Promise<R> {
   revalidatePath("/noticias");
   return { ok: true };
 }
+
+// ---------- Jornada de prueba (solo administrador) ----------
+/** Crea 4 equipos automáticos (y uno para ti si no tienes) con la jornada anterior, para ver todo funcionando con datos reales */
+export async function adminCrearPrueba(): Promise<R> {
+  const q = await admin();
+  if (q.config.prueba) return { error: "Ya hay una prueba en marcha. Bórrala primero." };
+  const { sumarDias, lunesDe } = await import("@/lib/pistas");
+  const { hoyLocal } = await import("@/lib/fechas");
+  const jornada = sumarDias(lunesDe(hoyLocal()), -7);
+  const d = db();
+  const cfgPrueba = { ...q.config, inicio: jornada };
+  const { liga, partidos } = await cargarLiga(cfgPrueba);
+  const sem = liga.semana(jornada), precios = liga.precio(jornada);
+  const jugaron = [...sem.entries()].filter(([, x]) => x.jugo).map(([id]) => id);
+  if (jugaron.length < 10) return { error: "La semana pasada no hay suficientes estadísticas cargadas para la prueba." };
+  // Semilla fija por bot para que cada equipo sea distinto
+  const azar = (semilla: number) => () => { semilla = (semilla * 9301 + 49297) % 233280; return semilla / 233280; };
+  const montar = (semilla: number) => {
+    const r = azar(semilla);
+    const orden = [...jugaron].sort(() => r() - 0.5);
+    const tit: string[] = [], porEq = new Map<string, number>(), pers = new Set<string>();
+    let gasto = 0;
+    for (const id of orden) {
+      const j = liga.jugadores.get(id)!, p = precios.get(id)?.precio ?? 6;
+      const quedan = 5 - tit.length;
+      if (pers.has(j.persona) || (porEq.get(j.equipoId) ?? 0) >= MAX_POR_EQUIPO || gasto + p + (quedan - 1) * 4 + 4 > PRESUPUESTO) continue;
+      tit.push(id); pers.add(j.persona); porEq.set(j.equipoId, (porEq.get(j.equipoId) ?? 0) + 1); gasto += p;
+      if (tit.length === 5) break;
+    }
+    const sup = [...liga.jugadores.keys()].find((id) => !pers.has(liga.jugadores.get(id)!.persona) && gasto + (precios.get(id)?.precio ?? 6) <= PRESUPUESTO);
+    if (sup) gasto += precios.get(sup)?.precio ?? 6;
+    return { tit, sup: sup ?? null, capitan: tit[Math.floor(r() * tit.length)], coste: gasto };
+  };
+  const bots = [
+    { alias: "🧪 Los Triples", emoji: "🔥", color: "#d81f2f", comodin: "capitan3" },
+    { alias: "🧪 Peira Ballers", emoji: "🦅", color: "#1d4ed8", comodin: null },
+    { alias: "🧪 Turó Dream Team", emoji: "👑", color: "#e08a00", comodin: "banquillo" },
+    { alias: "🧪 Rebote Ofensivo", emoji: "🐺", color: "#0f9d58", comodin: null },
+  ];
+  const { data: creados, error } = await d.from("fantasy_participantes")
+    .insert(bots.map((b) => ({ alias: b.alias, nombre: "Equipo de prueba", mostrar: "Prueba", emoji: b.emoji, color: b.color, prueba: true }))).select("id, alias");
+  if (error || !creados) return { error: error?.message ?? "No se han podido crear los equipos de prueba." };
+  const ficha = (id: string) => ({ id, precio: precios.get(id)?.precio ?? 6 });
+  const filas = creados.map((c, i) => {
+    const m = montar(11 + i * 17);
+    return { participante_id: c.id, jornada, titulares: m.tit.map(ficha), suplente: m.sup ? ficha(m.sup) : null, capitan: m.capitan, comodin: bots[i].comodin, coste: m.coste };
+  });
+  let alineacionAdmin = false;
+  if (q.participante && !liga.alineacion(q.participante.id, jornada)) {
+    const m = montar(99);
+    filas.push({ participante_id: q.participante.id, jornada, titulares: m.tit.map(ficha), suplente: m.sup ? ficha(m.sup) : null, capitan: m.capitan, comodin: null, coste: m.coste });
+    alineacionAdmin = true;
+  }
+  await d.from("fantasy_alineaciones").insert(filas);
+  // Un partido de esa semana como especial y unos mensajes en el chat
+  const ini = new Date(`${jornada}T00:00:00Z`).toISOString(), fin = new Date(`${sumarDias(jornada, 7)}T00:00:00Z`).toISOString();
+  const especial = partidos.find((p) => liga.pool.has(p.equipo_id) && p.fecha >= ini && p.fecha < fin)?.id ?? null;
+  const esp = { ...q.config.especiales };
+  if (especial) esp[jornada] = [...new Set([...(esp[jornada] ?? []), especial])];
+  await d.from("fantasy_mensajes").insert([
+    { jornada, participante_id: creados[0].id, texto: "¡Vaya jornada! Mi capitán ha estado on fire 🔥" },
+    { jornada, participante_id: creados[1].id, texto: "La ganga de la semana me ha salvado 😅" },
+    { jornada, participante_id: creados[2].id, texto: "¿Alguien sabe si el U18 juega el sábado o el domingo?" },
+  ]);
+  await d.from("fantasy_config").update({ inicio: jornada, especiales: esp, prueba: { inicio: q.config.inicio, jornada, especial, alineacionAdmin } }).eq("id", 1);
+  revalidatePath("/fantasy", "layout");
+  return { ok: true };
+}
+
+/** Borra todo lo de la prueba y lo deja como estaba */
+export async function adminBorrarPrueba(): Promise<R> {
+  const q = await admin();
+  const p = q.config.prueba;
+  if (!p) return { ok: true };
+  const d = db();
+  await d.from("fantasy_participantes").delete().eq("prueba", true);
+  if (p.alineacionAdmin && q.participante) await d.from("fantasy_alineaciones").delete().eq("participante_id", q.participante.id).eq("jornada", p.jornada);
+  if (q.participante) await d.from("fantasy_mensajes").delete().eq("participante_id", q.participante.id).eq("jornada", p.jornada);
+  const esp = { ...q.config.especiales };
+  if (p.especial && esp[p.jornada]) { esp[p.jornada] = esp[p.jornada].filter((x) => x !== p.especial); if (!esp[p.jornada].length) delete esp[p.jornada]; }
+  await d.from("fantasy_config").update({ inicio: p.inicio, especiales: esp, prueba: null }).eq("id", 1);
+  revalidatePath("/fantasy", "layout");
+  return { ok: true };
+}

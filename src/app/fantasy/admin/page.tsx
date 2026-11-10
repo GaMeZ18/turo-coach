@@ -6,7 +6,7 @@ import { cargarLiga, db, quienSoy } from "@/lib/fantasy/datos";
 import { nombreJornada } from "@/lib/fantasy/motor";
 import { aISO, fechaCorta, hora } from "@/lib/fechas";
 import { sumarDias } from "@/lib/pistas";
-import { Interruptor, Premio, Inicio, Especial, Anular, Silenciar, Borrar, CerrarTemporada, CopiarEnlace, QuitarFoto } from "./Controles";
+import { Interruptor, Premio, Inicio, Especial, Anular, Silenciar, Borrar, CerrarTemporada, CopiarEnlace, QuitarFoto, Prueba } from "./Controles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Fantasy · Administrar", robots: { index: false } };
@@ -34,6 +34,18 @@ export default async function AdminFantasy() {
           <Premio valor={q.config.premio ?? ""} />
           <Inicio valor={q.config.inicio} />
           <p className="text-xs text-white/60">Últimas estadísticas cargadas de la FCBQ: <strong>{ult?.created_at ? `${fechaCorta(ult.created_at)} ${hora(ult.created_at)}` : "nunca"}</strong>. Los puntos salen en cuanto se cargan (botón «Actualizar desde la FCBQ» en Partidos).</p>
+        </section>
+
+        <section className="fx-card space-y-2 p-4">
+          <h2 className="font-semibold">🔄 Cargar puntos</h2>
+          <p className="text-xs text-white/60">Trae las estadísticas de la FCBQ (lo mismo que «Actualizar desde la FCBQ» en Partidos). Necesita la extensión instalada en el ordenador. Los coordinadores también lo ven.</p>
+          <a href="/partidos/importar?auto=1" target="_blank" rel="noopener" className="fx-btn w-full">🔄 Cargar puntos Fantasy</a>
+        </section>
+
+        <section className="fx-card space-y-2 p-4">
+          <h2 className="font-semibold">🧪 Jornada de prueba</h2>
+          <p className="text-xs text-white/60">Crea 4 equipos automáticos y te pone uno a ti con los partidos de la semana pasada, para ver puntos, clasificación, quinteto ideal, chat e insignias funcionando con datos reales. Luego se borra todo con un botón.</p>
+          <Prueba activa={!!q.config.prueba} jornada={q.config.prueba?.jornada ?? null} />
         </section>
 
         <section className="fx-card overflow-hidden">
