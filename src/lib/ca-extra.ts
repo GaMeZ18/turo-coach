@@ -2,6 +2,18 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Sé el primero en comentar.": "Sigues el primer a comentar.",
+ "Escribe un comentario…": "Escriu un comentari…",
+ "Comentar": "Comentar",
+ "GIF": "GIF",
+ "Usar": "Fer servir",
+ "Reaccionar": "Reaccionar",
+ "Pega el enlace de un GIF (en Giphy o Tenor: «Copiar enlace del GIF») o sube uno desde el móvil.": "Enganxa l'enllaç d'un GIF (a Giphy o Tenor: «Copiar enllaç del GIF») o puja'n un des del mòbil.",
+ "Subir un GIF del móvil": "Pujar un GIF del mòbil",
+ "Borrar comentario": "Esborrar el comentari",
+ "Escribe algo o pon un GIF.": "Escriu alguna cosa o posa un GIF.",
+ "Tiene que ser un GIF.": "Ha de ser un GIF.",
+ "El GIF pesa demasiado (máximo 1 MB).": "El GIF pesa massa (màxim 1 MB).",
  "Reenviar": "Reenviar",
  "Enviar ya": "Enviar ja",
  "Borrar": "Esborrar",
@@ -1107,6 +1119,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["Comentarios ({})", "Comentaris ({})"],
  ["🏀 Mañana tenéis partido · {}", "🏀 Demà teniu partit · {}"],
  ["🏟️ En pista {}–{}", "🏟️ A pista {}–{}"],
  ["Ejercicios de {} (también los que no ha publicado en la biblioteca)", "Exercicis de {} (també els que no ha publicat a la biblioteca)"],

@@ -6,8 +6,8 @@ import { Newspaper } from "lucide-react";
 /** Noticias del club: lo que publica coordinación, para consultarlo cuando se quiera */
 export default async function Noticias() {
   const { supabase, perfil } = await requireUser();
-  const { data } = await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles(nombre)").lte("publicada_en", new Date().toISOString()).order("publicada_en", { ascending: false }).limit(100);
-  const lista = (data ?? []) as unknown as { id: string; titulo: string; resumen: string; contenido: string; publicada_en: string; perfiles: { nombre: string | null } | null }[];
+  const { data } = await supabase.from("noticias").select("id, titulo, resumen, contenido, publicada_en, perfiles(nombre), noticia_comentarios(count), noticia_reacciones(count)").lte("publicada_en", new Date().toISOString()).order("publicada_en", { ascending: false }).limit(100);
+  const lista = (data ?? []) as unknown as { id: string; titulo: string; resumen: string; contenido: string; publicada_en: string; perfiles: { nombre: string | null } | null; noticia_comentarios?: { count: number }[]; noticia_reacciones?: { count: number }[] }[];
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -21,6 +21,12 @@ export default async function Noticias() {
               <p className="text-xs capitalize text-tinta/50">{fechaLarga(n.publicada_en)}{n.perfiles?.nombre ? ` · ${n.perfiles.nombre}` : ""}</p>
               <p className="mt-0.5 text-lg font-semibold">{n.titulo}</p>
               <p className="mt-1 line-clamp-3 text-sm text-tinta/70">{n.resumen || n.contenido.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\*\*/g, "")}</p>
+              {((n.noticia_reacciones?.[0]?.count ?? 0) > 0 || (n.noticia_comentarios?.[0]?.count ?? 0) > 0) && (
+                <p className="mt-2 flex gap-3 text-xs text-tinta/50">
+                  {(n.noticia_reacciones?.[0]?.count ?? 0) > 0 && <span>❤️ {n.noticia_reacciones![0].count}</span>}
+                  {(n.noticia_comentarios?.[0]?.count ?? 0) > 0 && <span>💬 {n.noticia_comentarios![0].count}</span>}
+                </p>
+              )}
             </Link>
           </li>
         ))}
