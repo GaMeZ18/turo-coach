@@ -5,6 +5,7 @@ import { Camera, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { COLORES_AVATAR, EMOJIS_AVATAR } from "@/lib/fantasy/estilo";
 import { darmeDeBaja, guardarPerfil, salir } from "./actions";
 import { Escudo } from "./ui";
+import AvisosFantasy from "./Avisos";
 
 export type AvatarDatos = { emoji: string | null; color: string | null; foto: string | null };
 
@@ -135,7 +136,7 @@ export function ElegirAvatar({ alias, valor, onChange }: { alias: string; valor:
 }
 
 /** Botón «Editar» de mi equipo: nombre, cómo me ven y avatar */
-export function EditarPerfil({ alias, mostrar, avatar, publico }: { alias: string; mostrar: string; avatar: AvatarDatos; publico: boolean }) {
+export function EditarPerfil({ alias, mostrar, avatar, publico, clavePublica }: { alias: string; mostrar: string; avatar: AvatarDatos; publico: boolean; clavePublica?: string }) {
   const [abierto, setAbierto] = useState(false);
   const [f, setF] = useState({ alias, mostrar, ...avatar });
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +155,7 @@ export function EditarPerfil({ alias, mostrar, avatar, publico }: { alias: strin
               setError(null); const r = await guardarPerfil(f); if (r.error) setError(r.error); else setAbierto(false);
             })}>{pend && <Loader2 size={16} className="animate-spin" />} Guardar</button>
             {error && <p className="text-sm text-red-300">{error}</p>}
+            {publico && clavePublica && <div className="border-t border-[var(--fx-borde)] pt-3"><p className="mb-1 text-xs font-bold uppercase fx-suave">Avisos en el móvil</p><AvisosFantasy clavePublica={clavePublica} siempre /></div>}
             {publico && <button className="w-full text-center text-xs fx-suave underline" onClick={() => start(async () => { await salir(); })}>Salir en este móvil</button>}
             <button className="w-full text-center text-xs text-red-300/80 underline" onClick={() => confirm("¿Seguro que quieres darte de baja del Fantasy? Se borran tu equipo, tus puntos y tus mensajes. No se puede deshacer.") && start(async () => { await darmeDeBaja(); })}>Darme de baja del Fantasy</button>
           </div>

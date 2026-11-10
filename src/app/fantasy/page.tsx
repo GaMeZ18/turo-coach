@@ -134,7 +134,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
       <div className="space-y-3">
         <section className="relative overflow-hidden rounded-2xl border-2 border-[var(--fx-oro)] bg-gradient-to-br from-[#1d2f70] via-[#111a3a] to-[#3d0d19] p-4 shadow-[0_0_28px_-10px_rgba(246,196,69,.7)]">
           <img src="/marca/escudo-128.png" alt="" aria-hidden className="pointer-events-none absolute -right-6 -top-4 h-36 w-auto rotate-12 opacity-[0.08]" />
-          <div className="absolute right-2 top-2"><EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} /></div>
+          <div className="absolute right-2 top-2"><EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} clavePublica={VAPID_PUBLICO} /></div>
           <div className="relative flex items-center gap-3 pr-6">
             <Escudo alias={yo.alias} emoji={yo.emoji} color={yo.color} foto={yo.foto} size={64} />
             <div className="min-w-0 flex-1">

@@ -6,13 +6,13 @@ import { activarPush, ayudaPush, estadoPush, type EstadoPush } from "@/lib/push-
 import { guardarAvisoFantasy } from "./actions";
 
 /** Avisos del Fantasy en este móvil (para quien no tiene cuenta de la app): viernes «haz tu equipo» y lunes «tus puntos» */
-export default function AvisosFantasy({ clavePublica }: { clavePublica: string }) {
+export default function AvisosFantasy({ clavePublica, siempre = false }: { clavePublica: string; siempre?: boolean }) {
   const [estado, setEstado] = useState<EstadoPush | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [oculto, setOculto] = useState(false);
   useEffect(() => {
-    try { if (localStorage.getItem("fx-avisos-oculto")) setOculto(true); } catch { /* */ }
+    try { if (!siempre && localStorage.getItem("fx-avisos-oculto")) setOculto(true); } catch { /* */ }
     estadoPush().then(async (e) => {
       // Si este móvil ya tiene permiso, se asocia sin preguntar
       if (e === "activo" || (e === "inactivo" && Notification.permission === "granted")) {
@@ -21,6 +21,8 @@ export default function AvisosFantasy({ clavePublica }: { clavePublica: string }
       } else setEstado(e);
     }).catch(() => setEstado("no-soportado"));
   }, [clavePublica]);
+  if (siempre && estado === "activo") return <p className="rounded-lg bg-green-900/40 p-2 text-sm text-green-100">🔔 Avisos activados en este móvil.</p>;
+  if (siempre && estado === "no-soportado") return <p className="text-xs fx-suave">Este navegador no admite avisos.</p>;
   if (!estado || estado === "activo" || estado === "no-soportado" || oculto) return null;
   const activar = async () => {
     setOcupado(true); setMsg(null);
@@ -49,7 +51,7 @@ export default function AvisosFantasy({ clavePublica }: { clavePublica: string }
         )}
         {msg && <p className="mt-1 text-xs">{msg}</p>}
       </div>
-      <button type="button" className="absolute right-2 top-2 fx-suave" aria-label="Ocultar" onClick={() => { setOculto(true); try { localStorage.setItem("fx-avisos-oculto", "1"); } catch { /* */ } }}><X size={16} /></button>
+      {!siempre && <button type="button" className="absolute right-2 top-2 fx-suave" aria-label="Ocultar" onClick={() => { setOculto(true); try { localStorage.setItem("fx-avisos-oculto", "1"); } catch { /* */ } }}><X size={16} /></button>}
     </div>
   );
 }
