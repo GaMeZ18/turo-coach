@@ -1,6 +1,6 @@
 "use client";
 
-const VERSION_EXTENSION = "1.8.0";
+const VERSION_EXTENSION = "1.9.0";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";

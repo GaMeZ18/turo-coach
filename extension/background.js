@@ -48,9 +48,29 @@ async function revisarPendiente() {
   const ultimoLunes = proximoLunes6() - 864e5;
   if (ultimaAuto < ultimoLunes && Date.now() > ultimoLunes) await lanzarAuto();
 }
-chrome.runtime.onInstalled.addListener(() => { programar(); chrome.storage.local.set({ ultimaAuto: Date.now() }); });
-chrome.runtime.onStartup.addListener(() => { programar(); revisarPendiente(); });
+// ---------- Al acabar cada partido (versión 1.9) ----------
+// Cada 30 minutos se pregunta a Coach Manager si hay algún partido ya terminado sin estadísticas.
+// Si lo hay, se cargan los datos en ese momento (como mucho una vez cada 45 minutos), y así los puntos del Fantasy salen enseguida.
+async function programarPartidos() {
+  const a = await chrome.alarms.get("fcbq-partidos");
+  if (!a) chrome.alarms.create("fcbq-partidos", { delayInMinutes: 5, periodInMinutes: 30 });
+}
+async function revisarPartidos() {
+  try {
+    const r = await fetch(`${await app()}/api/fcbq/pendiente`, { cache: "no-store" });
+    if (!r.ok) return;
+    const { pendiente } = await r.json();
+    if (!pendiente) return;
+    const { ultimaAuto = 0 } = await chrome.storage.local.get("ultimaAuto");
+    if (Date.now() - ultimaAuto < 45 * 60e3) return;
+    await lanzarAuto();
+  } catch { /* sin conexión: se vuelve a mirar en 30 minutos */ }
+}
+
+chrome.runtime.onInstalled.addListener(() => { programar(); programarPartidos(); chrome.storage.local.set({ ultimaAuto: Date.now() }); });
+chrome.runtime.onStartup.addListener(() => { programar(); programarPartidos(); revisarPendiente(); });
 chrome.alarms.onAlarm.addListener(async (a) => {
+  if (a.name === "fcbq-partidos") { await revisarPartidos(); return; }
   if (a.name !== "fcbq-semanal") return;
   await programar();
   await lanzarAuto();

@@ -46,7 +46,7 @@ export default async function ImportarPage() {
           <li>Recarga esta página: el botón <strong>Actualizar desde la FCBQ</strong> ya funcionará.</li>
         </ol>
         <p className="mt-3 rounded-lg bg-oro/15 p-2 text-xs text-tinta/70">
-          <strong>Automático:</strong> desde la versión 1.8, la extensión actualiza sola <strong>cada día a las 6:00</strong> si el ordenador está encendido con el navegador abierto
+          <strong>Automático:</strong> la extensión actualiza sola <strong>cada día a las 6:00</strong> y, desde la versión 1.9, también <strong>al acabar cada partido</strong> (mira cada 30 minutos si hay alguno terminado sin estadísticas). Hace falta el ordenador encendido con el navegador abierto
           y la sesión de Coach Manager CBTuró iniciada. Si a esa hora estaba apagado, lo hace al abrir el navegador. Si la FCBQ pide verificación, la pestaña se queda esperando a que la resuelvas.
         </p>
         <p className="mt-3 text-xs text-tinta/50">
