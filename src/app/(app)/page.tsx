@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
-  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge,
+  Shield, Users, Timer, TrafficCone, PenTool, CalendarDays, Target, Binoculars, Video, BookOpen, Trophy, MapPin, Gauge, ClipboardCheck, Megaphone, Newspaper,
 } from "lucide-react";
-import { requireUser } from "@/lib/supabase/server";
+import { gestionaMesas, requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import InstalarApp from "@/components/InstalarApp";
 
@@ -19,6 +19,7 @@ const MODULOS = [
   { href: "/scouting", titulo: "Scouting", texto: "Liga, rivales, estadísticas y fichas", icono: Binoculars },
   { href: "/video", titulo: "Vídeo", texto: "Etiqueta acciones y revisa los clips", icono: Video },
   { href: "/biblioteca", titulo: "Biblioteca", texto: "Ejercicios del club listos para usar", icono: BookOpen },
+  { href: "/noticias", titulo: "Noticias", texto: "Lo que publica el club", icono: Newspaper },
 ];
 
 export default async function Inicio() {
@@ -50,7 +51,11 @@ export default async function Inicio() {
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {[...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []), ...MODULOS.map((m) => (m.href === "/video" && perfil.rol !== "coordinador" ? { ...m, href: "" } : m))].map(({ href, titulo, texto, icono: Icono }) => {
+        {[
+          ...(perfil.rol === "coordinador" ? [{ href: "/coordinacion", titulo: "Coordinación", texto: "Panel con todos los equipos y avisos", icono: Gauge }] : []),
+          ...(gestionaMesas(perfil) ? [{ href: "/mesas", titulo: "Mesas", texto: "Quién hace cada mesa y pagos del mes", icono: ClipboardCheck }] : []),
+          ...(perfil.rol === "coordinador" ? [{ href: "/comunicados", titulo: "Comunicados", texto: "Mensajes y noticias a quien elijas", icono: Megaphone }] : []),
+          ...MODULOS.map((m) => (m.href === "/video" && perfil.rol !== "coordinador" ? { ...m, href: "" } : m))].map(({ href, titulo, texto, icono: Icono }) => {
           const contenido = (
             <>
               <span className={`flex h-11 w-11 items-center justify-center rounded-full ${href ? "bg-azul text-oro ring-2 ring-oro/60 ring-offset-2" : "bg-tinta/5 text-tinta/40"}`}>

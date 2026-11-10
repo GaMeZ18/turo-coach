@@ -2,6 +2,9 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Quién hace cada mesa y pagos del mes": "Qui fa cada taula i pagaments del mes",
+ "Mensajes y noticias a quien elijas": "Missatges i notícies a qui triïs",
+ "Lo que publica el club": "El que publica el club",
  "Prep. física (sin pizarra)": "Prep. física (sense pissarra)",
  "Cuenta en la hora del entreno pero no ocupa pista si va al principio o al final de la sesión. Pon cómo se hace: series, repeticiones o tiempo y descanso.": "Compta a l'hora de l'entrenament però no ocupa pista si va al principi o al final de la sessió. Posa com es fa: sèries, repeticions o temps i descans.",
  "Si además pones «Prep. física» en la sesión, cuenta lo que sea mayor.": "Si a més poses «Prep. física» a la sessió, compta el que sigui més gran.",
