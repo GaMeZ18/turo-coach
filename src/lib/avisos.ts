@@ -134,6 +134,20 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     }
   }
 
+  // 7) Día antes del partido (a partir de las 19:00) → entrenadores del equipo: rival, hora y lugar
+  if (horaLocal >= 19) {
+    const manana = sumarDias(hoy, 1);
+    const { data: pmR } = await db.from("partidos").select("id, equipo_id, fecha, rival, local, lugar")
+      .in("equipo_id", ids).gte("fecha", aISO(manana, "00:00")).lt("fecha", aISO(sumarDias(manana, 1), "00:00"));
+    for (const pt of (pmR ?? []) as { id: string; equipo_id: string; fecha: string; rival: string; local: boolean; lugar: string | null }[]) {
+      if (!staff(pt.equipo_id).length) continue;
+      await unaVez(`partidomanana:${pt.id}`, () => notificarPerfiles(db, staff(pt.equipo_id),
+        `🏀 Mañana tenéis partido · ${nombre(pt.equipo_id)}`,
+        `vs ${pt.rival} (${pt.local ? "en casa" : "fuera"}) · ${fechaCorta(pt.fecha)} a las ${hora(pt.fecha)}\n📍 ${pt.lugar || "Pista por confirmar"}\nToca para ver el partido, la convocatoria y cómo llegar.`,
+        `/partidos/${pt.id}`, pt.equipo_id, true));
+    }
+  }
+
   // 5) 1 hora antes de cada partido → a quien hace la mesa (si activó los avisos desde el enlace)
   const enUnaHora = await partidosDeCasa(db, new Date(ahora).toISOString(), new Date(ahora + 65 * MIN).toISOString());
   if (enUnaHora.length) {

@@ -2,6 +2,7 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Cómo llegar": "Com arribar-hi",
  "Fotos (hasta 4)": "Fotos (fins a 4)",
  "Añadir foto": "Afegir foto",
  "Salen en el entreno y en el PDF. Puedes hacer captura de un vídeo y subirla.": "Surten a l'entrenament i al PDF. Pots fer una captura d'un vídeo i pujar-la.",
@@ -1101,6 +1102,7 @@ export const CA_EXTRA: Record<string, string> = {
 
 /** [castellano con {} , catalán con {}] — los huecos se rellenan en el mismo orden */
 export const CA_PATRONES: [string, string][] = [
+ ["🏀 Mañana tenéis partido · {}", "🏀 Demà teniu partit · {}"],
  ["🏟️ En pista {}–{}", "🏟️ A pista {}–{}"],
  ["Ejercicios de {} (también los que no ha publicado en la biblioteca)", "Exercicis de {} (també els que no ha publicat a la biblioteca)"],
  ["Faltas de {}", "Faltes de {}"],

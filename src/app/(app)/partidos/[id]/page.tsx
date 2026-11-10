@@ -73,7 +73,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-linea px-4 py-2 text-sm text-tinta/70">
           <span className="capitalize">{fechaLarga(p.fecha)} · {hora(p.fecha)}</span>
-          {p.lugar && <span className="flex items-center gap-1"><MapPin size={14} /> {p.lugar}</span>}
+          {p.lugar && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lugar)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 underline decoration-dotted hover:text-azul" title="Cómo llegar"><MapPin size={14} /> {p.lugar}</a>}
           <Resultado p={p} />
         </div>
       </div>
