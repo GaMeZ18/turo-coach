@@ -6,7 +6,7 @@ import Konva from "konva";
 import { Stage, Layer, Group, Line, Arrow, Circle, Text, Rect, RegularPolygon } from "react-konva";
 import {
   Play, Pause, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera, Undo2, Trash2, Settings,
-  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown, Repeat,
+  Pencil, MoveRight, Download, RotateCcw, RotateCw, Maximize2, Minimize2, RefreshCw, Layers, X, FileDown, Film, ImageDown, Repeat, Share2, LayoutGrid,
 } from "lucide-react";
 import Pista from "./Pista";
 import {
@@ -59,6 +59,23 @@ export interface EditorProps {
   soloVer?: boolean; // solo reproducir (sin editar): play, pausa, stop y fotogramas
 }
 
+/** Formaciones listas para colocar (u: 0-15 de banda a banda; v: metros desde la línea de fondo de la canasta que se ve) */
+type Formacion = { nombre: string; tipo: "atacante" | "defensor"; sitios: [number, number][]; completa?: boolean };
+const FORMACIONES: Formacion[] = [
+  { nombre: "Zona 2-3", tipo: "defensor", sitios: [[5.3, 5.6], [9.7, 5.6], [2.8, 2.0], [7.5, 1.8], [12.2, 2.0]] },
+  { nombre: "Zona 3-2", tipo: "defensor", sitios: [[7.5, 6.8], [3.0, 5.0], [12.0, 5.0], [5.2, 2.2], [9.8, 2.2]] },
+  { nombre: "Zona 1-3-1", tipo: "defensor", sitios: [[7.5, 7.8], [2.8, 4.8], [12.2, 4.8], [7.5, 4.4], [7.5, 1.3]] },
+  { nombre: "Zona 2-1-2", tipo: "defensor", sitios: [[5.4, 5.8], [9.6, 5.8], [7.5, 4.0], [3.6, 1.8], [11.4, 1.8]] },
+  { nombre: "Presión 1-2-1-1", tipo: "defensor", completa: true, sitios: [[7.5, 25.0], [4.0, 21.5], [11.0, 21.5], [7.5, 15.5], [7.5, 5.0]] },
+  { nombre: "Presión 2-2-1", tipo: "defensor", completa: true, sitios: [[5.0, 22.0], [10.0, 22.0], [4.0, 15.5], [11.0, 15.5], [7.5, 5.0]] },
+  { nombre: "5 abiertos (1-2-2)", tipo: "atacante", sitios: [[7.5, 8.9], [12.6, 6.2], [2.4, 6.2], [13.6, 1.2], [1.4, 1.2]] },
+  { nombre: "1-4 alto", tipo: "atacante", sitios: [[7.5, 9.2], [1.6, 5.8], [5.3, 5.8], [9.7, 5.8], [13.4, 5.8]] },
+  { nombre: "Horns", tipo: "atacante", sitios: [[7.5, 9.2], [1.0, 1.0], [14.0, 1.0], [5.3, 5.9], [9.7, 5.9]] },
+  { nombre: "1-3-1 (ataque)", tipo: "atacante", sitios: [[7.5, 9.2], [1.4, 4.6], [13.6, 4.6], [7.5, 5.8], [9.6, 1.4]] },
+  { nombre: "Box (caja)", tipo: "atacante", sitios: [[7.5, 9.2], [5.2, 1.8], [9.8, 1.8], [5.2, 5.8], [9.8, 5.8]] },
+  { nombre: "2-3 (dos bases)", tipo: "atacante", sitios: [[5.0, 8.6], [10.0, 8.6], [1.0, 1.2], [14.0, 1.2], [7.5, 3.6]] },
+];
+
 export default function Editor({ valor, onChange, registrarCaptura, altoMax = 600, titulo = "Pizarra", soloVer = false }: EditorProps) {
   const [p, setP] = useState<Pizarra>(() => normalizar(valor ?? pizarraVacia()));
   const [historial, setHistorial] = useState<{ p: Pizarra; cursor: number }[]>([]);
@@ -82,7 +99,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   const [anim, setAnim] = useState<{ f: number; t: number } | null>(null);
   const [especial, setEspecial] = useState<VistaEspecial>(null);
   const [grande, setGrande] = useState(false);
-  const [panel, setPanel] = useState<null | "config" | "descargar">(null);
+  const [panel, setPanel] = useState<null | "config" | "descargar" | "formaciones">(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [exportando, setExportando] = useState<string | null>(null);
   const [caja, setCaja] = useState({ ancho: 400, alto: 800 });
@@ -207,6 +224,27 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
         d.inicial[id] = pos;
       });
     });
+  };
+
+  /** Coloca a 5 atacantes o 5 defensores en una formación (u = ancho de la pista, v = metros desde la línea de fondo) */
+  const formacion = (f: Formacion) => {
+    if (ocupado) return;
+    if (n > 0) { avisar("Las formaciones se colocan antes de grabar: borra la grabación o colócalos a mano."); return; }
+    const tipo = f.tipo;
+    cambiar((d) => {
+      if (f.completa && d.vista !== "completa") d.vista = "completa";
+      f.sitios.forEach(([u, v], i) => {
+        const etiqueta = tipo === "defensor" ? `X${i + 1}` : String(i + 1);
+        const pos = d.vista === "defensiva" ? { x: v, y: 15 - u } : { x: 28 - v, y: u };
+        const ya = d.elementos.find((e) => e.tipo === tipo && e.etiqueta === etiqueta);
+        if (ya) { d.inicial[ya.id] = pos; return; }
+        const id = nuevoId();
+        d.elementos.push({ id, tipo, etiqueta, color: colorActivo ?? COLOR_DEFECTO[tipo] });
+        d.inicial[id] = pos;
+      });
+    });
+    setPanel(null);
+    avisar(`${f.nombre} colocada. Arrastra a quien quieras para ajustarla.`);
   };
 
   // ---------- fotogramas ----------
@@ -599,35 +637,61 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
     setExportando(null);
   };
 
-  const descargarVideo = async () => {
+  /** Graba la animación en vídeo (mp4 si el navegador puede; si no, webm) */
+  const grabarVideo = async (): Promise<{ blob: Blob; ext: string; mime: string } | null> => {
     setPanel(null);
-    if (!n) { avisar("Graba algún movimiento antes de exportar el vídeo."); return; }
+    if (!n) { avisar("Graba algún movimiento antes de exportar el vídeo."); return null; }
+    if (anim) parar();
     const canvas = layerRef.current?.getNativeCanvasElement() as (HTMLCanvasElement & { captureStream?: (fps: number) => MediaStream }) | undefined;
     if (!canvas?.captureStream || typeof MediaRecorder === "undefined") {
-      avisar("Este navegador no permite grabar vídeo. Prueba con Chrome.");
-      return;
+      avisar("Este navegador no permite grabar vídeo. Prueba con Chrome o Safari actualizados.");
+      return null;
     }
     const tipos = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
     const mime = tipos.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const rec = new MediaRecorder(canvas.captureStream(30), mime ? { mimeType: mime } : undefined);
+    const rec = new MediaRecorder(canvas.captureStream(30), { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 4_000_000 });
     const trozos: Blob[] = [];
     rec.ondataavailable = (ev) => { if (ev.data.size) trozos.push(ev.data); };
     const terminado = new Promise<void>((r) => { rec.onstop = () => r(); });
-    setExportando("Grabando vídeo…");
+    setExportando("Grabando vídeo… (no cambies de pantalla)");
+    setEspecial(null); limpiarSeleccion();
     setCursor(0);
     await esperarPintado();
-    rec.start();
-    await dormir(500);
+    rec.start(250);
+    await dormir(600);
     await reproducir(0);
-    await dormir(800);
+    await dormir(900);
     rec.stop();
     await terminado;
-    const blob = new Blob(trozos, { type: mime || "video/webm" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${titulo}.${mime.startsWith("video/mp4") ? "mp4" : "webm"}`;
-    a.click();
     setExportando(null);
+    const tipo = (mime || "video/webm").split(";")[0];
+    return { blob: new Blob(trozos, { type: tipo }), ext: tipo === "video/mp4" ? "mp4" : "webm", mime: tipo };
+  };
+  const nombreArchivo = (ext: string) => `${(titulo || "jugada").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 60) || "jugada"}.${ext}`;
+
+  const descargarVideo = async () => {
+    const v = await grabarVideo();
+    if (!v) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(v.blob);
+    a.download = nombreArchivo(v.ext);
+    a.click();
+  };
+
+  /** Compartir el vídeo (WhatsApp, etc.) desde el móvil; en el ordenador se descarga */
+  const compartirVideo = async () => {
+    const v = await grabarVideo();
+    if (!v) return;
+    const archivo = new File([v.blob], nombreArchivo(v.ext), { type: v.mime });
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    if (nav.canShare?.({ files: [archivo] })) {
+      try { await nav.share({ files: [archivo], title: titulo }); return; } catch (e) { if ((e as Error).name === "AbortError") return; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(v.blob);
+    a.download = archivo.name;
+    a.click();
+    avisar(v.ext === "webm" ? "Vídeo descargado (.webm). Si WhatsApp no lo acepta, usa Safari o Chrome actualizado." : "Vídeo descargado. Ya puedes enviarlo por WhatsApp.");
   };
 
   // miniatura del ejercicio: todas las imágenes superpuestas
@@ -1162,6 +1226,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <Boton titulo="Fotograma siguiente" onClick={() => irA(cursor + 1)}><ChevronRight size={18} /></Boton>
             <span className="mx-1 h-6 w-px bg-linea" />
             <Boton titulo={grande ? "Salir de pantalla completa" : "Pantalla completa"} onClick={() => setGrande((g) => !g)}>{grande ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</Boton>
+            {n > 0 && <Boton titulo="Compartir en vídeo (WhatsApp…)" onClick={() => void compartirVideo()} desactivado={!!exportando}><Share2 size={16} /></Boton>}
           </div>
         )}
         {!soloVer && <>
@@ -1172,6 +1237,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           <Pieza titulo="Balón" onClick={() => agregar("balon")}><svg viewBox="0 0 24 24" className="h-6 w-6"><circle cx="12" cy="12" r="8" fill="#fc6401" stroke="#7a2c00" /><path d="M4 12h16M12 4v16" stroke="#7a2c00" strokeWidth="1" /></svg></Pieza>
           <Pieza titulo="Defensor" onClick={() => agregar("defensor")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M6 6l12 12M18 6L6 18" stroke="#ca010c" strokeWidth="2.6" strokeLinecap="round" /></svg></Pieza>
           <Pieza titulo="5 defensores" onClick={() => cinco("defensor")}><svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M4 4l9 9M13 4l-9 9" stroke="#ca010c" strokeWidth="2.4" strokeLinecap="round" /><text x="18" y="22" fontSize="9" fontWeight="700" textAnchor="middle" fill="#1f2937">x5</text></svg></Pieza>
+          <Pieza titulo="Formaciones (2-3, 3-2, 1-3-1, 1-4, Horns…)" onClick={() => setPanel((x) => (x === "formaciones" ? null : "formaciones"))}><LayoutGrid size={20} className={panel === "formaciones" ? "text-azul" : "text-tinta"} /></Pieza>
           <Pieza titulo="Entrenador" onClick={() => agregar("entrenador")}><svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="4" y="4" width="16" height="16" rx="2" fill="#1f2937" /><text x="12" y="16.5" fontSize="11" fontWeight="700" textAnchor="middle" fill="#fff">E</text></svg></Pieza>
           <Pieza titulo="Canasta" onClick={() => agregar("canasta")}><svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="2" y="9" width="5" height="6" fill="#6b7280" /><path d="M9 4v16" stroke="#1f2937" strokeWidth="2" /><circle cx="15" cy="12" r="4" fill="none" stroke="#fc6401" strokeWidth="1.8" /></svg></Pieza>
           <span className="mx-1 h-6 w-px bg-linea" />
@@ -1284,6 +1350,25 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
 
       {soloVer ? null : <>
       {/* ===== Paneles ===== */}
+      {panel === "formaciones" && (
+        <div className="mx-auto w-full rounded-xl border border-linea bg-white p-3 text-sm" style={{ maxWidth: anchoBarra }}>
+          <div className="flex items-center justify-between">
+            <p className="font-semibold">Formaciones</p>
+            <button type="button" onClick={() => setPanel(null)} className="text-tinta/50 hover:text-tinta" aria-label="Cerrar"><X size={16} /></button>
+          </div>
+          <p className="text-xs text-tinta/55">Coloca a los 5 (si ya están, los mueve). Se ponen antes de grabar; las presiones usan la pista completa.</p>
+          {(["defensor", "atacante"] as const).map((t) => (
+            <div key={t} className="mt-2">
+              <p className={`text-xs font-bold uppercase ${t === "defensor" ? "text-rojo" : "text-azul"}`}>{t === "defensor" ? "Defensa" : "Ataque"}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {FORMACIONES.filter((f) => f.tipo === t).map((f) => (
+                  <button key={f.nombre} type="button" onClick={() => formacion(f)} className="rounded-full border border-linea bg-white px-2.5 py-1 text-xs font-semibold hover:bg-suave">{f.nombre}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {panel === "config" && (
         <div className="mx-auto flex w-full flex-wrap items-center gap-4 rounded-xl border border-linea bg-white p-3 text-sm" style={{ maxWidth: anchoBarra }}>
           <label className="flex items-center gap-2">Tamaño de jugadores
@@ -1381,6 +1466,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
             <div className="absolute bottom-full left-0 z-20 mb-1 w-56 overflow-hidden rounded-lg border border-linea bg-white text-sm shadow-lg">
               <button type="button" onClick={descargarPDF} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><FileDown size={15} /> PDF con las capturas</button>
               <button type="button" onClick={descargarVideo} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><Film size={15} /> Vídeo de la animación</button>
+              <button type="button" onClick={() => { setPanel(null); void compartirVideo(); }} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><Share2 size={15} /> Compartir vídeo (WhatsApp)</button>
               <button type="button" onClick={descargarPNG} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-suave"><ImageDown size={15} /> Imagen de lo que se ve</button>
             </div>
           )}
@@ -1396,7 +1482,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
           ? "GRABANDO: toca un jugador y arrástralo; si lleva el balón bota, si no corta. Para pasar, toca el balón y luego al receptor (o arrastra el balón hasta él); para tirar, toca el balón y una canasta. Todo lo que hagas va al mismo paso (se mueve a la vez); para pasar al siguiente paso pulsa ›. Con la T añades comentarios y eliges en qué pasos se ven; con un jugador seleccionado puedes cambiarlo de defensor a atacante desde ese paso. 📷 limpia las líneas y sigue."
           : "Toca una ficha para seleccionarla (aro amarillo) y arrástrala a su sitio. Para dar el balón: toca el balón y luego al jugador, o arrástralo encima de él. Doble toque para cambiar la etiqueta. Pulsa REC para grabar la jugada."}
         {" "}Teclado: ← → fotogramas · Espacio reproducir · C captura · Supr borrar · R girar · Ctrl+Z deshacer.
-        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v3.9</span>
+        <span className="ml-1 rounded bg-azul/10 px-1.5 py-0.5 font-semibold text-azul">Pizarra v4.0</span>
       </p>
       </>}
     </div>

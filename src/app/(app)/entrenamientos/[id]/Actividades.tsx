@@ -71,9 +71,9 @@ const TZ = "Europe/Madrid";
 const hhmm = (d: Date) => d.toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 
 export default function Actividades({
-  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo,
+  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo, favoritos = [],
 }: {
-  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null;
+  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null; favoritos?: string[];
 }) {
   const [lista, setLista] = useState(actividades);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
@@ -194,7 +194,7 @@ export default function Actividades({
       </ol>
 
       <div className="mt-3">
-        <SelectorEjercicios entrenoId={entrenoId} ejercicios={ejercicios} yo={yo} edadEquipo={edadEquipo} />
+        <SelectorEjercicios entrenoId={entrenoId} ejercicios={ejercicios} yo={yo} edadEquipo={edadEquipo} favoritos={favoritos} />
       </div>
       <form
         ref={formAlta}

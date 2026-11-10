@@ -4,7 +4,7 @@ import { FOCOS, FORMATOS, POSICIONES, RANGOS_JUGADORES } from "@/lib/rasgos-ejer
 export type ParamsFiltro = { q?: string; tipo?: string; foco?: string; edad?: string; pos?: string; formato?: string; jug?: string; balones?: string };
 
 /** Filtros de búsqueda de ejercicios: qué se trabaja, edad, jugadores, tipo de trabajo, posición y material */
-export default function FiltrosEjercicios({ p, extra }: { p: ParamsFiltro; extra?: React.ReactNode }) {
+export default function FiltrosEjercicios({ p, extra, extra2 }: { p: ParamsFiltro; extra?: React.ReactNode; extra2?: React.ReactNode }) {
   return (
     <>
       <input name="q" defaultValue={p.q} placeholder="Buscar por título, texto o etiqueta" className="campo min-w-48 flex-1" />
@@ -36,6 +36,7 @@ export default function FiltrosEjercicios({ p, extra }: { p: ParamsFiltro; extra
       </select>
       <label className="flex items-center gap-1.5 px-1 text-sm"><input type="checkbox" name="balones" value="1" defaultChecked={p.balones === "1"} /> Con 1 balón</label>
       {extra}
+      {extra2}
       <button className="btn-secundario">Filtrar</button>
     </>
   );

@@ -18,6 +18,7 @@ const NAV = [
   { href: "/ejercicios", label: "Ejercicios" },
   { href: "/biblioteca", label: "Biblioteca" },
   { href: "/pizarra", label: "Pizarra" },
+  { href: "/playbook", label: "Playbook" },
   { href: "/noticias", label: "Noticias" },
 ];
 

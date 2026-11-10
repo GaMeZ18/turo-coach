@@ -222,3 +222,44 @@ export async function cargarBibliotecaInicial(): Promise<{ nuevos: number; actua
     return { nuevos: 0, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** Estrella de favorito (cada entrenador tiene los suyos) */
+export async function alternarFavorito(id: string, poner: boolean) {
+  const supabase = await createClient();
+  const r = poner
+    ? await supabase.from("ejercicio_favoritos").upsert({ ejercicio_id: id }, { onConflict: "perfil_id,ejercicio_id", ignoreDuplicates: true })
+    : await supabase.from("ejercicio_favoritos").delete().eq("ejercicio_id", id);
+  revalidatePath("/ejercicios");
+  revalidatePath("/biblioteca");
+  return r.error ? { error: r.error.message } : {};
+}
+
+/** «Me gusta»: lo ve todo el club y sirve para ordenar la biblioteca por los más valorados */
+export async function alternarMegusta(id: string, poner: boolean): Promise<{ total?: number; error?: string }> {
+  const supabase = await createClient();
+  const r = poner
+    ? await supabase.from("ejercicio_megusta").upsert({ ejercicio_id: id }, { onConflict: "perfil_id,ejercicio_id", ignoreDuplicates: true })
+    : await supabase.from("ejercicio_megusta").delete().eq("ejercicio_id", id);
+  if (r.error) return { error: r.error.message };
+  const { count } = await supabase.from("ejercicio_megusta").select("perfil_id", { count: "exact", head: true }).eq("ejercicio_id", id);
+  revalidatePath("/biblioteca");
+  return { total: count ?? 0 };
+}
+
+/** Enlace público (solo lectura) para compartir el ejercicio por WhatsApp */
+export async function enlaceCompartir(id: string): Promise<{ url?: string; error?: string }> {
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const supabase = await createClient();
+  // Solo si quien lo pide puede verlo
+  const { data: e } = await supabase.from("ejercicios").select("id, compartir_token").eq("id", id).maybeSingle();
+  if (!e) return { error: "No encuentro el ejercicio." };
+  let token = e.compartir_token as string | null;
+  if (!token) {
+    const db = adminClient();
+    if (!db) return { error: "Falta la configuración del servidor." };
+    token = crypto.randomUUID().replace(/-/g, "").slice(0, 20);
+    const { error } = await db.from("ejercicios").update({ compartir_token: token }).eq("id", id);
+    if (error) return { error: error.message };
+  }
+  return { url: `https://coach.cbturo.com/e/${token}` };
+}

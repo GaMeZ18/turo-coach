@@ -300,3 +300,46 @@ export async function avisarStaff(entrenoId: string, mensaje: string): Promise<{
     ruta(entrenoId), e.equipo_id);
   return { ok: destino.length };
 }
+
+/** Comentario en un entreno (o visita del coordinador, si lo ha visto en directo). Avisa a quien corresponda. */
+export async function comentarEntreno(entrenoId: string, texto: string, visita: boolean): Promise<{ ok?: boolean; error?: string }> {
+  const { requireUser } = await import("@/lib/supabase/server");
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const { notificarPerfiles } = await import("@/lib/notificar");
+  const { fechaCorta } = await import("@/lib/fechas");
+  const { supabase, user, perfil } = await requireUser();
+  const t = texto.trim().slice(0, 2000);
+  if (!t) return { error: "Escribe algo." };
+  const esCoord = perfil.rol === "coordinador";
+  const { data: e } = await supabase.from("entrenamientos").select("id, equipo_id, fecha, equipos(nombre)").eq("id", entrenoId).maybeSingle();
+  if (!e) return { error: "No encuentro el entreno." };
+  const { error } = await supabase.from("entreno_comentarios").insert({ entrenamiento_id: entrenoId, texto: t, visita: visita && esCoord });
+  if (error) return { error: error.message };
+  revalidatePath(ruta(entrenoId));
+
+  // Avisos: al cuerpo técnico del equipo y a los coordinadores que hayan comentado en este entreno
+  const db = adminClient();
+  if (db) {
+    const [{ data: staff }, { data: prev }] = await Promise.all([
+      db.from("equipo_staff").select("perfil_id").eq("equipo_id", e.equipo_id),
+      db.from("entreno_comentarios").select("autor_id").eq("entrenamiento_id", entrenoId),
+    ]);
+    const destino = [...new Set([...(staff ?? []).map((s) => s.perfil_id as string), ...(prev ?? []).map((c) => c.autor_id as string)])].filter((id) => id !== user.id);
+    if (destino.length) {
+      const equipo = (e.equipos as unknown as { nombre: string } | null)?.nombre ?? "";
+      const quien = perfil.nombre?.split(" ")[0] ?? "Alguien";
+      await notificarPerfiles(db, destino,
+        visita && esCoord ? `👀 ${quien} ha visto vuestro entreno · ${equipo}` : `💬 ${quien} ha comentado el entreno · ${equipo}`,
+        `${fechaCorta(e.fecha)}\n${t.length > 300 ? `${t.slice(0, 297)}…` : t}`,
+        `${ruta(entrenoId)}#comentarios`, e.equipo_id);
+    }
+  }
+  return { ok: true };
+}
+
+export async function borrarComentarioEntreno(entrenoId: string, id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("entreno_comentarios").delete().eq("id", id);
+  revalidatePath(ruta(entrenoId));
+  return error ? { error: error.message } : {};
+}

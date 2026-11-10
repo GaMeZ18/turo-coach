@@ -17,14 +17,15 @@ export type EjercicioLista = {
 
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEquipo }: {
-  entrenoId: string; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null;
+export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEquipo, favoritos = [] }: {
+  entrenoId: string; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null; favoritos?: string[];
 }) {
   const [abierto, setAbierto] = useState(false);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [edad, setEdad] = useState(edadEquipo ?? "");
-  const [origen, setOrigen] = useState<"todos" | "biblioteca" | "mios">("todos");
+  const [origen, setOrigen] = useState<"todos" | "biblioteca" | "mios" | "favoritos">("todos");
+  const favs = useMemo(() => new Set(favoritos), [favoritos]);
   const [autor, setAutor] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [minutos, setMinutos] = useState<string>("");
@@ -37,13 +38,14 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
     return ejercicios.filter((e) => {
       if (origen === "biblioteca" && !e.en_biblioteca) return false;
       if (origen === "mios" && e.autor_id !== yo) return false;
+      if (origen === "favoritos" && !favs.has(e.id)) return false;
       if (autor && e.autor_id !== autor) return false;
       if (cat && (cat === "Sistema de juego" ? e.tipo !== "sistema" && e.categoria !== cat : e.categoria !== cat)) return false;
       if (edad && e.edades?.length && !e.edades.includes(edad)) return false;
       if (t && !sinAcentos(`${e.titulo} ${e.categoria ?? ""} ${(e.etiquetas ?? []).join(" ")}`).includes(t)) return false;
       return true;
     });
-  }, [ejercicios, q, cat, edad, origen, yo, autor]);
+  }, [ejercicios, q, cat, edad, origen, yo, autor, favs]);
 
   // Entrenadores que tienen ejercicios (para copiarle alguno a un compañero)
   const autores = useMemo(() => {
@@ -125,7 +127,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                 </select>
               </div>
               <div className="flex rounded-lg border border-linea p-0.5 text-xs">
-                {([["todos", "Todos"], ["biblioteca", "Biblioteca del club"], ["mios", "Míos"]] as const).map(([k, l]) => (
+                {([["todos", "Todos"], ["biblioteca", "Biblioteca"], ["mios", "Míos"], ["favoritos", "★ Favoritos"]] as const).map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setOrigen(k)} className={`flex-1 rounded-md py-1 ${origen === k ? "bg-azul text-white" : "text-tinta/70"}`}>{l}</button>
                 ))}
               </div>

@@ -4,6 +4,10 @@ import { requireUser } from "@/lib/supabase/server";
 import { esVertical, urlEmbed } from "@/lib/video";
 import { alternarBiblioteca, borrarEjercicio, duplicarEjercicio } from "../actions";
 import VisorPizarra from "./VisorPizarra";
+import Social from "./Social";
+import AlPlaybook from "./AlPlaybook";
+import { misEquipos } from "@/lib/equipo-activo";
+import Historial from "@/components/Historial";
 import { Copy, Library, Pencil, Trash2, PlayCircle } from "lucide-react";
 import Enviar from "@/components/Enviar";
 import { nombreFormato } from "@/lib/rasgos-ejercicio";
@@ -17,6 +21,12 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
     .eq("id", id)
     .maybeSingle();
   if (!e) notFound();
+  const esCoord = perfil.rol === "coordinador";
+  const [{ data: fav }, { data: mg }, { equipos: mios }] = await Promise.all([
+    supabase.from("ejercicio_favoritos").select("ejercicio_id").eq("ejercicio_id", id).eq("perfil_id", user.id).maybeSingle(),
+    supabase.from("ejercicio_megusta").select("ejercicio_id").eq("ejercicio_id", id).eq("perfil_id", user.id).maybeSingle(),
+    misEquipos(supabase),
+  ]);
 
   const puedeEditar = e.autor_id === user.id || perfil.rol === "coordinador";
   const video = urlEmbed(e.video_url);
@@ -42,7 +52,9 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Social id={e.id} titulo={e.titulo} favorito={!!fav} megusta={!!mg} total={e.megusta ?? 0} />
+          {e.pizarra && <AlPlaybook ejercicioId={e.id} equipos={mios.map((q) => ({ id: q.id, nombre: q.nombre }))} />}
           {puedeEditar && <Link href={`/ejercicios/${e.id}/editar`} className="btn-primario"><Pencil size={16} /> Editar</Link>}
           <form action={duplicarEjercicio}>
             <input type="hidden" name="id" value={e.id} />
@@ -136,6 +148,7 @@ export default async function VerEjercicio({ params }: { params: Promise<{ id: s
           )}
         </div>
       </div>
+      {esCoord && <Historial registroId={e.id} />}
     </div>
   );
 }

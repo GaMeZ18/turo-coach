@@ -9,6 +9,8 @@ import Actividades from "./Actividades";
 import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
 import AvisarStaff from "./AvisarStaff";
+import Comentarios, { type ComentarioEntreno } from "./Comentarios";
+import Historial from "@/components/Historial";
 import type { Objetivo } from "@/lib/objetivos";
 import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
@@ -37,7 +39,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!e) notFound();
 
-  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }] = await Promise.all([
+  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }, { data: favs }, { data: comentarios }] = await Promise.all([
     supabase
       .from("entreno_actividades")
       .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, hecho, ejercicio_id, ejercicios(titulo, preview, descripcion)")
@@ -54,6 +56,8 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     supabase.from("planificaciones").select("id, nombre, equipo_id, temporada_id, objetivos(id, planificacion_id, padre_id, nombre, descripcion, color, orden)").or(`equipo_id.is.null,equipo_id.eq.${e.equipo_id}`).order("created_at"),
     supabase.from("entreno_objetivos").select("objetivo_id").eq("entrenamiento_id", id),
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
+    supabase.from("ejercicio_favoritos").select("ejercicio_id").eq("perfil_id", user.id),
+    supabase.from("entreno_comentarios").select("id, texto, visita, created_at, autor_id, perfiles(nombre)").eq("entrenamiento_id", id).order("created_at"),
   ]);
   // ¿Coincide en la pista con otro equipo?
   let choque: string[] = [];
@@ -153,10 +157,16 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           actividades={(actividades ?? []) as never}
           ejercicios={(ejercicios ?? []) as unknown as EjercicioLista[]}
           yo={user.id}
+          favoritos={(favs ?? []).map((f) => f.ejercicio_id as string)}
           edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
         />
         <div id="asistencia" className="scroll-mt-28"><Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} /></div>
       </div>
+
+      <div id="comentarios" className="scroll-mt-28">
+        <Comentarios entrenoId={e.id} yo={user.id} coordinador={perfil.rol === "coordinador"} comentarios={(comentarios ?? []) as unknown as ComentarioEntreno[]} />
+      </div>
+      {perfil.rol === "coordinador" && <Historial registroId={e.id} />}
     </div>
   );
 }
