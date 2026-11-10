@@ -265,7 +265,7 @@ export type FichaEjercicio = {
   id: string; titulo: string; tipo: string; categoria: string | null; duracion: number | null; jugadores_min: number | null;
   descripcion: string | null; correcciones: string | null; objetivos?: string | null; material?: string | null;
   series?: string | null; repeticiones?: string | null; descanso?: string | null;
-  imagenes?: string[] | null; video_url?: string | null;
+  imagenes?: string[] | null;
   edades?: string[]; etiquetas: string[]; pizarra: unknown; preview: string | null; video_url: string | null;
 };
 export async function fichaEjercicio(id: string): Promise<FichaEjercicio | null> {
