@@ -314,7 +314,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <p className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${jugada ? "bg-[#5e0f17] text-red-100" : "bg-[#155f2d] text-green-100"}`}>
           {jugada ? (liga.enJuego === jSel ? "🔴 En juego: los puntos se suman en cuanto entran las estadísticas." : "Terminada") : `📅 Fichajes abiertos hasta el ${fechaCorta(liga.cierre(jSel))} a las ${hora(liga.cierre(jSel))}`}
         </p>
-        <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={yo.silenciado} />
+        <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={yo.silenciado} equipos={participantes.filter((p) => p.id !== yo.id).map((p) => p.alias)} />
         {(esp.length > 0 || gg || rev || ideal.length > 0) && <h2 className="fx-display pt-2 text-xl">Resumen de la jornada</h2>}
         {esp.length > 0 && (
           <div className="fx-card-rojo p-3 text-center">

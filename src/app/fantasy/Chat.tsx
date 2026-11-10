@@ -9,12 +9,23 @@ type Msg = Awaited<ReturnType<typeof leerMensajes>>[number];
 const hora = (iso: string) => new Date(iso).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
 /** Chat de la jornada: se actualiza solo cada 15 segundos */
-export default function Chat({ jornada, esAdmin, silenciado }: { jornada: string; esAdmin: boolean; silenciado: boolean }) {
+export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { jornada: string; esAdmin: boolean; silenciado: boolean; equipos?: string[] }) {
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [texto, setTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const fin = useRef<HTMLDivElement>(null);
+  // «@» al final: sugerir equipos para mencionar
+  const arroba = texto.match(/@([^@]*)$/);
+  const sugerencias = arroba ? equipos.filter((a) => a.toLowerCase().startsWith(arroba[1].toLowerCase()) && a.toLowerCase() !== arroba[1].toLowerCase().trim()).slice(0, 5) : [];
+  const mencionar = (alias: string) => setTexto(texto.replace(/@([^@]*)$/, `@${alias} `));
+  /** Resalta las menciones a equipos que existen */
+  const conMenciones = (t: string) => {
+    const nombres = [...equipos].sort((a, b) => b.length - a.length).map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (!nombres.length) return t;
+    const partes = t.split(new RegExp(`(@(?:${nombres.join("|")}))`, "gi"));
+    return partes.map((x, i) => (i % 2 ? <strong key={i} className="text-[#1d4ed8]">{x}</strong> : x));
+  };
   const cargar = useCallback(async () => { try { setMsgs(await leerMensajes(jornada)); } catch { /* sin conexión */ } }, [jornada]);
   useEffect(() => {
     void cargar();
@@ -41,7 +52,7 @@ export default function Chat({ jornada, esAdmin, silenciado }: { jornada: string
               {!m.yo && <Escudo alias={m.alias} emoji={m.emoji} color={m.color} foto={m.foto} size={30} />}
               <div className={`max-w-[80%] px-3 py-1.5 text-sm shadow ${m.yo ? "fx-burbuja-yo" : "fx-burbuja"}`}>
                 <p className="text-[12px] font-bold leading-tight">{m.alias} {m.mostrar && <span className="font-normal opacity-60">· {m.mostrar}</span>}</p>
-                {m.borrado ? <p className="italic opacity-60">Mensaje borrado</p> : <p className="whitespace-pre-line break-words">{m.texto}</p>}
+                {m.borrado ? <p className="italic opacity-60">Mensaje borrado</p> : <p className="whitespace-pre-line break-words">{conMenciones(m.texto)}</p>}
                 <p className="flex items-center justify-end gap-1 text-[10px] opacity-60">
                   {hora(m.fecha)}{m.yo && " ✓✓"}
                   {!m.borrado && (m.yo || esAdmin) && <button onClick={() => borrar(m.id)} aria-label="Borrar" className="ml-1 hover:text-red-600"><Trash2 size={11} /></button>}
@@ -52,8 +63,13 @@ export default function Chat({ jornada, esAdmin, silenciado }: { jornada: string
         <div ref={fin} />
       </div>
       {silenciado ? <p className="border-t border-[var(--fx-borde)] p-3 text-sm fx-suave">El administrador te ha silenciado en el chat.</p> : (
-        <div className="flex gap-2 border-t border-[var(--fx-borde)] p-2">
-          <input className="fx-input flex-1 !rounded-full" placeholder="Escribe un mensaje…" maxLength={500} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && texto.trim() && enviar()} />
+        <div className="relative flex gap-2 border-t border-[var(--fx-borde)] p-2">
+          {sugerencias.length > 0 && (
+            <ul className="absolute bottom-full left-2 right-2 mb-1 overflow-hidden rounded-xl border border-[var(--fx-borde)] bg-[#0c1430] shadow-lg">
+              {sugerencias.map((a) => <li key={a}><button type="button" onClick={() => mencionar(a)} className="w-full px-3 py-2 text-left text-sm hover:bg-white/10">@{a}</button></li>)}
+            </ul>
+          )}
+          <input className="fx-input flex-1 !rounded-full" placeholder="Escribe un mensaje… (@ para mencionar)" maxLength={500} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && texto.trim() && enviar()} />
           <button onClick={enviar} disabled={pend || !texto.trim()} className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--fx-rojo)] text-white disabled:opacity-50" aria-label="Enviar">{pend ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}</button>
         </div>
       )}

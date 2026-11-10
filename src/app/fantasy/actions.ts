@@ -179,6 +179,16 @@ export async function enviarMensaje(jornada: string, texto: string): Promise<R> 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(jornada)) return { error: "Jornada no válida." };
   const { error } = await db().from("fantasy_mensajes").insert({ jornada, participante_id: q.participante.id, texto: t });
   if (error) return { error: error.message };
+  // Menciones: «@Nombre del equipo» avisa a esa persona
+  if (t.includes("@")) {
+    const bajo = t.toLowerCase();
+    const { data: todos } = await db().from("fantasy_participantes").select("id, perfil_id, alias").neq("id", q.participante.id);
+    const mencionados = (todos ?? []).filter((p) => bajo.includes(`@${(p.alias as string).toLowerCase()}`));
+    if (mencionados.length) {
+      const { notificarFantasy } = await import("@/lib/notificar");
+      await notificarFantasy(db(), mencionados as { id: string; perfil_id: string | null }[], `💬 ${q.participante.alias} te ha mencionado`, t.length > 200 ? `${t.slice(0, 197)}…` : t, `/fantasy?v=jornada&j=${jornada}`);
+    }
+  }
   revalidatePath("/fantasy");
   return { ok: true };
 }
@@ -186,6 +196,9 @@ export async function enviarMensaje(jornada: string, texto: string): Promise<R> 
 export async function leerMensajes(jornada: string) {
   const q = await quienSoy();
   if (!q.acceso || !q.participante) return [];
+  // Apuntar que ha mirado el chat (para el resumen diario), como mucho cada 2 minutos
+  const hace2 = new Date(Date.now() - 120e3).toISOString();
+  await db().from("fantasy_participantes").update({ chat_visto: new Date().toISOString() }).eq("id", q.participante.id).or(`chat_visto.is.null,chat_visto.lt.${hace2}`);
   const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, fantasy_participantes(alias, mostrar, emoji, color, foto)")
     .eq("jornada", jornada).order("created_at").limit(300);
   type P = { alias: string; mostrar: string | null; emoji: string | null; color: string | null; foto: string | null };

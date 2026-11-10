@@ -162,35 +162,67 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     }
   }
 
-  // 8) Fantasy Turó → a los participantes del staff (con avisos activados): viernes «haz tu equipo», lunes «tus puntos»
+  // 8) Fantasy Turó: viernes «haz tu equipo», 2 h antes del cierre, lunes «tus puntos», insignias nuevas y resumen del chat
   try {
-    if ((diaSemana === 5 && horaLocal >= 19) || (diaSemana === 1 && horaLocal >= 12)) {
-      const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");
-      const { nombreJornada } = await import("./fantasy/motor");
-      const cfg = await leerConfig();
-      const { liga, participantes } = await cargarLiga(cfg);
-      const { notificarFantasy } = await import("./notificar");
-      const conCuenta = participantes.filter((p) => cfg.abierto || p.perfil_id === ADMIN_FANTASY);
-      if (diaSemana === 5 && !cfg.cerrada) {
-        const l = liga.abierta, cierre = l ? liga.cierre(l) : "";
-        if (l && cierre > new Date(ahora).toISOString()) {
-          for (const p of conCuenta) {
-            if (liga.alineacion(p.id, l)) continue;
-            await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarFantasy(db, [p], "🏆 Fantasy: ¡haz tu equipo!",
-              `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
-          }
-        }
+    const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");
+    const { nombreJornada, INSIGNIAS } = await import("./fantasy/motor");
+    const { notificarFantasy } = await import("./notificar");
+    const cfg = await leerConfig();
+    const { liga, participantes } = await cargarLiga(cfg);
+    const activos = participantes.filter((p) => cfg.abierto || p.perfil_id === ADMIN_FANTASY);
+    const ya = new Date(ahora).toISOString();
+    const l = liga.abierta, cierre = l ? liga.cierre(l) : "";
+    // Viernes desde las 19:00: a quien aún no tiene equipo
+    if (diaSemana === 5 && horaLocal >= 19 && l && cierre > ya && !cfg.cerrada) {
+      for (const p of activos) {
+        if (liga.alineacion(p.id, l)) continue;
+        await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarFantasy(db, [p], "🏆 Fantasy: ¡haz tu equipo!",
+          `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
       }
-      if (diaSemana === 1) {
-        const l = liga.terminadas[liga.terminadas.length - 1];
-        const ranking = l ? liga.porJornada.get(l) ?? [] : [];
-        for (const p of conCuenta) {
-          const r = ranking.find((x) => x.id === p.id);
-          if (!l || !r) continue;
-          const pos = liga.general.findIndex((g) => g.id === p.id) + 1;
-          await unaVez(`fantasy-puntos:${l}:${p.id}`, () => notificarFantasy(db, [p], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
-            `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
-        }
+    }
+    // 2 horas antes del cierre: último aviso a quien aún no tiene equipo
+    if (l && cierre > ya && Date.parse(cierre) - ahora <= 2 * 3600e3 && !cfg.cerrada) {
+      for (const p of activos) {
+        if (liga.alineacion(p.id, l)) continue;
+        await unaVez(`fantasy-2h:${l}:${p.id}`, () => notificarFantasy(db, [p], "⏰ Fantasy: ¡quedan menos de 2 horas!",
+          `Los fichajes de la ${nombreJornada(cfg.inicio, l, cfg.anuladas).toLowerCase()} cierran a las ${hora(cierre)} y aún no tienes equipo.`, "/fantasy"));
+      }
+    }
+    // Lunes desde las 12:00: puntos de la jornada que acaba de terminar
+    if (diaSemana === 1 && horaLocal >= 12) {
+      const t = liga.terminadas[liga.terminadas.length - 1];
+      const ranking = t ? liga.porJornada.get(t) ?? [] : [];
+      for (const p of activos) {
+        const r = ranking.find((x) => x.id === p.id);
+        if (!t || !r) continue;
+        const pos = liga.general.findIndex((g) => g.id === p.id) + 1;
+        await unaVez(`fantasy-puntos:${t}:${p.id}`, () => notificarFantasy(db, [p], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
+          `${nombreJornada(cfg.inicio, t, cfg.anuladas)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
+      }
+    }
+    // Insignias nuevas (en cuanto se consiguen; se apuntan para no repetir el aviso)
+    const { data: avisadas } = await db.from("fantasy_insignias_avisadas").select("participante_id, codigo");
+    const hechas = new Set((avisadas ?? []).map((a) => `${a.participante_id}|${a.codigo}`));
+    for (const p of activos) {
+      const nuevas = INSIGNIAS.filter((x) => liga.insignias(p.id).has(x.codigo) && !hechas.has(`${p.id}|${x.codigo}`));
+      if (!nuevas.length) continue;
+      const { error } = await db.from("fantasy_insignias_avisadas").insert(nuevas.map((x) => ({ participante_id: p.id, codigo: x.codigo })));
+      if (error) continue;
+      await notificarFantasy(db, [p],
+        nuevas.length === 1 ? `🏅 ¡Has conseguido «${nuevas[0].nombre}»!` : `🏅 ¡Has conseguido ${nuevas.length} insignias!`,
+        nuevas.length === 1 ? nuevas[0].texto : nuevas.map((x) => x.nombre).join(", "),
+        nuevas.length === 1 ? `/fantasy?v=insignias&i=${nuevas[0].codigo}` : "/fantasy?v=insignias");
+    }
+    // Resumen del chat (20:00): solo si hay 3 mensajes o más de otros que aún no has visto
+    if (horaLocal >= 20) {
+      const desde = new Date(ahora - 24 * 3600e3).toISOString();
+      const { data: msgs } = await db.from("fantasy_mensajes").select("participante_id, created_at").eq("borrado", false).gte("created_at", desde);
+      const { data: vistos } = await db.from("fantasy_participantes").select("id, chat_visto");
+      const visto = new Map((vistos ?? []).map((v) => [v.id as string, (v.chat_visto as string | null) ?? desde]));
+      for (const p of activos) {
+        const n = (msgs ?? []).filter((m) => m.participante_id !== p.id && (m.created_at as string) > (visto.get(p.id) ?? desde)).length;
+        if (n < 3) continue;
+        await unaVez(`fantasy-chat:${hoy}:${p.id}`, () => notificarFantasy(db, [p], "💬 Fantasy: mensajes nuevos en el chat", `Hay ${n} mensajes nuevos en el chat de la jornada.`, "/fantasy?v=jornada"));
       }
     }
   } catch { /* el fantasy no debe romper el resto de avisos */ }
