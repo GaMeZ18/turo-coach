@@ -2,6 +2,8 @@
 // Las genera y revisa el equipo; los nombres de jugadores, equipos y notas no se traducen.
 
 export const CA_EXTRA: Record<string, string> = {
+ "Prep. física (sin pizarra)": "Prep. física (sense pissarra)",
+ "Cuenta en la hora del entreno pero no ocupa pista si va al principio o al final de la sesión. Pon cómo se hace: series, repeticiones o tiempo y descanso.": "Compta a l'hora de l'entrenament però no ocupa pista si va al principi o al final de la sessió. Posa com es fa: sèries, repeticions o temps i descans.",
  "Si además pones «Prep. física» en la sesión, cuenta lo que sea mayor.": "Si a més poses «Prep. física» a la sessió, compta el que sigui més gran.",
  "🏃 Todo fuera de pista": "🏃 Tot fora de pista",
  "Pista ocupada": "Pista ocupada",

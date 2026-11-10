@@ -47,7 +47,7 @@ export default function FichaEjercicio({ id, compacta = false, reproductor = fal
       ) : null}
       {!compacta && (
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-rojo">{f.tipo === "sistema" ? "Sistema" : f.tipo === "fisico" ? "Físico" : f.categoria ?? "Ejercicio"}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-rojo">{f.tipo === "sistema" ? "Sistema" : f.tipo === "fisico" ? "Prep. física" : f.categoria ?? "Ejercicio"}</p>
           <h3 className="text-lg font-semibold leading-tight">{f.titulo}</h3>
         </div>
       )}

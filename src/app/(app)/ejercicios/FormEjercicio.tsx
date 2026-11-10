@@ -101,8 +101,8 @@ export default function FormEjercicio({
       <div className="min-w-0">
         {fisico ? (
           <div className="tarjeta space-y-3 p-4">
-            <p className="font-semibold">Ejercicio de físico (sin pizarra)</p>
-            <p className="text-xs text-tinta/60">Explica el ejercicio en la descripción y pon aquí cómo se hace: series, repeticiones o tiempo y descanso.</p>
+            <p className="font-semibold">Prep. física (sin pizarra)</p>
+            <p className="text-xs text-tinta/60">Cuenta en la hora del entreno pero no ocupa pista si va al principio o al final de la sesión. Pon cómo se hace: series, repeticiones o tiempo y descanso.</p>
             <div className="grid gap-2 sm:grid-cols-3">
               <div><label className="etiqueta">Series</label><input value={d.series ?? ""} onChange={(e) => set("series", e.target.value)} className="campo" placeholder="4" /></div>
               <div><label className="etiqueta">Repeticiones o tiempo</label><input value={d.repeticiones ?? ""} onChange={(e) => set("repeticiones", e.target.value)} className="campo" placeholder="12 rep · 30″ · 20 m" /></div>
@@ -118,7 +118,7 @@ export default function FormEjercicio({
           {(["ejercicio", "sistema", "fisico"] as const).map((t) => (
             <button key={t} type="button" onClick={() => { set("tipo", t); if (t === "fisico" && !d.categoria) set("categoria", "Físico"); }}
               className={`flex-1 rounded-md py-1.5 ${d.tipo === t ? "bg-club text-white" : "text-tinta/70"}`}>
-              {t === "ejercicio" ? "Ejercicio" : t === "sistema" ? "Sistema" : "Físico"}
+              {t === "ejercicio" ? "Ejercicio" : t === "sistema" ? "Sistema" : "Prep. física"}
             </button>
           ))}
         </div>

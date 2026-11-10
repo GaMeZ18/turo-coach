@@ -16,7 +16,7 @@ export default function FiltrosEjercicios({ p, extra }: { p: ParamsFiltro; extra
         <option value="">Ejercicios y sistemas</option>
         <option value="ejercicio">Ejercicios</option>
         <option value="sistema">Sistemas</option>
-        <option value="fisico">Físico</option>
+        <option value="fisico">Prep. física</option>
       </select>
       <select name="edad" defaultValue={p.edad ?? ""} className="campo !w-auto" aria-label="Edad">
         <option value="">Cualquier edad</option>

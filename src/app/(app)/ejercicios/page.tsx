@@ -71,7 +71,7 @@ export default async function EjerciciosPage({
                 {e.visibilidad === "privado" && <Lock size={13} className="mt-0.5 shrink-0 text-tinta/40" />}
               </div>
               <p className="mt-1 text-xs text-tinta/60">
-                {e.tipo === "sistema" ? "Sistema" : e.tipo === "fisico" ? "Físico" : e.categoria ?? "Ejercicio"}
+                {e.tipo === "sistema" ? "Sistema" : e.tipo === "fisico" ? "Prep. física" : e.categoria ?? "Ejercicio"}
                 {e.duracion ? ` · ${e.duracion}′` : ""}
               </p>
               <p className="mt-0.5 truncate text-xs text-tinta/40">{e.perfiles?.nombre}</p>

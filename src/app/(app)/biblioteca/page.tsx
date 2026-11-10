@@ -103,7 +103,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
                     : <span className="text-xs text-tinta/40">Sin pizarra</span>}
                 </div>
                 <div className="p-2 sm:p-3">
-                  <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-rojo sm:text-[11px]">{e.tipo === "sistema" ? "Sistema" : e.tipo === "fisico" ? "Físico" : e.categoria ?? "Ejercicio"}</p>
+                  <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-rojo sm:text-[11px]">{e.tipo === "sistema" ? "Sistema" : e.tipo === "fisico" ? "Prep. física" : e.categoria ?? "Ejercicio"}</p>
                   <h3 className="line-clamp-2 text-xs font-semibold group-hover:text-azul sm:text-sm">{e.titulo}</h3>
                   <p className="mt-1 hidden flex-wrap items-center gap-x-2 text-xs text-tinta/60 sm:flex">
                     {e.duracion ? <span className="inline-flex items-center gap-0.5"><Timer size={11} /> {e.duracion}′</span> : null}

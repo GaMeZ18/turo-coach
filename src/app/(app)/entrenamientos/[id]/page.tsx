@@ -125,16 +125,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           <div className="col-span-2"><label className="etiqueta">Título</label><input name="titulo" defaultValue={e.titulo ?? ""} className="campo" /></div>
           <div><label className="etiqueta">Minutos</label><input name="duracion_prevista" type="number" min={0} defaultValue={e.duracion_prevista} className="campo" /></div>
           <div><label className="etiqueta">Pista</label><input name="lugar" list="lista-pistas" defaultValue={e.lugar ?? ""} className="campo" /><ListaPistas /></div>
-          <div className="col-span-2">
-            <label className="etiqueta">Físico fuera de pista (min)</label>
-            <p className="text-[11px] text-tinta/50">Si además pones «Prep. física» en la sesión, cuenta lo que sea mayor.</p>
-            <div className="flex gap-2">
-              <label className="flex-1 text-[11px] text-tinta/60">Al empezar<input name="fisico_fuera" type="number" min={0} max={120} defaultValue={e.fisico_fuera ?? 0} className="campo" /></label>
-              <label className="flex-1 text-[11px] text-tinta/60">Al acabar<input name="fisico_fuera_fin" type="number" min={0} max={120} defaultValue={e.fisico_fuera_fin ?? 0} className="campo" /></label>
-            </div>
-            <label className="mt-1 flex items-start gap-1.5 text-[11px] text-tinta/60"><input type="checkbox" name="fisico_todos" className="mt-0.5" /> Aplicar también a los próximos entrenos de este equipo a la misma hora</label>
-          </div>
-          <div className="col-span-2 sm:col-span-4"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
+          <div className="col-span-2 sm:col-span-5"><label className="etiqueta">Notas del entreno</label><textarea name="notas" rows={2} defaultValue={e.notas ?? ""} className="campo" placeholder="Objetivo de la sesión, material, avisos…" /></div>
           <Enviar>Guardar</Enviar>
         </form>
       </details>
@@ -159,8 +150,6 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           entrenoId={e.id}
           inicio={e.fecha}
           prevista={e.duracion_prevista}
-          fisicoIni={e.fisico_fuera ?? 0}
-          fisicoFin={e.fisico_fuera_fin ?? 0}
           actividades={(actividades ?? []) as never}
           ejercicios={(ejercicios ?? []) as unknown as EjercicioLista[]}
           yo={user.id}

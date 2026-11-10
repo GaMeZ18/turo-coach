@@ -71,10 +71,9 @@ const TZ = "Europe/Madrid";
 const hhmm = (d: Date) => d.toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 
 export default function Actividades({
-  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo, fisicoIni = 0, fisicoFin = 0,
+  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo,
 }: {
   entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null;
-  fisicoIni?: number; fisicoFin?: number; // minutos de físico puestos a mano en «Editar»
 }) {
   const [lista, setLista] = useState(actividades);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
@@ -111,12 +110,11 @@ export default function Actividades({
         // Pista ocupada: desde el primer ejercicio que no es de prep. física hasta el último
         const fis = (x: Actividad) => x.tipo === "prep_fisica";
         const primero = lista.findIndex((x) => !fis(x));
-        if (primero < 0 && lista.length) return null;
+        if (primero < 0 || !lista.some(fis)) return null;
         let ultimo = lista.length - 1;
         while (ultimo > primero && fis(lista[ultimo])) ultimo--;
-        // Lo que sea mayor: la prep. física de la sesión o los minutos puestos a mano
-        const ini = Math.max(fisicoIni, primero < 0 ? 0 : lista.slice(0, primero).reduce((s2, x) => s2 + (x.duracion || 0), 0));
-        const fin = Math.max(fisicoFin, primero < 0 ? 0 : lista.slice(ultimo + 1).reduce((s2, x) => s2 + (x.duracion || 0), 0));
+        const ini = lista.slice(0, primero).reduce((s2, x) => s2 + (x.duracion || 0), 0);
+        const fin = lista.slice(ultimo + 1).reduce((s2, x) => s2 + (x.duracion || 0), 0);
         if (!ini && !fin) return null;
         const pistaHasta = t0 + (prevista - fin) * 60000;
         return <p className="mt-1 text-xs text-orange-800">🏟️ Pista ocupada de {hhmm(new Date(t0 + ini * 60000))} a {hhmm(new Date(pistaHasta))} · prep. física fuera: {ini ? `${ini}′ al empezar` : ""}{ini && fin ? " y " : ""}{fin ? `${fin}′ al acabar` : ""}</p>;
