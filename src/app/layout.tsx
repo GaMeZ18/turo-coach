@@ -24,9 +24,12 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const idioma = (await cookies()).get("idioma")?.value === "ca" ? "ca" : "es";
+  const galletas = await cookies();
+  const idioma = galletas.get("idioma")?.value === "ca" ? "ca" : "es";
+  const t = galletas.get("tema")?.value;
+  const tema = t === "oscuro" || t === "auto" ? t : "claro";
   return (
-    <html lang={idioma} data-idioma={idioma} suppressHydrationWarning className={`${barlow.variable} ${barlowCondensed.variable} ${graduate.variable}`}>
+    <html lang={idioma} data-idioma={idioma} data-tema={tema} suppressHydrationWarning className={`${barlow.variable} ${barlowCondensed.variable} ${graduate.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
         {idioma === "ca" && (
           // Mientras se traduce, no se ve la página en castellano (como mucho 1,5 s)

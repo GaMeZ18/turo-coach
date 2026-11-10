@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import Enviar from "@/components/Enviar";
+import SelectorTema from "@/components/SelectorTema";
 import SelectorIdioma from "@/components/SelectorIdioma";
 
 const volver = (q: string) => redirect(`/cuenta?${q}`);
@@ -47,6 +48,7 @@ export default async function CuentaPage({
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Mi cuenta</h1>
         <div className="flex items-center gap-2 text-sm text-tinta/60"><span>Idioma</span><SelectorIdioma /></div>
+        <div className="flex items-center gap-2 text-sm text-tinta/60"><span>Tema</span><SelectorTema /></div>
       </div>
       <p className="text-sm text-tinta/60">{user.email} · {perfil.rol}</p>
       {nuevo && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">¡Bienvenido! Ponte una contraseña para entrar la próxima vez.</p>}

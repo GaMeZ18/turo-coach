@@ -104,3 +104,66 @@ h1 {
 
 /* Catalán: ocultar la página hasta que esté traducida (lo hace <Traductor/>) */
 html[data-idioma="ca"]:not([data-traducido]) body { visibility: hidden; }
+
+/* ============================================================
+   Modo oscuro (Cuenta / cabecera: ☀️ claro · 🌙 oscuro · auto)
+   Solo en pantalla: al imprimir (PDF) siempre en claro.
+   ============================================================ */
+@media screen {
+html[data-tema="oscuro"] {
+  color-scheme: dark;
+  --color-tinta: #e6e9f4;
+  --color-suave: #0b1122;
+  --color-linea: #26304f;
+  --color-azul: #7aa2ff;
+  --color-azul-oscuro: #5b86f0;
+  --color-oro: #fde302;
+  --superficie: #141b31;
+  --color-green-50: #0f2a1b; --color-green-100: #13371f; --color-green-200: #1d5a32; --color-green-300: #2b7a46;
+  --color-green-600: #16a34a; --color-green-700: #4ade80; --color-green-800: #86efac;
+  --color-red-50: #2e1216; --color-red-100: #3d1519; --color-red-300: #7f1d1d;
+  --color-red-600: #ef4444; --color-red-700: #f87171; --color-red-800: #fca5a5; --color-red-900: #fecaca;
+  --color-amber-50: #2c2210; --color-amber-100: #3a2c10; --color-amber-300: #7c5a12;
+  --color-amber-600: #f59e0b; --color-amber-700: #fbbf24; --color-amber-800: #fcd34d; --color-amber-900: #fde68a;
+  --color-sky-100: #0e2a3d; --color-sky-700: #7dd3fc; --color-sky-800: #bae6fd;
+  --color-orange-100: #3a1f0d; --color-orange-800: #fdba74;
+  --color-emerald-800: #6ee7b7;
+  --color-gray-200: #26304f;
+}
+  html[data-tema="oscuro"] .bg-white { background-color: var(--superficie); }
+  html[data-tema="oscuro"] .bg-white\/90, .bg-white\/80 { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
+  html[data-tema="oscuro"] .hover\:bg-white:hover { background-color: var(--superficie); }
+  html[data-tema="oscuro"] .campo, .tarjeta, .btn-secundario { background-color: var(--superficie); }
+  html[data-tema="oscuro"] .btn-azul, .bg-azul { background-color: #1e3fa8; }
+  html[data-tema="oscuro"] .bg-azul.text-white, .bg-azul .text-white { color: #fff; }
+  html[data-tema="oscuro"] img[src$=".svg"] { filter: none; }
+}
+@media screen and (prefers-color-scheme: dark) {
+html[data-tema="auto"] {
+  color-scheme: dark;
+  --color-tinta: #e6e9f4;
+  --color-suave: #0b1122;
+  --color-linea: #26304f;
+  --color-azul: #7aa2ff;
+  --color-azul-oscuro: #5b86f0;
+  --color-oro: #fde302;
+  --superficie: #141b31;
+  --color-green-50: #0f2a1b; --color-green-100: #13371f; --color-green-200: #1d5a32; --color-green-300: #2b7a46;
+  --color-green-600: #16a34a; --color-green-700: #4ade80; --color-green-800: #86efac;
+  --color-red-50: #2e1216; --color-red-100: #3d1519; --color-red-300: #7f1d1d;
+  --color-red-600: #ef4444; --color-red-700: #f87171; --color-red-800: #fca5a5; --color-red-900: #fecaca;
+  --color-amber-50: #2c2210; --color-amber-100: #3a2c10; --color-amber-300: #7c5a12;
+  --color-amber-600: #f59e0b; --color-amber-700: #fbbf24; --color-amber-800: #fcd34d; --color-amber-900: #fde68a;
+  --color-sky-100: #0e2a3d; --color-sky-700: #7dd3fc; --color-sky-800: #bae6fd;
+  --color-orange-100: #3a1f0d; --color-orange-800: #fdba74;
+  --color-emerald-800: #6ee7b7;
+  --color-gray-200: #26304f;
+}
+  html[data-tema="auto"] .bg-white { background-color: var(--superficie); }
+  html[data-tema="auto"] .bg-white\/90, .bg-white\/80 { background-color: color-mix(in oklab, var(--superficie) 90%, transparent); }
+  html[data-tema="auto"] .hover\:bg-white:hover { background-color: var(--superficie); }
+  html[data-tema="auto"] .campo, .tarjeta, .btn-secundario { background-color: var(--superficie); }
+  html[data-tema="auto"] .btn-azul, .bg-azul { background-color: #1e3fa8; }
+  html[data-tema="auto"] .bg-azul.text-white, .bg-azul .text-white { color: #fff; }
+  html[data-tema="auto"] img[src$=".svg"] { filter: none; }
+}
