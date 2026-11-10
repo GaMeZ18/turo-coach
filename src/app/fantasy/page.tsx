@@ -1,5 +1,7 @@
 import Link from "next/link";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { VAPID_PUBLICO } from "@/lib/notificar";
+import AvisosFantasy from "./Avisos";
 import "./fantasy.css";
 import { cargarLiga, quienSoy } from "@/lib/fantasy/datos";
 import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
@@ -17,8 +19,11 @@ import { Camiseta, Escudo, Marco, Nombre, pts } from "./ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Fantasy Turó", description: "La liga fantasy del CB Turó de la Peira", robots: { index: false },
+  manifest: "/fantasy/manifest.webmanifest", appleWebApp: { capable: true, title: "Fantasy Turó", statusBarStyle: "black-translucent" },
   openGraph: { title: "Fantasy Turó", description: "Ficha a 5 jugadores del club cada jornada y suma puntos con sus estadísticas", images: [{ url: "https://coach.cbturo.com/insignias/29-campeon-del-turo.png" }] },
 };
+
+export const viewport: Viewport = { themeColor: "#0a1024" };
 
 const temporadaDe = (dia: string) => { const y = Number(dia.slice(0, 4)), m = Number(dia.slice(5, 7)); const a = m >= 8 ? y : y - 1; return `${a}/${String(a + 1).slice(2)}`; };
 const NIVEL: Record<Nivel, { t: string; color: string; borde: string }> = {
@@ -121,6 +126,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             <EditarPerfil alias={yo.alias} mostrar={yo.mostrar ?? ""} avatar={{ emoji: yo.emoji, color: yo.color, foto: yo.foto }} publico={!yo.perfil_id} />
           </div>
         </div>
+        {!yo.perfil_id && <AvisosFantasy clavePublica={VAPID_PUBLICO} />}
         {l ? (
           <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
             actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null}
@@ -349,6 +355,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             <li>El <strong>suplente</strong> entra solo si un titular no juega.</li>
             <li>A quien fiches una jornada no lo puedes fichar la siguiente (el suplente, solo si llegó a entrar).</li>
             <li>Si alguien juega en dos equipos, eliges con cuál puntúa.</li>
+            <li><strong>¿Quién se puede fichar?</strong> Los jugadores de los equipos que tienen estadísticas de la Federació en cada partido ({[...new Set([...liga.jugadores.values()].map((j) => j.equipo))].sort().join(", ")}). Los equipos de CEEB, minibásquet y los que no tienen estadísticas no salen porque no hay datos para puntuar.</li>
           </ul>
         </Acordeon>
         <Acordeon titulo="🏀 Puntuación (estadísticas de la FCBQ)">
@@ -362,7 +369,13 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <p className="mt-2 fx-suave">Cada uno se puede usar una vez por temporada, y solo uno por jornada.</p>
         </Acordeon>
         <Acordeon titulo="💬 Normas del chat">
-          <p>Se puede picar, pero siempre con respeto: nada de insultos ni de meterse con jugadores, familias o árbitros. El club puede borrar mensajes y silenciar a quien no cumpla.</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Respeto siempre: <strong>sin insultos</strong>, sin burlas ni comentarios ofensivos.</li>
+            <li>No se habla mal de jugadores, entrenadores, familias, árbitros ni rivales.</li>
+            <li>No compartas datos personales (teléfonos, direcciones…) ni fotos de otras personas.</li>
+            <li>Habla del juego, de los partidos y anima al club 💪.</li>
+          </ul>
+          <p className="mt-2 fx-suave">El club puede borrar mensajes y silenciar o dar de baja a quien no cumpla las normas.</p>
         </Acordeon>
       </div>
     );

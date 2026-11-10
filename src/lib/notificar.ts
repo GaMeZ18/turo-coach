@@ -91,3 +91,27 @@ export async function probarPushDe(db: SupabaseClient, perfilId: string) {
   }
   return diag;
 }
+
+/** Aviso a participantes del Fantasy: a los del staff por su cuenta; al resto, a los móviles donde activaron los avisos */
+export async function notificarFantasy(db: SupabaseClient, participantes: { id: string; perfil_id: string | null }[], titulo: string, cuerpo: string, url: string) {
+  const conCuenta = participantes.filter((p) => p.perfil_id).map((p) => p.perfil_id!);
+  if (conCuenta.length) await notificarPerfiles(db, conCuenta, titulo, cuerpo, url, null, true);
+  const ids = participantes.filter((p) => !p.perfil_id).map((p) => p.id);
+  if (!ids.length) return;
+  const { data: subs } = await db.from("fantasy_push").select("endpoint, p256dh, auth").in("participante_id", ids);
+  const privada = process.env.VAPID_PRIVATE_KEY?.trim();
+  if (!privada || !subs?.length) return;
+  try {
+    const webpush = (await import("web-push")).default;
+    webpush.setVapidDetails((process.env.VAPID_SUBJECT || "mailto:info@cbturo.com").trim(), VAPID_PUBLICO, privada);
+    const carga = JSON.stringify({ titulo: titulo.slice(0, 120), cuerpo: cuerpo.length > 400 ? `${cuerpo.slice(0, 397)}…` : cuerpo, url });
+    await Promise.all((subs as Sub[]).map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
+      } catch (e) {
+        const code = (e as { statusCode?: number }).statusCode;
+        if (code === 404 || code === 410) await db.from("fantasy_push").delete().eq("endpoint", s.endpoint);
+      }
+    }));
+  } catch {}
+}

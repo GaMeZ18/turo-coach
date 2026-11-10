@@ -88,6 +88,15 @@ export async function darmeDeBaja(): Promise<R> {
   return { ok: true };
 }
 
+/** Guarda la suscripción de avisos de este móvil (participantes sin cuenta de la app) */
+export async function guardarAvisoFantasy(sub: { endpoint: string; p256dh: string; auth: string }): Promise<{ error?: string }> {
+  const q = await quienSoy();
+  if (!q.participante) return { error: "No estás apuntado." };
+  if (!/^https:\/\//.test(sub.endpoint) || !sub.p256dh || !sub.auth) return { error: "Suscripción no válida." };
+  const { error } = await db().from("fantasy_push").upsert({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, participante_id: q.participante.id });
+  return error ? { error: error.message } : {};
+}
+
 export async function salir() {
   (await cookies()).delete(COOKIE_FANTASY);
   revalidatePath("/fantasy");

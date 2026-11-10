@@ -35,7 +35,7 @@ export default function Chat({ jornada, esAdmin, silenciado }: { jornada: string
       <h2 className="flex items-center gap-2 border-b border-[var(--fx-borde)] px-3 py-2.5 fx-display text-lg"><MessageCircle size={18} className="text-[var(--fx-oro)]" /> Chat de la jornada</h2>
       <div className="max-h-[60vh] space-y-2.5 overflow-y-auto p-3">
         {msgs === null ? <p className="flex items-center gap-1 text-sm fx-suave"><Loader2 size={14} className="animate-spin" /> Cargando…</p>
-          : msgs.length === 0 ? <p className="text-sm fx-suave">Nadie ha escrito todavía. ¡Empieza tú el pique! 😄</p>
+          : msgs.length === 0 ? <p className="text-sm fx-suave">Nadie ha escrito todavía. ¡Sé el primero en escribir! 🏀</p>
           : msgs.map((m) => (
             <div key={m.id} className={`flex items-end gap-2 ${m.yo ? "justify-end" : "justify-start"}`}>
               {!m.yo && <Escudo alias={m.alias} emoji={m.emoji} color={m.color} foto={m.foto} size={30} />}

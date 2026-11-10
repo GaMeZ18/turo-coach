@@ -169,14 +169,15 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
       const { nombreJornada } = await import("./fantasy/motor");
       const cfg = await leerConfig();
       const { liga, participantes } = await cargarLiga(cfg);
-      const conCuenta = participantes.filter((p) => p.perfil_id && (cfg.abierto || p.perfil_id === ADMIN_FANTASY));
+      const { notificarFantasy } = await import("./notificar");
+      const conCuenta = participantes.filter((p) => cfg.abierto || p.perfil_id === ADMIN_FANTASY);
       if (diaSemana === 5 && !cfg.cerrada) {
         const l = liga.abierta, cierre = l ? liga.cierre(l) : "";
         if (l && cierre > new Date(ahora).toISOString()) {
           for (const p of conCuenta) {
             if (liga.alineacion(p.id, l)) continue;
-            await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarPerfiles(db, [p.perfil_id!], "🏆 Fantasy: ¡haz tu equipo!",
-              `${nombreJornada(cfg.inicio, l)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy", null, true));
+            await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarFantasy(db, [p], "🏆 Fantasy: ¡haz tu equipo!",
+              `${nombreJornada(cfg.inicio, l)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
           }
         }
       }
@@ -187,8 +188,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
           const r = ranking.find((x) => x.id === p.id);
           if (!l || !r) continue;
           const pos = liga.general.findIndex((g) => g.id === p.id) + 1;
-          await unaVez(`fantasy-puntos:${l}:${p.id}`, () => notificarPerfiles(db, [p.perfil_id!], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
-            `${nombreJornada(cfg.inicio, l)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion", null, true));
+          await unaVez(`fantasy-puntos:${l}:${p.id}`, () => notificarFantasy(db, [p], `🏆 Fantasy: ${r.total.toLocaleString("es-ES")} puntos`,
+            `${nombreJornada(cfg.inicio, l)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
         }
       }
     }
