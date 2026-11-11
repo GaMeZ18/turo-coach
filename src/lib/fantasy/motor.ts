@@ -461,7 +461,7 @@ export function calcularLiga(e: Entrada) {
   };
 
   return {
-    duos, precioDuo, semanaDuo,
+    duos, precioDuo, semanaDuo, resDuo,
     jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas, proxima, lunesHoy, descansoHoy,
     cierre: (l: string) => cierreDe(l, e.partidos, pool),
     descansan: (l: string) => descansan(l, e.partidos, pool),

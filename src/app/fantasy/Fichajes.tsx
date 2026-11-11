@@ -134,7 +134,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, duos 
                   <li key={d.id} className={`flex items-center gap-2.5 px-3 py-2 ${on ? "bg-[var(--fx-oro)]/10" : d.bloqueado ? "opacity-55" : ""}`}>
                     <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-white/10 text-lg">📋</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{d.nombre}</p>
+                      <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(d.id)}`} className="block truncate font-semibold underline-offset-2 hover:underline">{d.nombre} <span className="text-[11px] font-normal text-[var(--fx-oro)]">📈</span></Link>
                       <p className="flex flex-wrap items-center gap-x-2 text-[11px] fx-suave"><Sigla equipo={d.equipo} /><span>Media {d.media !== null ? n(d.media) : "–"}</span><span>Últ: {d.ultimo !== null ? n(d.ultimo) : "–"}</span></p>
                       {d.descansa ? <p className="text-[11px] font-semibold text-amber-300"><Moon size={10} className="inline" /> Descansa</p> : d.rival && <p className="truncate text-[11px] text-white/80">🏀 {d.rival}</p>}
                       {d.bloqueado && <p className="text-[11px] font-semibold text-red-400"><Lock size={10} className="inline" /> Bloqueado</p>}
@@ -164,7 +164,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, duos 
               <li key={j.id} className={`flex items-center gap-2.5 px-3 py-2 ${dentro ? "bg-[var(--fx-oro)]/10" : no ? "opacity-55" : ""}`}>
                 <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={34} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{j.nombre}</p>
+                  <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(j.id)}`} className="block truncate font-semibold underline-offset-2 hover:underline">{j.nombre} <span className="text-[11px] font-normal text-[var(--fx-oro)]">📈</span></Link>
                   <p className="flex flex-wrap items-center gap-x-2 text-[11px] fx-suave">
                     <Sigla equipo={j.equipo} />
                     <span>Media {j.media !== null ? n(j.media) : "–"}</span>
@@ -213,7 +213,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, duos 
       <div className="flex items-center gap-2.5 rounded-xl bg-[#0c1430] px-2.5 py-2">
         <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={32} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{j.nombre}</p>
+          <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(j.id)}`} className="block truncate font-semibold">{j.nombre}</Link>
           <p className="flex min-w-0 gap-2 text-[11px] fx-suave"><Sigla equipo={j.equipo} /> {j.descansa ? <span className="font-semibold text-amber-300">Descansa</span> : j.rival && <span className="truncate text-white/80">{j.rival}</span>}</p>
         </div>
         <span className="text-sm font-bold">{j.precio}⭐</span>

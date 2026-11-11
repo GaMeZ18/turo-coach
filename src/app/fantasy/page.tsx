@@ -16,6 +16,7 @@ import Chat from "./Chat";
 import Celebracion from "./Celebracion";
 import { EditarPerfil } from "./Perfil";
 import { MiJornada } from "./Piezas";
+import { BarrasPuntos, GraficaPrecio } from "./Bolsa";
 import { Camiseta, Escudo, Marco, Nombre, pts } from "./ui";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ function Acordeon({ titulo, children, abierto = false }: { titulo: React.ReactNo
   );
 }
 
-export default async function FantasyPage({ searchParams }: { searchParams: Promise<{ v?: string; j?: string; t?: string; i?: string }> }) {
+export default async function FantasyPage({ searchParams }: { searchParams: Promise<{ v?: string; j?: string; t?: string; i?: string; id?: string }> }) {
   const sp = await searchParams;
   const q = await quienSoy();
   const temporada = temporadaDe(hoyLocal());
@@ -75,7 +76,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = ["equipo", "mercado", "clasificacion", "jornada", "calendario", "insignias", "reglas"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const vista = ["equipo", "mercado", "clasificacion", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
   const part = new Map(participantes.map((p) => [p.id, p]));
   const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
@@ -84,7 +85,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   const misInsignias = liga.insignias(yo.id);
   const campeon = q.config.cerrada && q.config.campeon ? part.get(q.config.campeon)?.alias ?? null : null;
 
-  const clasif = vista === "equipo" || vista === "mercado" || vista === "jornada" ? await cargarClasificaciones() : new Map();
+  const clasif = ["equipo", "mercado", "jornada", "jugador"].includes(vista) ? await cargarClasificaciones() : new Map();
   /** Rival de cada equipo esa semana, con su posición: «vs Nou Barris (5º)» */
   const rivalDe = (equipoId: string, l: string) => {
     const p = partidos.filter((x) => x.equipo_id === equipoId && lunesDe(diaInput(x.fecha)) === l).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
@@ -370,6 +371,98 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         )}
       </div>
     );
+  }
+
+  if (vista === "jugador") {
+    const id = sp.id ?? "";
+    const esDuo = id.startsWith("duo:");
+    const j = esDuo ? undefined : liga.jugadores.get(id);
+    const d = esDuo ? liga.duos.get(id) : undefined;
+    if (!j && !d) {
+      cuerpo = <div className="space-y-3"><Link href="/fantasy?v=mercado" className="fx-btn-sec">← Mercado</Link><p className="fx-card p-4 text-sm fx-suave">No encuentro a ese jugador.</p></div>;
+    } else {
+      const equipoId = j?.equipoId ?? d!.equipoId, equipoNom = j?.equipo ?? d!.equipo, nombre = j?.nombre ?? d!.nombre;
+      const precioEn = (l: string) => (esDuo ? liga.precioDuo(l) : liga.precio(l)).get(id);
+      const puntosEn = (l: string) => { const x = (esDuo ? liga.semanaDuo(l) : liga.semana(l)).get(id); return x?.jugo ? x.puntos : null; };
+      // Semanas desde su primer partido hasta la jornada que se ficha ahora (o la siguiente)
+      const fechas = esDuo ? liga.resDuo.filter((r) => r.id === id).map((r) => r.lunes) : liga.actuaciones.filter((a) => a.jugador === id).map((a) => a.lunes);
+      const primera = fechas.sort()[0] ?? liga.lunesHoy;
+      const hasta = liga.abierta ?? sumarDias(liga.lunesHoy, 7);
+      const semanas: string[] = [];
+      for (let l = sumarDias(primera, 7); l <= hasta; l = sumarDias(l, 7)) semanas.push(l);
+      const etiqueta = (l: string) => new Date(`${l}T12:00:00Z`).toLocaleDateString("es-ES", { day: "numeric", month: "short" }).replace(".", "");
+      const serie = semanas.map((l) => ({ etiqueta: etiqueta(l), precio: precioEn(l)?.precio ?? 0 })).filter((x) => x.precio);
+      const actual = precioEn(hasta) ?? { precio: 0, media: null, pj: 0 };
+      const antes = serie.length > 1 ? serie[serie.length - 2].precio : actual.precio;
+      const inicial = serie[0]?.precio ?? actual.precio;
+      const pct = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : 0);
+      const cambio = actual.precio - antes, cambioPct = pct(actual.precio, antes), totalPct = pct(actual.precio, inicial);
+      const maxP = serie.length ? Math.max(...serie.map((x) => x.precio)) : actual.precio, minP = serie.length ? Math.min(...serie.map((x) => x.precio)) : actual.precio;
+      const puntosSem = [...new Set(fechas)].sort().slice(-10).map((l) => ({ etiqueta: etiqueta(l), puntos: puntosEn(l) }));
+      // Popularidad: cuántos lo tienen en la jornada actual
+      const jActual = liga.abierta ?? liga.enJuego ?? liga.cerradas[liga.cerradas.length - 1];
+      const conEquipo = jActual ? participantes.filter((p) => liga.alineacion(p.id, jActual)) : [];
+      const loTienen = jActual ? conEquipo.filter((p) => { const al = liga.alineacion(p.id, jActual)!; return esDuo ? al.duo?.id === id : al.titulares.some((t) => t.id === id) || al.suplente?.id === id; }).length : 0;
+      const proximo = rivalDe(equipoId, hasta);
+      const partidoDe = new Map(partidos.map((p) => [p.id, p]));
+      const lista = esDuo
+        ? liga.resDuo.filter((r) => r.id === id).sort((a, b) => b.fecha.localeCompare(a.fecha)).map((r) => {
+            const p = partidoDe.get(r.partidoId);
+            return { k: r.partidoId, fecha: r.fecha, rival: `${p?.local ? "vs" : "@"} ${p?.rival ?? "?"}`, linea: `${p?.puntos_favor}-${p?.puntos_contra} · ${(p?.puntos_favor ?? 0) > (p?.puntos_contra ?? 0) ? "victoria" : "derrota"}`, puntos: r.puntos as number | null };
+          })
+        : liga.actuaciones.filter((a) => a.jugador === id).sort((a, b) => b.fecha.localeCompare(a.fecha)).map((a) => {
+            const p = a.partidoId ? partidoDe.get(a.partidoId) : undefined;
+            return { k: a.partido, fecha: a.fecha, rival: p ? `${p.local ? "vs" : "@"} ${p.rival ?? "?"}` : a.s.marcador, linea: a.jugo ? `${a.s.pts} pts · ${a.s.min}' · ${a.s.mm > 0 ? "+" : ""}${a.s.mm} · ${a.s.fc} F${a.s.titular ? " · titular" : ""}` : "No jugó", puntos: a.jugo ? a.puntos : null };
+          });
+      cuerpo = (
+        <div className="space-y-3">
+          <Link href="/fantasy?v=mercado" className="fx-btn-sec">← Mercado</Link>
+          <section className="fx-card p-4">
+            <div className="flex items-center gap-3">
+              {j ? <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={52} /> : <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white/10 text-2xl">📋</span>}
+              <div className="min-w-0 flex-1">
+                <h1 className="fx-display break-words text-2xl leading-tight">{nombre}</h1>
+                <p className="text-xs fx-suave">{esDuo ? "Dúo técnico · " : j?.dorsal ? `#${j.dorsal} · ` : ""}{equipoNom}</p>
+                {proximo && <p className="text-xs text-white/80">🏀 Próximo: {proximo}</p>}
+              </div>
+              <div className="text-right">
+                <p className="fx-display text-4xl leading-none">{actual.precio}<span className="text-2xl">⭐</span></p>
+                <p className={`text-sm font-bold ${cambio > 0 ? "text-green-400" : cambio < 0 ? "text-red-400" : "fx-suave"}`}>{cambio > 0 ? "▲" : cambio < 0 ? "▼" : "="} {cambio > 0 ? "+" : ""}{cambio} ({cambioPct > 0 ? "+" : ""}{cambioPct}%)</p>
+                <p className="text-[10px] fx-suave">vs. semana anterior</p>
+              </div>
+            </div>
+            <div className="mt-3"><GraficaPrecio datos={serie} /></div>
+            <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+              {[["Desde el inicio", `${totalPct > 0 ? "+" : ""}${totalPct}%`, totalPct > 0 ? "text-green-400" : totalPct < 0 ? "text-red-400" : ""], ["Máximo", `${maxP}⭐`, ""], ["Mínimo", `${minP}⭐`, ""], ["Media", actual.media !== null ? pts(actual.media) : "–", "text-[var(--fx-oro)]"]].map(([t, v, c]) => (
+                <div key={t} className="rounded-lg bg-black/25 px-1 py-1.5"><p className={`text-base font-bold ${c}`}>{v}</p><p className="text-[10px] fx-suave">{t}</p></div>
+              ))}
+            </div>
+            {jActual && conEquipo.length > 0 && <p className="mt-3 text-center text-xs fx-suave">👥 Lo tienen <strong className="text-white">{loTienen} de {conEquipo.length}</strong> equipos esta jornada ({Math.round((loTienen / conEquipo.length) * 100)}%)</p>}
+          </section>
+          {puntosSem.length > 0 && (
+            <section className="fx-card p-3">
+              <h2 className="font-semibold">Puntos Fantasy por jornada</h2>
+              <BarrasPuntos datos={puntosSem} />
+            </section>
+          )}
+          <section className="fx-card overflow-hidden">
+            <h2 className="border-b border-[var(--fx-borde)] px-3 py-2 font-semibold">{esDuo ? "Resultados" : "Partidos"}</h2>
+            {lista.length === 0 ? <p className="p-3 text-sm fx-suave">Aún no hay partidos.</p> : (
+              <ul className="fx-sep">
+                {lista.map((x) => (
+                  <li key={x.k} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                    <span className="w-14 shrink-0 text-[11px] fx-suave">{new Date(x.fecha).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: "Europe/Madrid" })}</span>
+                    <div className="min-w-0 flex-1"><p className="truncate font-semibold">{x.rival}</p><p className="truncate text-[11px] fx-suave">{x.linea}</p></div>
+                    {x.puntos === null ? <span className="text-xs fx-suave">—</span> : <span className={x.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(x.puntos)} pts</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <p className="text-center text-[11px] fx-suave">El precio de cada semana sale de la media de sus últimas 4 jornadas. Se fija el lunes a las 9:30.</p>
+        </div>
+      );
+    }
   }
 
   if (vista === "calendario") {
