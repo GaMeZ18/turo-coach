@@ -171,3 +171,43 @@ export async function sincronizarPlantillas(equipoIds: string[]) {
   }
   return altas;
 }
+
+// ---------- Seguimiento del jugador (solo staff): notas privadas y objetivos individuales ----------
+export async function anadirNotaJugador(jugadorId: string, texto: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const t = texto.trim().slice(0, 2000);
+  if (!t) return { error: "Escribe la nota." };
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from("jugador_notas").insert({ jugador_id: jugadorId, texto: t, autor_id: u.user?.id });
+  if (error) return { error: error.message };
+  revalidatePath(`/jugadores/${jugadorId}`);
+  return {};
+}
+
+export async function borrarNotaJugador(jugadorId: string, id: string) {
+  const supabase = await createClient();
+  check(await supabase.from("jugador_notas").delete().eq("id", id));
+  revalidatePath(`/jugadores/${jugadorId}`);
+}
+
+export async function anadirObjetivoJugador(jugadorId: string, texto: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const t = texto.trim().slice(0, 300);
+  if (!t) return { error: "Escribe el objetivo." };
+  const { error } = await supabase.from("jugador_objetivos").insert({ jugador_id: jugadorId, texto: t });
+  if (error) return { error: error.message };
+  revalidatePath(`/jugadores/${jugadorId}`);
+  return {};
+}
+
+export async function estadoObjetivoJugador(jugadorId: string, id: string, estado: "en_curso" | "conseguido" | "descartado") {
+  const supabase = await createClient();
+  check(await supabase.from("jugador_objetivos").update({ estado, cerrado_en: estado === "en_curso" ? null : new Date().toISOString() }).eq("id", id));
+  revalidatePath(`/jugadores/${jugadorId}`);
+}
+
+export async function borrarObjetivoJugador(jugadorId: string, id: string) {
+  const supabase = await createClient();
+  check(await supabase.from("jugador_objetivos").delete().eq("id", id));
+  revalidatePath(`/jugadores/${jugadorId}`);
+}

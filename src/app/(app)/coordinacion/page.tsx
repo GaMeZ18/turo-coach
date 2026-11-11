@@ -1,3 +1,4 @@
+import { FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
@@ -100,6 +101,7 @@ export default async function Coordinacion() {
           <p className="text-sm text-tinta/60">Temporada {temporada?.nombre ?? ""} · semana del {fechaCorta(iniSemana)} · {equipos.length} equipos</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <a href="/api/exportar?equipo=todos" download className="btn-secundario"><FileSpreadsheet size={16} /> Exportar todo a Excel</a>
           <Link href="/coordinacion/asistencia" className="btn-secundario"><Users size={16} /> Asistencia general</Link>
           <Link href="/coordinacion/avisos" className="btn-secundario"><BellRing size={16} /> Avisos activados</Link>
           <Link href="/coordinacion/visitas" className="btn-secundario"><Eye size={16} /> Visitas</Link>

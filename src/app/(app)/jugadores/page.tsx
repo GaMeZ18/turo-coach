@@ -1,3 +1,4 @@
+import { FileSpreadsheet } from "lucide-react";
 import { hoyLocal } from "@/lib/fechas";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
@@ -53,7 +54,10 @@ export default async function JugadoresPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Jugadores</h1>
-      <p className="text-sm text-tinta/60">{equipo.nombre} · {filas.length} jugadores</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-tinta/60">{equipo.nombre} · {filas.length} jugadores</p>
+        <a href={`/api/exportar?equipo=${equipo.id}`} className="btn-secundario !py-1.5 text-sm" download><FileSpreadsheet size={15} /> Exportar a Excel</a>
+      </div>
       {!equipo.congelado && <PlantillaFCBQ key={`${equipo.id}-${candidatos.length}-${cambios.length}`} equipoId={equipo.id} candidatos={candidatos} cambios={cambios} />}
 
       <div className="tarjeta mt-5 overflow-x-auto">

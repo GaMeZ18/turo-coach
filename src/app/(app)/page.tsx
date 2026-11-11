@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   Package,
@@ -8,6 +9,7 @@ import { veFantasy } from "@/lib/fantasy/menu";
 import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import InstalarApp from "@/components/InstalarApp";
+import ProximoRival from "@/components/ProximoRival";
 
 const MODULOS = [
   { href: "/equipos", titulo: "Equipos", texto: "Equipos de la temporada y su staff", icono: Shield },
@@ -53,6 +55,7 @@ export default async function Inicio() {
       <div className="mt-4">
         <InstalarApp />
       </div>
+      {activo && <Suspense fallback={null}><ProximoRival supabase={supabase} equipoId={activo.id} /></Suspense>}
 
       <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[

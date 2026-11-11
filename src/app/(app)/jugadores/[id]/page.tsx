@@ -7,6 +7,7 @@ import Enviar from "@/components/Enviar";
 import EstadisticasJugador from "./EstadisticasJugador";
 import VideoJugador from "./VideoJugador";
 import NoDisponible from "./NoDisponible";
+import Seguimiento, { type NotaJ, type ObjetivoJ } from "./Seguimiento";
 import { hoyLocal } from "@/lib/fechas";
 
 const ESTADOS: Record<string, string> = {
@@ -15,10 +16,10 @@ const ESTADOS: Record<string, string> = {
 
 export default async function FichaJugador({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase, perfil } = await requireUser();
+  const { supabase, perfil, user } = await requireUser();
   const equipo = await equipoActivo(supabase);
 
-  const [{ data: j }, { data: rel }, { data: historial }] = await Promise.all([
+  const [{ data: j }, { data: rel }, { data: historial }, { data: notasR }, { data: objR }] = await Promise.all([
     supabase.from("jugadores").select("*").eq("id", id).maybeSingle(),
     equipo
       ? supabase.from("equipo_jugadores").select("dorsal, posicion").eq("equipo_id", equipo.id).eq("jugador_id", id).maybeSingle()
@@ -28,6 +29,8 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
       .select("estado, motivo, entrenamientos(fecha, titulo)")
       .eq("jugador_id", id)
       .limit(60),
+    supabase.from("jugador_notas").select("id, texto, created_at, autor_id, perfiles!jugador_notas_autor_id_fkey(nombre)").eq("jugador_id", id).order("created_at", { ascending: false }).limit(200),
+    supabase.from("jugador_objetivos").select("id, texto, estado, created_at, cerrado_en").eq("jugador_id", id).order("created_at"),
   ]);
   if (!j) notFound();
 
@@ -70,6 +73,10 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
           <Enviar className="btn-peligro !px-0" confirmar={`¿Quitar a ${j.nombre} de ${equipo.nombre}?`}>Quitar de {equipo.nombre}</Enviar>
         </form>
       )}
+
+      <Seguimiento jugadorId={j.id} nombre={j.nombre} yo={user.id} coordinador={perfil.rol === "coordinador"}
+        notas={((notasR ?? []) as unknown as (Omit<NotaJ, "autor"> & { perfiles: { nombre: string | null } | null })[]).map(({ perfiles, ...n }) => ({ ...n, autor: perfiles?.nombre ?? null }))}
+        objetivos={(objR ?? []) as ObjetivoJ[]} />
 
       <EstadisticasJugador supabase={supabase} jugador={{ id: j.id, nombre: j.nombre, apellidos: j.apellidos }} />
 

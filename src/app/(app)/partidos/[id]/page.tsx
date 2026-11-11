@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
+import { diaInput, fechaCorta, fechaLarga, hora, horaInput } from "@/lib/fechas";
+import { informePartido } from "@/lib/informe-partido";
+import InformePartido from "./InformePartido";
 import Enviar from "@/components/Enviar";
 import { anadirSistemaPartido, borrarPartido, editarPartido, guardarPrevia, guardarResultado, quitarSistemaPartido } from "../actions";
 import BoxScore, { Parciales } from "@/components/BoxScore";
@@ -142,6 +144,8 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           </div>
         </section>
       )}
+
+      {st && (() => { const inf = informePartido(st); return inf ? <InformePartido inf={inf} equipo={equipo} fecha={fechaCorta(p.fecha)} /> : null; })()}
 
       {/* Estadísticas de la FCBQ */}
       {st && (
