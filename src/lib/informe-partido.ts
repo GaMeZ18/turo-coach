@@ -10,7 +10,9 @@ export type InformePartido = {
   cronica: string;
 };
 
-const nombreBonito = (n: string) => n.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase()).replace(/,\s*/, " ");
+const MINUS = new Set(["de", "la", "el", "i", "y", "del", "les", "els"]);
+const nombreBonito = (n: string) => n.toLowerCase().replace(/,\s*/, " ").split(/\s+/).filter(Boolean)
+  .map((w) => (w.length <= 2 && !MINUS.has(w) ? w.toUpperCase() : MINUS.has(w) ? w : w.replace(/^\p{L}/u, (m) => m.toUpperCase()))).join(" ");
 /** «PUIG SOLER, MARC» → «Marc Puig» */
 export const nombreJugador = (n: string) => {
   const [ap, nom] = n.split(",").map((x) => x.trim());
@@ -70,7 +72,7 @@ export function informePartido(st: StatsPartido): InformePartido | null {
   if (peor && peor.a < peor.b && peor !== mejor) claves.push(`Peor cuarto: el ${peor.n}º (${peor.a}-${peor.b}).`);
   const r = rachas(st, somosLocal);
   if (r.hay) {
-    if (r.nuestra >= 6) claves.push(`Parcial de ${r.nuestra}-0 a favor en el mejor momento.`);
+    if (r.nuestra >= 6) claves.push(`Mejor parcial a favor: ${r.nuestra}-0.`);
     if (r.suya >= 6) claves.push(`El rival llegó a hacer un ${r.suya}-0.`);
     if (r.maxVentaja >= 5) claves.push(`Máxima ventaja: +${r.maxVentaja}.`);
     if (r.maxDesventaja >= 5) claves.push(`Máxima desventaja: −${r.maxDesventaja}.`);
@@ -78,7 +80,7 @@ export function informePartido(st: StatsPartido): InformePartido | null {
   claves.push(`Tiros libres: ${yo.tlm}/${yo.tla} (${pct(yo.tlm, yo.tla)}%) · rival ${el.tlm}/${el.tla} (${pct(el.tlm, el.tla)}%).`);
   if (yo.t3 || el.t3) claves.push(`Triples: ${yo.t3} nuestros, ${el.t3} del rival.`);
   const anotadores = jug.filter((j) => j.pts > 0).length;
-  claves.push(`${plural(anotadores, "jugador", "jugadores")} anotaron y ${plural(jug.length, "jugó", "jugaron")}.`);
+  claves.push(`Anotaron ${anotadores} de ${plural(jug.length, "jugador que jugó", "jugadores que jugaron")}.`);
   claves.push(`Faltas: ${yo.fc} nuestras, ${el.fc} del rival.`);
 
   // Crónica corta
@@ -89,7 +91,7 @@ export function informePartido(st: StatsPartido): InformePartido | null {
   const escapada = !gana && r.hay && r.maxVentaja >= 6 ? ` después de ir ganando de ${r.maxVentaja}` : "";
   let cronica = `${tipo} ${somosLocal ? "en casa" : "a domicilio"} contra ${rival} (${yo.pts}-${el.pts})${remontada}${escapada}.`;
   if (mejor && mejor.a > mejor.b) cronica += ` La clave estuvo en el ${mejor.n}º cuarto, ganado ${mejor.a}-${mejor.b}.`;
-  if (mvp) cronica += ` ${nombreJugador(mvp.nombre)} fue el más destacado con ${plural(mvp.pts, "punto")}${mvp.mm > 0 ? ` y un +${mvp.mm} en pista` : ""}.`;
+  if (mvp) cronica += ` Destacó ${nombreJugador(mvp.nombre)}, con ${plural(mvp.pts, "punto")}${mvp.mm > 0 ? ` y un +${mvp.mm} en pista` : ""}.`;
   if (anotadores >= 7) cronica += ` Buen reparto: anotaron ${anotadores} jugadores.`;
 
   return { nuestro: nombreBonito(yo.nombre), rival, pf: yo.pts, pc: el.pts, gana, local: somosLocal, parciales, destacados, claves, cronica };
