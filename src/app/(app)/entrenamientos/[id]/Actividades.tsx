@@ -9,6 +9,7 @@ import {
 import Enviar from "@/components/Enviar";
 import FichaEjercicio, { useFicha } from "@/components/FichaEjercicio";
 import SelectorEjercicios, { type EjercicioLista } from "./SelectorEjercicios";
+import Cronometro from "./Cronometro";
 
 type Actividad = {
   id: string; orden: number; tipo: string; titulo: string | null; duracion: number; notas: string | null;
@@ -77,6 +78,7 @@ export default function Actividades({
 }) {
   const [lista, setLista] = useState(actividades);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
+  const [sobre, setSobre] = useState<number | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [, start] = useTransition();
   const formAlta = useRef<HTMLFormElement>(null);
@@ -95,13 +97,35 @@ export default function Actividades({
     start(() => reordenarActividades(entrenoId, nueva.map((x) => x.id)));
   };
 
+  // Arrastrar con el dedo o el ratón desde el asa (⋮⋮): funciona también en el móvil
+  const empezarArrastre = (i: number) => (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setArrastrando(i); setSobre(i);
+  };
+  const moverArrastre = (e: React.PointerEvent<HTMLElement>) => {
+    if (arrastrando === null) return;
+    const li = document.elementFromPoint(e.clientX, e.clientY)?.closest("li[data-idx]") as HTMLElement | null;
+    if (li) setSobre(Number(li.dataset.idx));
+    if (e.clientY < 90) window.scrollBy(0, -12);
+    else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 12);
+  };
+  const soltar = () => { if (arrastrando !== null && sobre !== null) mover(arrastrando, sobre); setArrastrando(null); setSobre(null); };
+  const marcarHecho = (id: string) => {
+    if (lista.find((x) => x.id === id)?.hecho) return;
+    setLista((l) => l.map((x) => (x.id === id ? { ...x, hecho: true } : x)));
+    start(() => actualizarActividad(entrenoId, id, { hecho: true }));
+  };
+
   let acumulado = 0;
   const t0 = new Date(inicio).getTime();
 
   return (
     <section>
       <div className="flex items-baseline justify-between">
-        <h2 className="font-semibold">Sesión</h2>
+        <h2 className="flex items-center gap-2 font-semibold">Sesión
+          <Cronometro onHecho={marcarHecho} pasos={lista.filter((a) => a.duracion > 0).map((a) => ({ id: a.id, tipo: a.tipo, duracion: a.duracion, notas: a.notas, titulo: a.titulo ?? a.ejercicios?.titulo ?? (TIPOS[a.tipo] ?? TIPOS.nota).label }))} />
+        </h2>
         <span className={`text-sm tabular-nums ${exceso ? "font-semibold text-red-700" : "text-tinta/60"}`}>
           {total} / {prevista} min {exceso && `· te pasas ${total - prevista}′`}
         </span>
@@ -132,14 +156,12 @@ export default function Actividades({
           return (
             <li
               key={a.id}
-              draggable
-              onDragStart={() => setArrastrando(i)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => { if (arrastrando !== null) mover(arrastrando, i); setArrastrando(null); }}
-              className={`tarjeta p-3 ${arrastrando === i ? "opacity-50" : ""} ${a.hecho ? "bg-green-50 ring-1 ring-green-300" : ""}`}
+              data-idx={i}
+              className={`tarjeta p-3 ${arrastrando === i ? "opacity-50" : ""} ${sobre === i && arrastrando !== null && arrastrando !== i ? "ring-2 ring-azul" : ""} ${a.hecho ? "bg-green-50 ring-1 ring-green-300" : ""}`}
             >
               <div className="flex items-center gap-2">
-                <GripVertical size={16} className="hidden shrink-0 cursor-grab text-tinta/30 sm:block" />
+                <span onPointerDown={empezarArrastre(i)} onPointerMove={moverArrastre} onPointerUp={soltar} onPointerCancel={() => { setArrastrando(null); setSobre(null); }}
+                  className="-ml-1 shrink-0 cursor-grab touch-none select-none p-1 text-tinta/30 active:cursor-grabbing" title="Arrastra para mover"><GripVertical size={16} /></span>
                 <button
                   type="button" aria-pressed={!!a.hecho} title={a.hecho ? "Hecho (toca para desmarcar)" : "Marcar como hecho"}
                   onClick={() => { const v = !a.hecho; setLista((l) => l.map((x) => (x.id === a.id ? { ...x, hecho: v } : x))); start(() => actualizarActividad(entrenoId, a.id, { hecho: v })); }}

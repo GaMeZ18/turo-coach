@@ -17,6 +17,7 @@ import { Copy, LayoutTemplate, Pencil, Printer, Trash2 } from "lucide-react";
 import Enviar from "@/components/Enviar";
 import ListaPistas from "@/components/ListaPistas";
 import { solapes, type Ocupacion, type Pista } from "@/lib/pistas";
+import { noDisponibleEn, type NoDisponible, type Respuesta } from "@/lib/asistencia";
 
 /** Edad de la biblioteca que corresponde al equipo ("U18 A" → Junior, "Sènior" → Sénior…) */
 function edadDe(t: string): string | null {
@@ -40,7 +41,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!e) notFound();
 
-  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }, { data: favs }, { data: comentarios }] = await Promise.all([
+  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }, { data: favs }, { data: comentarios }, { data: respR }] = await Promise.all([
     supabase
       .from("entreno_actividades")
       .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, hecho, ejercicio_id, ejercicios(titulo, preview, descripcion)")
@@ -50,7 +51,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles!ejercicios_autor_id_fkey(nombre)").order("titulo").range(d, h)),
     supabase
       .from("equipo_jugadores")
-      .select("dorsal, jugadores(id, nombre, apellidos)")
+      .select("dorsal, jugadores(id, nombre, apellidos, no_disponible_hasta, no_disponible_motivo)")
       .eq("equipo_id", e.equipo_id),
     supabase.from("asistencias").select("jugador_id, estado, motivo").eq("entrenamiento_id", id),
     // Planificaciones del club y de este equipo (si aún no existe la tabla, simplemente no hay)
@@ -59,6 +60,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     supabase.from("temporadas").select("id").eq("actual", true).maybeSingle(),
     supabase.from("ejercicio_favoritos").select("ejercicio_id").eq("perfil_id", user.id),
     supabase.from("entreno_comentarios").select("id, texto, visita, created_at, autor_id, perfiles!entreno_comentarios_autor_id_fkey(nombre)").eq("entrenamiento_id", id).order("created_at"),
+    supabase.from("respuestas_asistencia").select("jugador_id, va, motivo_tipo, motivo").eq("entrenamiento_id", id),
   ]);
   // ¿Coincide en la pista con otro equipo?
   let choque: string[] = [];
@@ -81,9 +83,14 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     .sort((a, b) => (a.equipo_id ? 0 : 1) - (b.equipo_id ? 0 : 1))
     .map((p) => ({ id: p.id, nombre: p.nombre, club: !p.equipo_id, objetivos: p.objetivos ?? [] }));
 
-  const jugadores = ((plantilla ?? []) as unknown as {
-    dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null };
-  }[])
+  const filasPl = (plantilla ?? []) as unknown as {
+    dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null; no_disponible_hasta: string | null; no_disponible_motivo: string | null };
+  }[];
+  const diaEntreno = diaInput(e.fecha);
+  const noDisp: Record<string, NoDisponible> = Object.fromEntries(filasPl.filter((p) => noDisponibleEn(p.jugadores.no_disponible_hasta, diaEntreno))
+    .map((p) => [p.jugadores.id, { hasta: p.jugadores.no_disponible_hasta!, motivo: p.jugadores.no_disponible_motivo }]));
+  const respuestas: Record<string, Respuesta> = Object.fromEntries(((respR ?? []) as (Respuesta & { jugador_id: string })[]).map(({ jugador_id, ...r }) => [jugador_id, r]));
+  const jugadores = filasPl
     .map((p) => ({ id: p.jugadores.id, nombre: `${p.jugadores.nombre} ${p.jugadores.apellidos ?? ""}`.trim(), dorsal: p.dorsal }))
     .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
 
@@ -163,7 +170,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           favoritos={(favs ?? []).map((f) => f.ejercicio_id as string)}
           edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
         />
-        <div id="asistencia" className="scroll-mt-28"><Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} /></div>
+        <div id="asistencia" className="scroll-mt-28"><Asistencia entrenoId={e.id} jugadores={jugadores} registros={asistencias ?? []} respuestas={respuestas} noDisp={noDisp} equipoId={e.equipo_id} equipo={(e.equipos as { nombre: string } | null)?.nombre ?? "Equipo"} /></div>
       </div>
 
       <div id="comentarios" className="scroll-mt-28">

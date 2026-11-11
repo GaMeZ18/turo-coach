@@ -6,6 +6,8 @@ import { guardarJugador, quitarDelEquipo } from "../actions";
 import Enviar from "@/components/Enviar";
 import EstadisticasJugador from "./EstadisticasJugador";
 import VideoJugador from "./VideoJugador";
+import NoDisponible from "./NoDisponible";
+import { hoyLocal } from "@/lib/fechas";
 
 const ESTADOS: Record<string, string> = {
   presente: "Presente", ausente: "Ausente", justificado: "Justificado", lesionado: "Lesionado", tarde: "Tarde",
@@ -37,6 +39,7 @@ export default async function FichaJugador({ params }: { params: Promise<{ id: s
     <div className="max-w-3xl">
       <Link href="/jugadores" className="text-sm text-tinta/60 hover:underline">← Jugadores</Link>
       <h1 className="mt-1 text-2xl font-semibold">{j.nombre} {j.apellidos}</h1>
+      <NoDisponible jugadorId={j.id} hasta={j.no_disponible_hasta ?? null} motivo={j.no_disponible_motivo ?? null} hoy={hoyLocal()} />
 
       <form action={guardarJugador} className="tarjeta mt-5 grid gap-3 p-4 sm:grid-cols-2">
         <input type="hidden" name="jugador_id" value={j.id} />

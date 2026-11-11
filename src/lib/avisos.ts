@@ -162,6 +162,72 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     }
   }
 
+  // 9) Enlace de asistencia: lunes desde las 10:00, recordar a los equipos que lo usan que lo manden al grupo
+  try {
+    if (diaSemana === 1 && horaLocal >= 10) {
+      const { data: conEnlace } = await db.from("equipos").select("id").in("id", ids).not("asistencia_token", "is", null);
+      for (const eq of (conEnlace ?? []) as { id: string }[]) {
+        if (!staff(eq.id).length) continue;
+        await unaVez(`enlace-asis:${lunes}:${eq.id}`, () => notificarPerfiles(db, staff(eq.id),
+          `📲 Asistencia de la semana · ${nombre(eq.id)}`, "Manda el enlace al grupo para que cada uno diga si viene a los entrenos y al partido.", "/entrenamientos", eq.id));
+      }
+    }
+
+    // 10) El día del entreno o partido (a las 12:00, o 3 h antes si es antes): resumen de lo que han respondido
+    const [{ data: entHoy }, { data: ptsHoy }] = await Promise.all([
+      db.from("entrenamientos").select("id, equipo_id, fecha").is("anulado_motivo", null).in("equipo_id", ids).gte("fecha", new Date(ahora).toISOString()).lt("fecha", aISO(sumarDias(hoy, 1), "00:00")),
+      db.from("partidos").select("id, equipo_id, fecha, rival").in("equipo_id", ids).gte("fecha", new Date(ahora).toISOString()).lt("fecha", aISO(sumarDias(hoy, 1), "00:00")),
+    ]);
+    const evHoy = [
+      ...((entHoy ?? []) as { id: string; equipo_id: string; fecha: string }[]).map((e) => ({ ...e, tipo: "e" as const })),
+      ...((ptsHoy ?? []) as { id: string; equipo_id: string; fecha: string; rival: string }[]).map((e) => ({ ...e, tipo: "p" as const })),
+    ].filter((e) => staff(e.equipo_id).length && (horaLocal >= 12 || new Date(e.fecha).getTime() - ahora <= 3 * 3600e3));
+    if (evHoy.length) {
+      const [{ data: rE }, { data: rP }, { data: plR }] = await Promise.all([
+        db.from("respuestas_asistencia").select("entrenamiento_id, va").in("entrenamiento_id", evHoy.filter((e) => e.tipo === "e").map((e) => e.id).concat("00000000-0000-0000-0000-000000000000")),
+        db.from("respuestas_asistencia").select("partido_id, va").in("partido_id", evHoy.filter((e) => e.tipo === "p").map((e) => e.id).concat("00000000-0000-0000-0000-000000000000")),
+        db.from("equipo_jugadores").select("equipo_id").in("equipo_id", [...new Set(evHoy.map((e) => e.equipo_id))]),
+      ]);
+      for (const e of evHoy) {
+        const rs = e.tipo === "e" ? ((rE ?? []) as { entrenamiento_id: string; va: boolean }[]).filter((r) => r.entrenamiento_id === e.id) : ((rP ?? []) as { partido_id: string; va: boolean }[]).filter((r) => r.partido_id === e.id);
+        if (!rs.length) continue; // el equipo no usa el enlace
+        const total = ((plR ?? []) as { equipo_id: string }[]).filter((x) => x.equipo_id === e.equipo_id).length;
+        const si = rs.filter((r) => r.va).length, no = rs.length - si;
+        const que = e.tipo === "e" ? `entreno de las ${hora(e.fecha)}` : `partido vs ${(e as { rival?: string }).rival ?? "?"} (${hora(e.fecha)})`;
+        await unaVez(`resumen-asis:${e.tipo}:${e.id}`, () => notificarPerfiles(db, staff(e.equipo_id),
+          `📋 ${nombre(e.equipo_id)} · ${que}`, `${si} ${e.tipo === "e" ? "vienen" : "pueden ir"}, ${no} no${total > rs.length ? `, ${total - rs.length} sin contestar` : ""}.`,
+          e.tipo === "e" ? `/entrenamientos/${e.id}#asistencia` : `/partidos/${e.id}`, e.equipo_id));
+      }
+    }
+
+    // 11) 3 entrenos seguidos sin venir y sin justificar → entrenadores del equipo y coordinación (una vez por racha)
+    const { data: pasados } = await db.from("entrenamientos").select("id, equipo_id, fecha").is("anulado_motivo", null).in("equipo_id", ids)
+      .gte("fecha", aISO(sumarDias(hoy, -45), "00:00")).lt("fecha", new Date(ahora).toISOString()).order("fecha", { ascending: false });
+    const pas = (pasados ?? []) as { id: string; equipo_id: string; fecha: string }[];
+    if (pas.length) {
+      const { data: asR } = await db.from("asistencias").select("entrenamiento_id, jugador_id, estado, jugadores(nombre, apellidos)").in("entrenamiento_id", pas.map((e) => e.id));
+      const as = (asR ?? []) as unknown as { entrenamiento_id: string; jugador_id: string; estado: string; jugadores: { nombre: string; apellidos: string | null } | null }[];
+      const conL = new Set(as.map((a) => a.entrenamiento_id));
+      for (const eq of ids) {
+        const ult = pas.filter((e) => e.equipo_id === eq && conL.has(e.id)).slice(0, 3);
+        if (ult.length < 3) continue;
+        const faltan = new Map<string, string>();
+        for (const a of as.filter((x) => x.entrenamiento_id === ult[0].id && x.estado === "ausente")) {
+          if (ult.every((e) => as.some((x) => x.entrenamiento_id === e.id && x.jugador_id === a.jugador_id && x.estado === "ausente")))
+            faltan.set(a.jugador_id, `${a.jugadores?.nombre ?? ""} ${a.jugadores?.apellidos ?? ""}`.trim());
+        }
+        for (const [jid, nom] of faltan) {
+          // La clave usa el primer entreno de la racha: si sigue faltando no se repite cada entreno
+          const conLista = pas.filter((e) => e.equipo_id === eq && conL.has(e.id));
+          let inicioRacha = conLista[0].id;
+          for (const e of conLista) { if (as.some((x) => x.entrenamiento_id === e.id && x.jugador_id === jid && x.estado === "ausente")) inicioRacha = e.id; else break; }
+          await unaVez(`3faltas:${jid}:${inicioRacha}`, () => notificarPerfiles(db, [...staff(eq), ...coordinadores],
+            `⚠️ ${nom || "Un jugador"} lleva 3 entrenos sin venir`, `${nombre(eq)} · 3 ausencias seguidas sin justificar. Quizá convenga hablar con la familia.`, `/jugadores/${jid}`, eq));
+        }
+      }
+    }
+  } catch { /* la asistencia no debe romper el resto de avisos */ }
+
   // 8) Fantasy Turó: viernes «haz tu equipo», 2 h antes del cierre, lunes «tus puntos», insignias nuevas y resumen del chat
   try {
     const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");

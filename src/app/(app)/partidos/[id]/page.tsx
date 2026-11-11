@@ -12,6 +12,7 @@ import Convocatoria from "./Convocatoria";
 import Periodos from "./Periodos";
 import AlineacionMini from "./AlineacionMini";
 import type { StatsPartido } from "@/lib/stats-fcbq";
+import { noDisponibleEn, type NoDisponible, type Respuesta } from "@/lib/asistencia";
 import { Binoculars, Clapperboard, ClipboardList, FileText, MapPin, Pencil, Trash2, X } from "lucide-react";
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,14 +23,15 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
   const p = data as Partido & { equipo_id: string; notas: string | null; equipos: { nombre: string; minibasquet?: boolean } | null; fcbq_stats_id?: string | null; num_periodos?: number | null; previa?: string | null };
   const equipo = p.equipos?.nombre ?? "Equipo";
 
-  const [{ data: plantilla }, { data: conv }, { data: staff }, { data: periodos }, { data: stats }] = await Promise.all([
-    supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", p.equipo_id),
+  const [{ data: plantilla }, { data: conv }, { data: staff }, { data: periodos }, { data: stats }, { data: respR }] = await Promise.all([
+    supabase.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos, no_disponible_hasta, no_disponible_motivo)").eq("equipo_id", p.equipo_id),
     supabase.from("convocatorias").select("jugador_id").eq("partido_id", id),
     supabase.from("equipo_staff").select("perfil_id").eq("equipo_id", p.equipo_id).eq("perfil_id", user.id).maybeSingle(),
     supabase.from("partido_periodos").select("jugador_id, periodos").eq("partido_id", id),
     p.fcbq_stats_id
       ? supabase.from("fcbq_stats").select("datos").eq("equipo_id", p.equipo_id).eq("stats_id", p.fcbq_stats_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("respuestas_asistencia").select("jugador_id, va, motivo_tipo, motivo").eq("partido_id", id),
   ]);
   const esStaff = perfil.rol === "coordinador" || !!staff;
   const { data: videoPartido } = esStaff ? await supabase.from("videos").select("id").eq("partido_id", p.id).order("created_at").limit(1).maybeSingle() : { data: null };
@@ -45,7 +47,12 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
   const caract = ((ficha as { caracteristicas?: Record<string, unknown> } | null)?.caracteristicas ?? {}) as Record<string, string | string[]>;
   const st = (stats as { datos: StatsPartido } | null)?.datos ?? null;
   const nuestroLado = st ? (/TUR[OÓ]/i.test(st.local.nombre) ? st.local : st.visitante) : null;
-  const jugadores = ((plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } }[])
+  const filasPl = (plantilla ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null; no_disponible_hasta: string | null; no_disponible_motivo: string | null } }[];
+  const diaPartido = diaInput(p.fecha);
+  const noDisp: Record<string, NoDisponible> = Object.fromEntries(filasPl.filter((x) => noDisponibleEn(x.jugadores.no_disponible_hasta, diaPartido))
+    .map((x) => [x.jugadores.id, { hasta: x.jugadores.no_disponible_hasta!, motivo: x.jugadores.no_disponible_motivo }]));
+  const respuestas: Record<string, Respuesta> = Object.fromEntries(((respR ?? []) as (Respuesta & { jugador_id: string })[]).map(({ jugador_id, ...r }) => [jugador_id, r]));
+  const jugadores = filasPl
     .map((x) => ({ id: x.jugadores.id, nombre: `${x.jugadores.nombre} ${x.jugadores.apellidos ?? ""}`.trim(), dorsal: x.dorsal }))
     .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
   const convocados = (conv ?? []).map((c) => c.jugador_id);
@@ -194,7 +201,8 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           </details>
         </div>
 
-        <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} />
+        <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} respuestas={respuestas} noDisp={noDisp} equipoId={p.equipo_id}
+          partido={{ equipo, rival: p.rival, local: !!p.local, fecha: p.fecha, lugar: p.lugar ?? null }} />
       </div>
       ) : (
         p.notas ? <p className="tarjeta mt-5 whitespace-pre-line p-4 text-sm">{p.notas}</p> : null

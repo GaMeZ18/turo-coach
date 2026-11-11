@@ -1,3 +1,4 @@
+import { hoyLocal } from "@/lib/fechas";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
@@ -12,7 +13,7 @@ import { plantillaDesdeActas } from "@/lib/plantilla-fcbq";
 type Fila = {
   dorsal: number | null;
   posicion: string | null;
-  jugadores: { id: string; nombre: string; apellidos: string | null; fecha_nacimiento: string | null };
+  jugadores: { id: string; nombre: string; apellidos: string | null; fecha_nacimiento: string | null; no_disponible_hasta?: string | null };
 };
 
 export default async function JugadoresPage() {
@@ -23,7 +24,7 @@ export default async function JugadoresPage() {
   const [{ data }, { data: todos }, { data: asistencias }] = await Promise.all([
     supabase
       .from("equipo_jugadores")
-      .select("dorsal, posicion, jugadores(id, nombre, apellidos, fecha_nacimiento)")
+      .select("dorsal, posicion, jugadores(id, nombre, apellidos, fecha_nacimiento, no_disponible_hasta)")
       .eq("equipo_id", equipo.id),
     supabase.from("jugadores").select("id, nombre, apellidos").order("nombre"),
     supabase
@@ -76,6 +77,7 @@ export default async function JugadoresPage() {
                     <Link href={`/jugadores/${f.jugadores.id}`} className="font-medium hover:underline">
                       {f.jugadores.nombre} {f.jugadores.apellidos}
                     </Link>
+                    {f.jugadores.no_disponible_hasta && f.jugadores.no_disponible_hasta >= hoyLocal() && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-800" title="No disponible">🚫 hasta {new Date(`${f.jugadores.no_disponible_hasta}T12:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span>}
                   </td>
                   <td className="hidden px-3 py-2 text-tinta/70 sm:table-cell">{f.posicion ?? "—"}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-tinta/70">{p === null ? "—" : `${p}%`}</td>

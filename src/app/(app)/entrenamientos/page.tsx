@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
+import EnlaceAsistencia from "@/components/EnlaceAsistencia";
 import { fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import SinEquipo from "@/components/SinEquipo";
 import { crearEntrenoDesde, programarEntrenos } from "./actions";
@@ -65,6 +66,7 @@ export default async function EntrenamientosPage() {
           <p className="text-sm text-tinta/60">{equipo.nombre}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <EnlaceAsistencia equipoId={equipo.id} equipo={equipo.nombre} compacto />
           <Link href="/entrenamientos/asistencia" className="btn-secundario"><ClipboardCheck size={16} /> Asistencia</Link>
           <Link href="/entrenamientos/plantillas" className="btn-secundario"><LayoutTemplate size={16} /> Plantillas</Link>
           <Link href="/imprimir/temporada" className="btn-secundario"><FileBarChart size={16} /> Informe de temporada</Link>
