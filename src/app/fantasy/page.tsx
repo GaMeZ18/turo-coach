@@ -630,7 +630,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   }
 
   return (
-    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista} temporada={temporada}>
+    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista === "jugador" ? "mercado" : vista} temporada={temporada}>
       {cuerpo}
       <Celebracion pid={`${yo.id}-${q.config.inicio}`} temporada={temporada} campeon={campeon}
         insignias={INSIGNIAS.filter((x) => misInsignias.has(x.codigo)).map(({ codigo, nombre, texto, img }) => ({ codigo, nombre, texto, img }))} />
