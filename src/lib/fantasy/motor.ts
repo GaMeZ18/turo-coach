@@ -3,7 +3,8 @@
 import { lunesDe, sumarDias } from "@/lib/pistas";
 import { aISO, diaInput } from "@/lib/fechas";
 
-export const PRESUPUESTO = 50;
+export const PRESUPUESTO = 54;
+export const DUO_MIN = 3, DUO_MAX = 8, DUO_SIN_DATOS = 5;
 export const PRECIO_MIN = 4;
 export const PRECIO_MAX = 15;
 export const PRECIO_SIN_DATOS = 6;
@@ -142,12 +143,23 @@ export function precios(lunes: string, jugadores: Map<string, JugadorF>, actuaci
 
 // ---------- Alineaciones y puntos ----------
 export type Ficha = { id: string; precio: number };
-export type Alineacion = { participante_id: string; jornada: string; titulares: Ficha[]; suplente: Ficha | null; capitan: string; comodin: Comodin | null; coste: number };
+export type Alineacion = { participante_id: string; jornada: string; titulares: Ficha[]; suplente: Ficha | null; capitan: string; comodin: Comodin | null; coste: number; duo?: Ficha | null };
+
+// ---------- Dúo técnico ----------
+/** El cuerpo técnico de un equipo: puntúa con el resultado del partido */
+export type Duo = { id: string; equipoId: string; equipo: string; nombre: string };
+export const idDuo = (equipoId: string) => `duo:${equipoId}`;
+/** Victoria +4 / derrota −1, ±1 por cada 5 puntos de diferencia (máx. ±4) y +2 si gana a un rival mejor clasificado */
+export function puntosDuo(pf: number, pc: number, rivalArriba: boolean) {
+  const gana = pf > pc;
+  return (gana ? 4 : -1) + clamp(Math.trunc((pf - pc) / 5), -4, 4) + (gana && rivalArriba ? 2 : 0);
+}
 
 export type Resultado = {
   total: number;
   filas: { id: string; precio: number; puntos: number; jugo: boolean; capitan: boolean; extra: number; porJugar: boolean }[];
   suplente: { id: string; precio: number; puntos: number; jugo: boolean; entro: boolean; porJugar: boolean } | null;
+  duo: { id: string; precio: number; puntos: number; jugo: boolean; porJugar: boolean } | null;
 };
 
 /** Puntos de cada jugador en una jornada (suma de sus partidos con ese equipo) */
@@ -161,7 +173,8 @@ export function puntosSemana(lunes: string, actuaciones: Actuacion[]) {
   return m;
 }
 
-export function puntuar(al: Alineacion, sem: Map<string, { puntos: number; jugo: boolean }>, pendientes: Set<string>, jugadores: Map<string, JugadorF>): Resultado {
+export function puntuar(al: Alineacion, sem: Map<string, { puntos: number; jugo: boolean }>, pendientes: Set<string>, jugadores: Map<string, JugadorF>,
+  semDuo: Map<string, { puntos: number; jugo: boolean }> = new Map(), pendientesDuo: Set<string> = new Set()): Resultado {
   const eqDe = (id: string) => jugadores.get(id)?.equipoId ?? "";
   const filas = al.titulares.map((t) => {
     const x = sem.get(t.id);
@@ -178,8 +191,13 @@ export function puntuar(al: Alineacion, sem: Map<string, { puntos: number; jugo:
   }
   const cap = filas.find((f) => f.capitan);
   if (cap && cap.jugo) cap.extra = r4(cap.puntos * ((al.comodin === "capitan3" ? 3 : 2) - 1));
-  const total = r4(filas.reduce((s, f) => s + f.puntos + f.extra, 0) + (suplente?.entro ? suplente.puntos : 0));
-  return { total, filas, suplente };
+  let duo: Resultado["duo"] = null;
+  if (al.duo) {
+    const x = semDuo.get(al.duo.id);
+    duo = { id: al.duo.id, precio: al.duo.precio, puntos: x?.jugo ? x.puntos : 0, jugo: !!x?.jugo, porJugar: !x?.jugo && pendientesDuo.has(al.duo.id.slice(4)) };
+  }
+  const total = r4(filas.reduce((s, f) => s + f.puntos + f.extra, 0) + (suplente?.entro ? suplente.puntos : 0) + (duo?.jugo ? duo.puntos : 0));
+  return { total, filas, suplente, duo };
 }
 
 /** Personas bloqueadas para la jornada siguiente: los titulares y el suplente si llegó a entrar */
@@ -188,6 +206,7 @@ export function bloqueadosTras(al: Alineacion | undefined, res: Resultado | unde
   if (!al) return s;
   al.titulares.forEach((t) => { const p = jugadores.get(t.id)?.persona; if (p) s.add(p); });
   if (al.suplente && res?.suplente?.entro) { const p = jugadores.get(al.suplente.id)?.persona; if (p) s.add(p); }
+  if (al.duo) s.add(al.duo.id); // el dúo técnico también descansa la jornada siguiente
   return s;
 }
 
@@ -259,6 +278,8 @@ export type Entrada = {
   alineaciones: Alineacion[]; participantes: { id: string; alias: string }[];
   mensajes: Record<string, number>; cerrada: boolean; campeon: string | null;
   preciosFijos?: PreciosFijos;
+  duosNombres?: Record<string, string>;        // nombre de cada dúo técnico (por equipo)
+  rivalArriba?: Record<string, boolean>;       // partido → el rival va por encima en la clasificación
 };
 
 export function calcularLiga(e: Entrada) {
@@ -300,6 +321,38 @@ export function calcularLiga(e: Entrada) {
     return new Set(e.partidos.filter((p) => p.fecha >= ini && p.fecha < fin && (!p.fcbq_stats_id || !con.has(`${p.equipo_id}|${p.fcbq_stats_id}`)) && pool.has(p.equipo_id)).map((p) => p.equipo_id));
   };
 
+  // Dúos técnicos: uno por equipo del Fantasy; puntúan con los resultados del calendario
+  const nombreEq = new Map(e.equipos.map((x) => [x.id, x.nombre]));
+  const duos = new Map([...pool].map((eq) => [idDuo(eq), { id: idDuo(eq), equipoId: eq, equipo: nombreEq.get(eq) ?? "", nombre: e.duosNombres?.[eq] || nombreEq.get(eq) || "" } as Duo]));
+  const espIds = new Set(Object.values(e.especiales).flat());
+  const resDuo = e.partidos.filter((p) => pool.has(p.equipo_id) && p.puntos_favor != null && p.puntos_contra != null).map((p) => {
+    const base = puntosDuo(p.puntos_favor!, p.puntos_contra!, !!e.rivalArriba?.[p.id]);
+    return { id: idDuo(p.equipo_id), partidoId: p.id, fecha: p.fecha, lunes: lunesDeFecha(p.fecha), base, puntos: r4(base * (espIds.has(p.id) ? 1.5 : 1)) };
+  });
+  const semanaDuo = (l: string) => {
+    const m = new Map<string, { puntos: number; jugo: boolean }>();
+    for (const r of resDuo) if (r.lunes === l) { const x = m.get(r.id) ?? { puntos: 0, jugo: true }; x.puntos = r4(x.puntos + r.puntos); m.set(r.id, x); }
+    return m;
+  };
+  const pendientesDuo = (l: string) => {
+    const ini = aISO(l, "00:00"), fin = aISO(sumarDias(l, 7), "00:00");
+    return new Set(e.partidos.filter((p) => pool.has(p.equipo_id) && p.fecha >= ini && p.fecha < fin && p.puntos_favor == null).map((p) => p.equipo_id));
+  };
+  /** Precio del dúo: media de sus últimos 4 resultados (de 3 a 8 ⭐) */
+  const precioDuo = (l: string) => {
+    const r = new Map<string, { precio: number; media: number | null; pj: number }>();
+    for (const d of duos.values()) {
+      const ult = resDuo.filter((x) => x.id === d.id && x.lunes < l).sort((a, b) => b.fecha.localeCompare(a.fecha));
+      const u4 = ult.slice(0, 4);
+      if (!u4.length) { r.set(d.id, { precio: DUO_SIN_DATOS, media: null, pj: 0 }); continue; }
+      const media = u4.reduce((s, x) => s + x.base, 0) / u4.length;
+      r.set(d.id, { precio: clamp(Math.round(3 + 0.75 * media), DUO_MIN, DUO_MAX), media: Math.round(media * 10) / 10, pj: ult.length });
+    }
+    const fijo = e.preciosFijos?.[l];
+    if (fijo) for (const [id, [p, m, pj]] of Object.entries(fijo)) if (r.has(id)) r.set(id, { precio: p, media: m, pj });
+    return r;
+  };
+
   const alDe = new Map(e.alineaciones.map((a) => [`${a.participante_id}|${a.jornada}`, a]));
   const resultados = new Map<string, Resultado>(); // participante|lunes
   const porJornada = new Map<string, { id: string; total: number; pos: number }[]>();
@@ -309,7 +362,7 @@ export function calcularLiga(e: Entrada) {
     for (const p of e.participantes) {
       const al = alDe.get(`${p.id}|${l}`);
       if (!al) continue;
-      const res = puntuar(al, sem, pend, jugadores);
+      const res = puntuar(al, sem, pend, jugadores, semanaDuo(l), pendientesDuo(l));
       resultados.set(`${p.id}|${l}`, res);
       if (!e.anuladas.includes(l)) lista.push({ id: p.id, total: res.total, pos: 0 });
     }
@@ -334,7 +387,7 @@ export function calcularLiga(e: Entrada) {
     // La jornada anterior que se jugó (saltando las semanas sin Fantasy)
     let prev = sumarDias(l, -7);
     for (let i = 0; i < 26 && sinFantasy.has(prev); i++) prev = sumarDias(prev, -7);
-    return bloqueadosTras(alDe.get(`${pid}|${prev}`), resultados.get(`${pid}|${prev}`) ?? (alDe.get(`${pid}|${prev}`) ? puntuar(alDe.get(`${pid}|${prev}`)!, semana(prev), pendientes(prev), jugadores) : undefined), jugadores);
+    return bloqueadosTras(alDe.get(`${pid}|${prev}`), resultados.get(`${pid}|${prev}`) ?? (alDe.get(`${pid}|${prev}`) ? puntuar(alDe.get(`${pid}|${prev}`)!, semana(prev), pendientes(prev), jugadores, semanaDuo(prev), pendientesDuo(prev)) : undefined), jugadores);
   };
 
   // Revelación del mes: el que más sube de precio desde la primera jornada del mes
@@ -408,6 +461,7 @@ export function calcularLiga(e: Entrada) {
   };
 
   return {
+    duos, precioDuo, semanaDuo,
     jugadores, actuaciones, pool, abierta, enJuego, todas, cerradas, terminadas, proxima, lunesHoy, descansoHoy,
     cierre: (l: string) => cierreDe(l, e.partidos, pool),
     descansan: (l: string) => descansan(l, e.partidos, pool),

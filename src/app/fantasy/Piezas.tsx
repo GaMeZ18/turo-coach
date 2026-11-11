@@ -1,10 +1,10 @@
-import type { Alineacion, JugadorF, Resultado } from "@/lib/fantasy/motor";
+import type { Alineacion, Duo, JugadorF, Resultado } from "@/lib/fantasy/motor";
 import { COMODINES, type Comodin } from "@/lib/fantasy/motor";
 import { Camiseta, Sigla, pts } from "./ui";
 
 /** El equipo de una jornada con los puntos de cada uno (como en el mockup) */
-export function MiJornada({ titulo, res, al, jugador, compacto = false }: {
-  titulo?: string; res: Resultado; al: Alineacion; jugador: (id: string) => JugadorF | undefined; compacto?: boolean;
+export function MiJornada({ titulo, res, al, jugador, compacto = false, duos }: {
+  titulo?: string; res: Resultado; al: Alineacion; jugador: (id: string) => JugadorF | undefined; compacto?: boolean; duos?: Map<string, Duo>;
 }) {
   const Fila = ({ id, puntos, jugo, porJugar, extra = 0, capitan = false, entro }: { id: string; puntos: number; jugo: boolean; porJugar: boolean; extra?: number; capitan?: boolean; entro?: boolean }) => {
     const j = jugador(id);
@@ -43,6 +43,21 @@ export function MiJornada({ titulo, res, al, jugador, compacto = false }: {
           <ul><Fila id={res.suplente.id} puntos={res.suplente.puntos} jugo={res.suplente.jugo} porJugar={res.suplente.porJugar} entro={res.suplente.entro} /></ul>
         </>
       )}
+      {res.duo && (() => {
+        const d = duos?.get(res.duo.id);
+        return (
+          <>
+            <p className="bg-white/5 px-3 py-1 text-xs font-bold uppercase fx-suave">Dúo técnico</p>
+            <div className="flex items-center gap-2.5 px-3 py-2">
+              <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-white/10">📋</span>
+              <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{d?.nombre ?? "Dúo técnico"}</span>{d && <Sigla equipo={d.equipo} />}</span>
+              {res.duo.jugo ? <span className={res.duo.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(res.duo.puntos)} pts</span>
+                : res.duo.porJugar ? <span className="rounded-lg border border-white/20 px-2 py-0.5 text-xs font-semibold text-white/70">Por jugar</span>
+                : <span className="fx-pill-rojo">No jugó</span>}
+            </div>
+          </>
+        );
+      })()}
       {compacto && <p className="px-3 pb-2 text-right text-sm">Total <strong className="text-[var(--fx-oro)]">{pts(res.total)}</strong></p>}
     </section>
   );

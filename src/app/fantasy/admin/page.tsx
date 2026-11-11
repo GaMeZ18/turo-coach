@@ -6,7 +6,7 @@ import { cargarClasificaciones, cargarLiga, db, posicion, quienSoy } from "@/lib
 import { nombreJornada } from "@/lib/fantasy/motor";
 import { aISO, diaInput, fechaCorta, hora } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
-import { Interruptor, Premio, Inicio, Especial, Anular, Silenciar, Borrar, CerrarTemporada, CopiarEnlace, QuitarFoto, Prueba } from "./Controles";
+import { Interruptor, Premio, Inicio, Especial, Anular, Silenciar, Borrar, CerrarTemporada, CopiarEnlace, QuitarFoto, Prueba, NombreDuo } from "./Controles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Fantasy · Administrar", robots: { index: false } };
@@ -39,6 +39,14 @@ export default async function AdminFantasy() {
           <Premio valor={q.config.premio ?? ""} />
           <Inicio valor={q.config.inicio} />
           <p className="text-xs text-white/60">Últimas estadísticas cargadas de la FCBQ: <strong>{ult?.created_at ? `${fechaCorta(ult.created_at)} ${hora(ult.created_at)}` : "nunca"}</strong>. Los puntos salen en cuanto se cargan (botón «Actualizar desde la FCBQ» en Partidos).</p>
+        </section>
+
+        <section className="fx-card space-y-2 p-4">
+          <h2 className="font-semibold">📋 Dúos técnicos</h2>
+          <p className="text-xs text-white/60">El nombre que sale en el Fantasy para el cuerpo técnico de cada equipo. Cámbialo cuando cambie el entrenador.</p>
+          {[...liga.duos.values()].sort((a, b) => a.equipo.localeCompare(b.equipo)).map((d) => (
+            <NombreDuo key={d.id} equipoId={d.equipoId} equipo={d.equipo} valor={q.config.duos[d.equipoId] ?? ""} />
+          ))}
         </section>
 
         <section className="fx-card space-y-2 p-4">

@@ -126,7 +126,7 @@ export async function guardarPerfil(d: { alias: string; mostrar: string } & Avat
 }
 
 /** Guarda el equipo de la jornada abierta, comprobando todas las reglas */
-export async function guardarEquipo(d: { titulares: string[]; suplente: string | null; capitan: string; comodin: Comodin | null }): Promise<R> {
+export async function guardarEquipo(d: { titulares: string[]; suplente: string | null; capitan: string; comodin: Comodin | null; duo: string | null }): Promise<R> {
   const q = await quienSoy();
   if (!q.acceso || !q.participante) return { error: "No estás apuntado." };
   if (q.config.cerrada) return { error: "La temporada ya ha terminado." };
@@ -148,16 +148,22 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   const bloq = liga.bloqueados(q.participante.id, l);
   const bloqueado = js.find((j) => bloq.has(j!.persona));
   if (bloqueado) return { error: `${bloqueado!.nombre} está bloqueado esta jornada (lo fichaste la anterior).` };
+  // Dúo técnico (obligatorio)
+  if (!d.duo) return { error: "Elige tu dúo técnico." };
+  const duo = liga.duos.get(d.duo);
+  if (!duo) return { error: "Ese dúo técnico no está disponible. Recarga la página." };
+  if (bloq.has(duo.id)) return { error: `El dúo técnico ${duo.nombre} está bloqueado esta jornada (lo fichaste la anterior).` };
+  const precioDuo = liga.precioDuo(l).get(duo.id)?.precio ?? 5;
   // Comodín: uno por jornada y cada uno una vez por temporada
   const usados = q.participante.comodines ?? {};
   if (d.comodin && usados[d.comodin] && usados[d.comodin] !== l) return { error: "Ese comodín ya lo has gastado esta temporada." };
   const presupuesto = PRESUPUESTO + (d.comodin === "presupuesto" ? 10 : 0);
-  const coste = todos.reduce((s, id) => s + (precios.get(id)?.precio ?? 6), 0);
+  const coste = todos.reduce((s, id) => s + (precios.get(id)?.precio ?? 6), 0) + precioDuo;
   if (coste > presupuesto) return { error: `Te pasas del presupuesto: ${coste} ⭐ de ${presupuesto} ⭐.` };
   const ficha = (id: string) => ({ id, precio: precios.get(id)?.precio ?? 6 });
   const { error } = await db().from("fantasy_alineaciones").upsert({
     participante_id: q.participante.id, jornada: l, titulares: ids.map(ficha), suplente: d.suplente ? ficha(d.suplente) : null,
-    capitan: d.capitan, comodin: d.comodin, coste, updated_at: new Date().toISOString(),
+    capitan: d.capitan, comodin: d.comodin, coste, duo: { id: duo.id, precio: precioDuo }, updated_at: new Date().toISOString(),
   });
   if (error) return { error: error.message };
   // Apuntar el comodín gastado (o liberarlo si se ha quitado en esta misma jornada)
@@ -371,6 +377,17 @@ export async function adminBorrarPrueba(): Promise<R> {
   const esp = { ...q.config.especiales };
   if (p.especial && esp[p.jornada]) { esp[p.jornada] = esp[p.jornada].filter((x) => x !== p.especial); if (!esp[p.jornada].length) delete esp[p.jornada]; }
   await d.from("fantasy_config").update({ inicio: p.inicio, especiales: esp, prueba: null }).eq("id", 1);
+  revalidatePath("/fantasy", "layout");
+  return { ok: true };
+}
+
+/** Nombre del dúo técnico de un equipo (lo que se ve en el Fantasy) */
+export async function adminDuo(equipoId: string, nombre: string): Promise<R> {
+  const q = await admin();
+  const n = limpiar(nombre, 80);
+  const duos = { ...q.config.duos };
+  if (n) duos[equipoId] = n; else delete duos[equipoId];
+  await db().from("fantasy_config").update({ duos }).eq("id", 1);
   revalidatePath("/fantasy", "layout");
   return { ok: true };
 }

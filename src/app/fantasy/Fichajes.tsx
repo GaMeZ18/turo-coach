@@ -11,7 +11,8 @@ export type JugadorMercado = {
   id: string; persona: string; nombre: string; dorsal: string; equipo: string; equipoId: string; chica: boolean;
   precio: number; media: number | null; pj: number; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean; rival: string | null;
 };
-type Equipo = { titulares: string[]; suplente: string | null; capitan: string | null; comodin: Comodin | null };
+export type DuoMercado = { id: string; nombre: string; equipo: string; equipoId: string; precio: number; media: number | null; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean; rival: string | null };
+type Equipo = { titulares: string[]; suplente: string | null; capitan: string | null; comodin: Comodin | null; duo?: string | null };
 
 const n = (v: number) => v.toLocaleString("es-ES", { maximumFractionDigits: 1 });
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -31,12 +32,13 @@ function useBorrador(jornada: string, inicial: Equipo) {
   return { e, cambiar, limpiar, listo };
 }
 
-export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actual, comodinesUsados, presupuesto }: {
-  modo: "equipo" | "mercado"; jornada: string; nombre: string; cierre: string; mercado: JugadorMercado[];
+export default function Fichajes({ modo, jornada, nombre, cierre, mercado, duos = [], actual, comodinesUsados, presupuesto }: {
+  modo: "equipo" | "mercado"; jornada: string; nombre: string; cierre: string; mercado: JugadorMercado[]; duos?: DuoMercado[];
   actual: Equipo | null; comodinesUsados: Partial<Record<Comodin, string>>; presupuesto: number;
 }) {
   const porId = useMemo(() => new Map(mercado.map((j) => [j.id, j])), [mercado]);
-  const guardado: Equipo = actual ?? { titulares: [], suplente: null, capitan: null, comodin: null };
+  const guardado: Equipo = actual ?? { titulares: [], suplente: null, capitan: null, comodin: null, duo: null };
+  const duoPorId = useMemo(() => new Map(duos.map((d) => [d.id, d])), [duos]);
   const { e, cambiar, limpiar } = useBorrador(jornada, guardado);
   const tit = e.titulares.filter((id) => porId.has(id)), sup = e.suplente && porId.has(e.suplente) ? e.suplente : null;
   const [q, setQ] = useState(""); const [eq, setEq] = useState(""); const [orden, setOrden] = useState<"media" | "precio" | "ultimo" | "nombre">("media");
@@ -45,10 +47,17 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
 
   const limite = presupuesto + (e.comodin === "presupuesto" ? 10 : 0);
   const elegidos = [...tit, ...(sup ? [sup] : [])];
-  const coste = elegidos.reduce((s, id) => s + (porId.get(id)?.precio ?? 0), 0);
+  const duo = e.duo && duoPorId.has(e.duo) ? duoPorId.get(e.duo)! : null;
+  const coste = elegidos.reduce((s, id) => s + (porId.get(id)?.precio ?? 0), 0) + (duo?.precio ?? 0);
   const queda = limite - coste;
   const personas = new Set(elegidos.map((id) => porId.get(id)?.persona));
-  const sinGuardar = JSON.stringify({ ...e, titulares: tit, suplente: sup }) !== JSON.stringify(guardado);
+  const sinGuardar = JSON.stringify({ titulares: tit, suplente: sup, capitan: e.capitan, comodin: e.comodin, duo: duo?.id ?? null }) !== JSON.stringify({ titulares: guardado.titulares, suplente: guardado.suplente, capitan: guardado.capitan, comodin: guardado.comodin, duo: guardado.duo ?? null });
+  const elegirDuo = (d: DuoMercado) => {
+    setMsg(null);
+    if (d.bloqueado) return setMsg({ t: "Ese dúo técnico está bloqueado: lo fichaste la jornada anterior." });
+    cambiar({ ...e, duo: e.duo === d.id ? null : d.id });
+    if (e.duo !== d.id) setMsg({ ok: true, t: `Dúo técnico: ${d.nombre}.` });
+  };
   const fechaCierre = new Date(cierre).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
   const motivo = (j: JugadorMercado): string | null => {
@@ -74,8 +83,9 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
     setMsg(null);
     if (tit.length !== 5) return setMsg({ t: `Te faltan ${5 - tit.length} titulares.` });
     if (!e.capitan || !tit.includes(e.capitan)) return setMsg({ t: "Elige capitán (toca la C)." });
+    if (!duo) return setMsg({ t: "Te falta el dúo técnico (está arriba del todo en el mercado)." });
     if (queda < 0) return setMsg({ t: `Te pasas ${-queda} ⭐ del presupuesto.` });
-    const r = await guardarEquipo({ titulares: tit, suplente: sup, capitan: e.capitan, comodin: e.comodin });
+    const r = await guardarEquipo({ titulares: tit, suplente: sup, capitan: e.capitan, comodin: e.comodin, duo: duo.id });
     if (r.error) setMsg({ t: r.error }); else { limpiar(); setMsg({ ok: true, t: "¡Equipo guardado! Lo puedes cambiar hasta el cierre." }); }
   });
 
@@ -92,7 +102,7 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
   const Estrellas = (
     <div className="fx-card flex items-center gap-2 px-3 py-2">
       <span className="text-sm">⭐ <strong className={queda < 0 ? "text-red-400" : "text-[var(--fx-oro)]"}>{queda}</strong> libres de {limite}</span>
-      <span className="ml-auto text-xs fx-suave">{tit.length}/5 + {sup ? 1 : 0} sup.</span>
+      <span className="ml-auto text-xs fx-suave">{tit.length}/5 + {sup ? 1 : 0} sup. + {duo ? 1 : 0} dúo</span>
       {sinGuardar && <span className="rounded bg-[var(--fx-oro)] px-1.5 py-0.5 text-[10px] font-bold text-black">SIN GUARDAR</span>}
     </div>
   );
@@ -114,6 +124,39 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
           </select>
         </div>
         {Mensaje}
+        {duos.length > 0 && (
+          <section className="fx-card overflow-hidden">
+            <p className="flex items-center gap-2 border-b border-[var(--fx-borde)] px-3 py-2 font-semibold">📋 Dúo técnico <span className="text-xs font-normal fx-suave">· elige uno · puntúa con el resultado del partido</span></p>
+            <ul className="fx-sep">
+              {duos.map((d) => {
+                const on = duo?.id === d.id;
+                return (
+                  <li key={d.id} className={`flex items-center gap-2.5 px-3 py-2 ${on ? "bg-[var(--fx-oro)]/10" : d.bloqueado ? "opacity-55" : ""}`}>
+                    <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-white/10 text-lg">📋</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{d.nombre}</p>
+                      <p className="flex flex-wrap items-center gap-x-2 text-[11px] fx-suave"><Sigla equipo={d.equipo} /><span>Media {d.media !== null ? n(d.media) : "–"}</span><span>Últ: {d.ultimo !== null ? n(d.ultimo) : "–"}</span></p>
+                      {d.descansa ? <p className="text-[11px] font-semibold text-amber-300"><Moon size={10} className="inline" /> Descansa</p> : d.rival && <p className="truncate text-[11px] text-white/80">🏀 {d.rival}</p>}
+                      {d.bloqueado && <p className="text-[11px] font-semibold text-red-400"><Lock size={10} className="inline" /> Bloqueado</p>}
+                    </div>
+                    <span className="flex items-center gap-0.5 text-lg font-bold">
+                      {d.tendencia > 0 ? <span className="text-xs text-green-400">▲</span> : d.tendencia < 0 ? <span className="text-xs text-red-400">▼</span> : null}
+                      {d.precio}<span className="text-base">⭐</span>
+                    </span>
+                    {on ? (
+                      <button onClick={() => elegirDuo(d)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--fx-oro)] text-black" aria-label="Quitar"><Check size={18} /></button>
+                    ) : d.bloqueado ? (
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><Lock size={15} /></span>
+                    ) : (
+                      <button onClick={() => elegirDuo(d)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--fx-verde)] text-white shadow" aria-label="Fichar dúo"><Plus size={18} /></button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        <p className="pt-1 text-xs font-bold uppercase fx-suave">Jugadores</p>
         <ul className="fx-card fx-sep overflow-hidden">
           {lista.map((j) => {
             const dentro = elegidos.includes(j.id), no = motivo(j);
@@ -194,6 +237,23 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, actua
         {[0, 1, 2, 3, 4].map((i) => <Fila key={i} id={tit[i]} i={i} />)}
         <p className="pt-1 text-xs font-bold uppercase fx-suave">Suplente</p>
         <Fila id={sup} i={5} suplente />
+        <p className="pt-1 text-xs font-bold uppercase fx-suave">Dúo técnico</p>
+        {duo ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-[#0c1430] px-2.5 py-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">📋</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{duo.nombre}</p>
+              <p className="flex min-w-0 gap-2 text-[11px] fx-suave"><Sigla equipo={duo.equipo} /> {duo.descansa ? <span className="font-semibold text-amber-300">Descansa</span> : duo.rival && <span className="truncate text-white/80">{duo.rival}</span>}</p>
+            </div>
+            <span className="text-sm font-bold">{duo.precio}⭐</span>
+            <button onClick={() => cambiar({ ...e, duo: null })} className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--fx-rojo)] text-white" aria-label="Quitar"><X size={15} /></button>
+          </div>
+        ) : (
+          <Link href="/fantasy?v=mercado" className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--fx-borde)] px-3 py-2.5 text-sm fx-suave">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5"><Plus size={16} /></span>
+            Elige tu dúo técnico (puntúa con el resultado del partido)
+          </Link>
+        )}
       </div>
       <p className="pt-1 text-xs font-bold uppercase fx-suave">Comodines</p>
       <div className="grid grid-cols-3 gap-2">

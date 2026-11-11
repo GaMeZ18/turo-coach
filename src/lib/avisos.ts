@@ -177,7 +177,7 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
       for (const p of activos) {
         if (liga.alineacion(p.id, l)) continue;
         await unaVez(`fantasy-equipo:${l}:${p.id}`, () => notificarFantasy(db, [p], "🏆 Fantasy: ¡haz tu equipo!",
-          `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 50 ⭐.`, "/fantasy"));
+          `${nombreJornada(cfg.inicio, l, cfg.anuladas)}: los fichajes cierran el ${fechaCorta(cierre)} a las ${hora(cierre)}. Tienes 54 ⭐.`, "/fantasy"));
       }
     }
     // 2 horas antes del cierre: último aviso a quien aún no tiene equipo

@@ -11,7 +11,7 @@ import { lunesDe, sumarDias } from "@/lib/pistas";
 import { diaInput, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { CalendarDays, ChevronDown, Lock, Star } from "lucide-react";
 import Alta from "./Alta";
-import Fichajes, { type JugadorMercado } from "./Fichajes";
+import Fichajes, { type DuoMercado, type JugadorMercado } from "./Fichajes";
 import Chat from "./Chat";
 import Celebracion from "./Celebracion";
 import { EditarPerfil } from "./Perfil";
@@ -92,6 +92,16 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const pos = posicion(clasif.get(equipoId), p.rival);
     return `${p.local ? "vs" : "@"} ${p.rival ?? "?"}${pos ? ` (${pos.pos}º)` : ""}`;
   };
+  const duosDe = (l: string): DuoMercado[] => {
+    const pr = liga.precioDuo(l), prAntes = liga.precioDuo(sumarDias(l, -7));
+    const ultima = liga.terminadas[liga.terminadas.length - 1] ?? sumarDias(l, -7);
+    const semUlt = liga.semanaDuo(ultima), desc = liga.descansan(l), bloq = liga.bloqueados(yo.id, l);
+    return [...liga.duos.values()].map((d) => {
+      const p = pr.get(d.id)!, a = prAntes.get(d.id);
+      return { id: d.id, nombre: d.nombre, equipo: d.equipo, equipoId: d.equipoId, precio: p.precio, media: p.media, tendencia: a ? Math.sign(p.precio - a.precio) : 0,
+        ultimo: semUlt.get(d.id)?.jugo ? semUlt.get(d.id)!.puntos : null, descansa: desc.has(d.equipoId), bloqueado: bloq.has(d.id), rival: rivalDe(d.equipoId, l) };
+    }).sort((a, b) => b.precio - a.precio);
+  };
   const mercadoDe = (l: string): JugadorMercado[] => {
     const pr = liga.precio(l), prAntes = liga.precio(sumarDias(l, -7));
     const ultima = liga.terminadas[liga.terminadas.length - 1] ?? sumarDias(l, -7);
@@ -168,13 +178,13 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <InstalarFantasy />
         {!yo.perfil_id && <AvisosFantasy clavePublica={VAPID_PUBLICO} />}
         {l ? (
-          <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
-            actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null}
+          <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)} duos={duosDe(l)}
+            actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null, duo: al.duo?.id ?? null } : null}
             comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>} presupuesto={PRESUPUESTO} />
         ) : <Cerrado />}
-        {enJuego && alJuego && resJuego && <MiJornada titulo={`${nombreJornada(q.config.inicio, enJuego, q.config.anuladas)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
+        {enJuego && alJuego && resJuego && <MiJornada duos={liga.duos} titulo={`${nombreJornada(q.config.inicio, enJuego, q.config.anuladas)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
         {enJuego && !alJuego && <p className="fx-card p-3 text-center text-sm fx-suave">No fichaste equipo para esta jornada.</p>}
-        {l && ant && alAnt && resAnt && <MiJornada titulo={`${nombreJornada(q.config.inicio, ant, q.config.anuladas)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
+        {l && ant && alAnt && resAnt && <MiJornada duos={liga.duos} titulo={`${nombreJornada(q.config.inicio, ant, q.config.anuladas)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
       </div>
     );
   }
@@ -182,8 +192,8 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   if (vista === "mercado") {
     const l = liga.abierta;
     cuerpo = l ? (
-      <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)}
-        actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null } : null; })()}
+      <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)} duos={duosDe(l)}
+        actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null, duo: al.duo?.id ?? null } : null; })()}
         comodinesUsados={{}} presupuesto={PRESUPUESTO} />
     ) : <Cerrado />;
   }
@@ -257,6 +267,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                               </li>
                             );
                           })}
+                        {al.duo && <li className="flex items-center gap-2.5 px-3 py-1.5 text-sm"><span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-white/10 text-xs">📋</span><span className="min-w-0 flex-1 truncate">{liga.duos.get(al.duo.id)?.nombre ?? "Dúo técnico"} <span className="text-[11px] fx-suave">{liga.duos.get(al.duo.id)?.equipo}</span></span><span className="text-[10px] font-bold fx-suave">DÚO</span><span className="text-xs">{al.duo.precio}⭐</span></li>}
                         </ul>
                       </details>
                     );
@@ -282,7 +293,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                           <span className="w-10 text-center text-sm fx-suave">{al.coste}</span>
                         </>}>{pts(r.total)}</Fila>
                       </summary>
-                      <div className="bg-black/20 pb-2"><MiJornada res={r} al={al} jugador={jug} compacto /></div>
+                      <div className="bg-black/20 pb-2"><MiJornada duos={liga.duos} res={r} al={al} jugador={jug} compacto /></div>
                     </details>
                   );
                 })}
@@ -486,7 +497,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <Acordeon titulo="📅 Cada jornada" abierto>
           <ul className="list-disc space-y-1 pl-5">
             <li>Una jornada es cada semana. Los fichajes se abren el <strong>lunes a las 9:30</strong> y se cierran cuando empieza el primer partido.</li>
-            <li>Tienes <strong>{PRESUPUESTO} ⭐</strong> para <strong>5 titulares y 1 suplente</strong>. Cada jugador cuesta de 4 a 15 ⭐ según sus últimas 4 jornadas, y el precio no cambia en toda la semana.</li>
+            <li>Tienes <strong>{PRESUPUESTO} ⭐</strong> para <strong>5 titulares, 1 suplente y 1 dúo técnico</strong>. Cada jugador cuesta de 4 a 15 ⭐ según sus últimas 4 jornadas, y el precio no cambia en toda la semana.</li>
             <li>Máximo <strong>2 titulares del mismo equipo</strong>. El <strong>capitán</strong> puntúa doble.</li>
             <li>El <strong>suplente</strong> entra solo si un titular no juega.</li>
             <li>A quien fiches una jornada no lo puedes fichar la siguiente (el suplente, solo si llegó a entrar).</li>
@@ -499,6 +510,14 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             {tabla.map(([i, a, b]) => <tr key={a}><td className="w-8 py-1.5 text-center">{i}</td><td className="py-1.5">{a}</td><td className={`py-1.5 text-right font-bold ${b.startsWith("−") ? "text-red-300" : "text-green-300"}`}>{b}</td></tr>)}
           </tbody></table>
           <p className="mt-2 fx-suave">Los puntos salen en cuanto entran las estadísticas de cada partido. Cada jornada puede tener un <strong>partido de la jornada</strong>: los jugadores de ese partido puntúan ×1,5.</p>
+        </Acordeon>
+        <Acordeon titulo="📋 Dúo técnico">
+          <p>Además de los jugadores, cada jornada fichas a <strong>un dúo técnico</strong>: el cuerpo técnico de un equipo. Puntúa con el resultado de su partido:</p>
+          <table className="mt-2 w-full"><tbody className="divide-y divide-[var(--fx-borde)]">
+            {[["Victoria", "+4"], ["Derrota", "−1"], ["Por cada 5 puntos de diferencia (ganando o perdiendo)", "±1 (máx. ±4)"], ["Ganar a un rival mejor clasificado", "+2"]]
+              .map(([a, b]) => <tr key={a}><td className="py-1.5">{a}</td><td className={`py-1.5 text-right font-bold ${b.startsWith("−") ? "text-red-300" : "text-green-300"}`}>{b}</td></tr>)}
+          </tbody></table>
+          <p className="mt-2 fx-suave">Cuesta de 3 a 8 ⭐ según sus últimos resultados, es obligatorio, no puede ser capitán y, como los jugadores, queda bloqueado la jornada siguiente. Si es el partido de la jornada, también puntúa ×1,5.</p>
         </Acordeon>
         <Acordeon titulo="🃏 Comodines">
           <ul className="space-y-1">{(Object.keys(COMODINES) as Comodin[]).map((c) => <li key={c}><strong className="text-[var(--fx-oro)]">{COMODINES[c].nombre}:</strong> {COMODINES[c].texto}</li>)}</ul>

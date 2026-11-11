@@ -38,7 +38,7 @@ export default function Alta({ staff, abiertoPublico, premio }: { staff: { nombr
       <img src="/insignias/29-campeon-del-turo.png" alt="" className="fx-pop mx-auto -mb-2 h-20 w-20" />
       <h1 className="fx-display fx-oro-texto text-4xl">Fantasy Turó</h1>
       <p className="-mt-3 text-sm text-white/80">CB Turó de la Peira</p>
-      <p className="text-sm text-white/85">Ficha a 5 jugadores con 50 ⭐, compite jornada a jornada y demuestra que eres el mejor mánager del Turó.</p>
+      <p className="text-sm text-white/85">Ficha a 5 jugadores y un dúo técnico con 54 ⭐, compite jornada a jornada y demuestra que eres el mejor mánager del Turó.</p>
       {premio && <Premio premio={premio} />}
 
       <div className="overflow-hidden rounded-2xl bg-[#f3f5fb] text-left text-[#121a33] shadow-xl">

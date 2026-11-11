@@ -10,7 +10,7 @@ export const ADMIN_FANTASY = "60fb55be-45e2-4f5d-addc-35aaf44b7610"; // Juan Gá
 export const COOKIE_FANTASY = "fantasy_sesion";
 
 export type Prueba = { inicio: string; jornada: string; especial: string | null; alineacionAdmin: boolean };
-export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null };
+export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null; duos: Record<string, string> };
 export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
 export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, comodines, emoji, color, foto, created_at";
 /** "Juan Gámez Gómez" → "Juan G." */
@@ -33,8 +33,8 @@ export function pinOk(pin: string, guardado: string | null) {
 export const nuevaSesion = () => randomBytes(24).toString("hex");
 
 export async function leerConfig(): Promise<Config> {
-  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada, prueba").eq("id", 1).single();
-  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada, prueba: (data?.prueba as Prueba | null) ?? null };
+  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada, prueba, duos").eq("id", 1).single();
+  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada, prueba: (data?.prueba as Prueba | null) ?? null, duos: (data?.duos ?? {}) as Record<string, string> };
 }
 
 /** Quién está mirando: usuario de la app (staff) y/o participante del fantasy */
@@ -81,10 +81,17 @@ export async function cargarLiga(config: Config) {
     d.from("fcbq_stats").select("equipo_id, stats_id, fecha, datos").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).or("local.ilike.%tur%,visitante.ilike.%tur%").limit(2000),
     d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id, rival, local, puntos_favor, puntos_contra").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("fecha", desde).limit(2000),
     d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
-    d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste"),
+    d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste, duo"),
     d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
     d.from("fantasy_precios").select("jornada, precios"),
   ]);
+  // Para el dúo técnico: ¿el rival de cada partido va por encima en la clasificación?
+  const clas = await cargarClasificaciones();
+  const rivalArriba: Record<string, boolean> = {};
+  for (const p of (partidos ?? []) as PartidoCal[]) {
+    const c = clas.get(p.equipo_id), r = posicion(c, p.rival), n = posicion(c, null, true);
+    if (r && n) rivalArriba[p.id] = r.pos < n.pos;
+  }
   const preciosFijos: PreciosFijos = Object.fromEntries((fijos ?? []).map((f) => [f.jornada as string, f.precios as PreciosFijos[string]]));
   const participantes = (parts ?? []) as Participante[];
   const mensajes: Record<string, number> = {};
@@ -94,12 +101,12 @@ export async function cargarLiga(config: Config) {
     equipos, filas: (filas ?? []) as FilaStats[], partidos: (partidos ?? []) as PartidoCal[],
     especiales: config.especiales, anuladas: config.anuladas,
     alineaciones: (als ?? []) as Alineacion[], participantes: participantes.map((p) => ({ id: p.id, alias: p.alias })),
-    mensajes, cerrada: config.cerrada, campeon: config.campeon, preciosFijos,
+    mensajes, cerrada: config.cerrada, campeon: config.campeon, preciosFijos, duosNombres: config.duos, rivalArriba,
   });
   // Al abrirse una jornada se guardan sus precios: así no cambian aunque luego entren más estadísticas
   if (liga.abierta && !preciosFijos[liga.abierta]) {
-    const p = liga.precio(liga.abierta);
-    await d.from("fantasy_precios").upsert({ jornada: liga.abierta, precios: Object.fromEntries([...p].map(([id, x]) => [id, [x.precio, x.media, x.pj]])) }, { onConflict: "jornada", ignoreDuplicates: true });
+    const p = [...liga.precio(liga.abierta), ...liga.precioDuo(liga.abierta)];
+    await d.from("fantasy_precios").upsert({ jornada: liga.abierta, precios: Object.fromEntries(p.map(([id, x]) => [id, [x.precio, x.media, x.pj]])) }, { onConflict: "jornada", ignoreDuplicates: true });
   }
   return { liga, participantes, partidos: (partidos ?? []) as PartidoCal[], equipos };
 }

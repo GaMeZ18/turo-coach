@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, Link2, Loader2 } from "lucide-react";
-import { adminAnular, adminQuitarFoto, adminBorrarParticipante, adminCrearPrueba, adminBorrarPrueba, adminCerrarTemporada, adminConfig, adminEspecial, adminSilenciar } from "../actions";
+import { adminAnular, adminDuo, adminQuitarFoto, adminBorrarParticipante, adminCrearPrueba, adminBorrarPrueba, adminCerrarTemporada, adminConfig, adminEspecial, adminSilenciar } from "../actions";
 
 function useAccion() {
   const [pend, start] = useTransition();
@@ -107,6 +107,16 @@ export function Prueba({ activa, jornada }: { activa: boolean; jornada: string |
         </button>
       )}
       {a.error && <p className="text-sm text-red-300">{a.error}</p>}
+    </div>
+  );
+}
+export function NombreDuo({ equipoId, equipo, valor }: { equipoId: string; equipo: string; valor: string }) {
+  const [v, setV] = useState(valor); const a = useAccion();
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-28 shrink-0 text-xs font-semibold">{equipo}</span>
+      <input className="fx-input flex-1 !py-1.5" value={v} maxLength={80} placeholder="Nombre y Nombre" onChange={(e) => setV(e.target.value)} />
+      <button className="fx-btn-sec" disabled={a.pend || v === valor} onClick={() => a.run(() => adminDuo(equipoId, v))}>{a.pend ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}</button>
     </div>
   );
 }
