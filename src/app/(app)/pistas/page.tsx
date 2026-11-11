@@ -6,6 +6,9 @@ import { aISO, diaInput, hora, hoyLocal, TZ } from "@/lib/fechas";
 import { horaReal, lunesDe, normPista, solapes, sumarDias, type Ocupacion, type Pista } from "@/lib/pistas";
 import Enviar from "@/components/Enviar";
 import { borrarPista, guardarPista } from "./actions";
+import Solicitudes, { type SolicitudVista } from "./Solicitudes";
+import { adminClient } from "@/lib/supabase/admin";
+import { fechaCorta } from "@/lib/fechas";
 import { AlertTriangle, ChevronLeft, ChevronRight, MapPin, Settings2, Trash2 } from "lucide-react";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -35,6 +38,38 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
     ...pistas.map((p) => ({ clave: normPista(p.nombre), nombre: p.nombre, capacidad: p.capacidad, notas: p.notas, casa: !!p.partidos_casa })),
     ...otras.map((k) => ({ clave: k, nombre: k, capacidad: 1, notas: "No está dada de alta", casa: false })),
   ];
+  // Cambios de pista pedidos (los pendientes y los últimos resueltos)
+  const { data: solR } = await supabase.from("solicitudes_pista")
+    .select("id, estado, entrenamiento_id, intercambio_id, nueva_fecha, nuevo_lugar, todas_semanas, motivo, respuesta, created_at, solicitante_id, perfiles!solicitudes_pista_solicitante_id_fkey(nombre)")
+    .order("created_at", { ascending: false }).limit(30);
+  const solTodas = ((solR ?? []) as unknown as { id: string; estado: string; entrenamiento_id: string; intercambio_id: string | null; nueva_fecha: string | null; nuevo_lugar: string | null; todas_semanas: boolean; motivo: string | null; respuesta: string | null; created_at: string; solicitante_id: string | null; perfiles: { nombre: string | null } | null }[])
+    ;
+  const solFilas = [...solTodas.filter((x) => x.estado === "pendiente"), ...solTodas.filter((x) => x.estado === "aprobada" || x.estado === "rechazada").slice(0, 6)];
+  let solicitudes: SolicitudVista[] = [];
+  const adm = adminClient();
+  if (solFilas.length && adm) {
+    const ids = [...new Set(solFilas.flatMap((x) => [x.entrenamiento_id, x.intercambio_id].filter(Boolean) as string[]))];
+    const { data: ents } = await adm.from("entrenamientos").select("id, equipo_id, fecha, lugar, duracion_prevista").in("id", ids);
+    const ent = new Map(((ents ?? []) as { id: string; equipo_id: string; fecha: string; lugar: string | null; duracion_prevista: number | null }[]).map((x) => [x.id, x]));
+    const txt = (x?: { fecha: string; lugar: string | null }) => (x ? `${fechaCorta(x.fecha)} ${hora(x.fecha)} · ${x.lugar ?? "sin pista"}` : "—");
+    solicitudes = await Promise.all(solFilas.map(async (x) => {
+      const e = ent.get(x.entrenamiento_id), o = x.intercambio_id ? ent.get(x.intercambio_id) : undefined;
+      let aviso: string | null = null;
+      if (x.estado === "pendiente" && x.nueva_fecha && x.nuevo_lugar && e) {
+        const ini = Date.parse(x.nueva_fecha), fin = ini + (e.duracion_prevista ?? 90) * 60000;
+        const { data: oc } = await supabase.rpc("ocupacion_pistas", { desde: new Date(ini - 4 * 3600e3).toISOString(), hasta: new Date(fin + 3600e3).toISOString() });
+        const cap = pistas.find((p) => normPista(p.nombre) === normPista(x.nuevo_lugar))?.capacidad ?? 1;
+        const otros = ((oc ?? []) as Ocupacion[]).filter((y) => y.id !== e.id && normPista(y.lugar) === normPista(x.nuevo_lugar) && Date.parse(y.fecha) < fin && ini < Date.parse(y.fecha) + (y.duracion ?? 90) * 60000);
+        if (otros.length >= cap) aviso = `A esa hora la pista ya la tiene ${otros.map((y) => `${nombreEq(y.equipo_id)} (${hora(y.fecha)})`).join(", ")}`;
+      }
+      return {
+        id: x.id, estado: x.estado, equipo: e ? nombreEq(e.equipo_id) : "Equipo", antes: txt(e),
+        despues: o ? `intercambio con ${nombreEq(o.equipo_id)} (${txt(o)})` : `${x.nueva_fecha ? `${fechaCorta(x.nueva_fecha)} ${hora(x.nueva_fecha)}` : ""} · ${x.nuevo_lugar ?? "sin pista"}`,
+        todas: x.todas_semanas, motivo: x.motivo, quien: x.perfiles?.nombre ?? null, cuando: fechaCorta(x.created_at), respuesta: x.respuesta, aviso, mia: x.solicitante_id === perfil.id,
+      };
+    }));
+  }
+
   const dias = Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
   const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("es-ES", { day: "numeric", month: "short", timeZone: TZ });
 
@@ -77,6 +112,8 @@ export default async function PistasPage({ searchParams }: { searchParams: Promi
           <Link href={`/pistas?semana=${sumarDias(lunes, 7)}`} className="btn-secundario !px-2.5" aria-label="Semana siguiente"><ChevronRight size={18} /></Link>
         </div>
       </div>
+
+      <Solicitudes lista={solicitudes} coordinador={esCoord} />
 
       {error && /pistas/.test(error.message) && <p className="tarjeta mt-4 p-3 text-sm text-red-700">Falta preparar la base de datos (0014_pistas.sql).</p>}
 

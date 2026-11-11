@@ -228,6 +228,59 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
     }
   } catch { /* la asistencia no debe romper el resto de avisos */ }
 
+  // 12) Reuniones de staff: 2 horas antes, a los convocados · 13) Tareas: el día que vencen (desde las 9:00), a su responsable
+  try {
+    const { data: reus } = await db.from("reuniones").select("id, titulo, fecha, lugar, asistentes").gte("fecha", new Date(ahora).toISOString()).lte("fecha", new Date(ahora + 2 * 3600e3).toISOString());
+    for (const r of (reus ?? []) as { id: string; titulo: string; fecha: string; lugar: string | null; asistentes: string[] }[]) {
+      await unaVez(`reunion2h:${r.id}`, () => notificarPerfiles(db, r.asistentes, `📅 Hoy: ${r.titulo}`, `A las ${hora(r.fecha)}${r.lugar ? ` · ${r.lugar}` : ""}. Toca para ver el orden del día.`, `/reuniones/${r.id}`));
+    }
+    if (horaLocal >= 9) {
+      const { data: tv } = await db.from("tareas").select("id, titulo, responsable_id, reunion_id").eq("hecha", false).eq("fecha_limite", hoy).not("responsable_id", "is", null);
+      for (const t of (tv ?? []) as { id: string; titulo: string; responsable_id: string; reunion_id: string | null }[]) {
+        await unaVez(`tarea:${t.id}:${hoy}`, () => notificarPerfiles(db, [t.responsable_id], "📝 Tarea para hoy", t.titulo, t.reunion_id ? `/reuniones/${t.reunion_id}` : "/reuniones"));
+      }
+    }
+
+    // 14) Domingo desde las 20:00: resumen de la semana a cada entrenador (sus equipos) y a coordinación (todo el club)
+    if (diaSemana === 0 && horaLocal >= 20) {
+      const desdeS = aISO(lunes, "00:00"), hastaS = new Date(ahora).toISOString();
+      const [{ data: entS }, { data: ptsS }] = await Promise.all([
+        db.from("entrenamientos").select("id, equipo_id").is("anulado_motivo", null).in("equipo_id", ids).gte("fecha", desdeS).lte("fecha", hastaS),
+        db.from("partidos").select("equipo_id, rival, puntos_favor, puntos_contra").in("equipo_id", ids).gte("fecha", desdeS).lte("fecha", hastaS),
+      ]);
+      const ents = (entS ?? []) as { id: string; equipo_id: string }[];
+      const { data: asS } = ents.length ? await db.from("asistencias").select("entrenamiento_id, estado").in("entrenamiento_id", ents.map((e) => e.id)) : { data: [] };
+      const asis = (asS ?? []) as { entrenamiento_id: string; estado: string }[];
+      const eqDeEnt = new Map(ents.map((e) => [e.id, e.equipo_id]));
+      const pts = ((ptsS ?? []) as { equipo_id: string; rival: string; puntos_favor: number | null; puntos_contra: number | null }[]).filter((p) => p.puntos_favor !== null && p.puntos_contra !== null);
+      const linea = (eq: string) => {
+        const n = ents.filter((e) => e.equipo_id === eq).length;
+        const a = asis.filter((x) => eqDeEnt.get(x.entrenamiento_id) === eq && x.estado !== "justificado");
+        const pc = a.length ? Math.round((a.filter((x) => x.estado === "presente" || x.estado === "tarde").length * 100) / a.length) : null;
+        const res = pts.filter((p) => p.equipo_id === eq).map((p) => `${p.puntos_favor! > p.puntos_contra! ? "ganó" : "perdió"} ${p.puntos_favor}-${p.puntos_contra} vs ${p.rival}`);
+        if (!n && !res.length) return null;
+        return `${nombre(eq)}: ${n} ${n === 1 ? "entreno" : "entrenos"}${pc !== null ? ` (${pc}% asistencia)` : ""}${res.length ? ` · ${res.join(", ")}` : ""}`;
+      };
+      const porPerfil = new Map<string, string[]>();
+      for (const s2 of (staffR ?? []) as { equipo_id: string; perfil_id: string }[]) {
+        const l = linea(s2.equipo_id);
+        if (l) porPerfil.set(s2.perfil_id, [...(porPerfil.get(s2.perfil_id) ?? []), l]);
+      }
+      for (const [pid, lineas] of porPerfil) {
+        if (coordinadores.includes(pid)) continue;
+        await unaVez(`resumen-semana:${lunes}:${pid}`, () => notificarPerfiles(db, [pid], "📊 Tu semana", lineas.join("\n"), "/entrenamientos"));
+      }
+      const g = pts.filter((p) => p.puntos_favor! > p.puntos_contra!).length;
+      const aTot = asis.filter((x) => x.estado !== "justificado");
+      const pcClub = aTot.length ? Math.round((aTot.filter((x) => x.estado === "presente" || x.estado === "tarde").length * 100) / aTot.length) : null;
+      const sinLista = ents.filter((e) => !asis.some((x) => x.entrenamiento_id === e.id)).length;
+      for (const pid of coordinadores) {
+        await unaVez(`resumen-semana:${lunes}:${pid}`, () => notificarPerfiles(db, [pid], "📊 La semana del club",
+          `${pts.length} partidos: ${g} victorias y ${pts.length - g} derrotas. ${ents.length} entrenos${pcClub !== null ? `, ${pcClub}% de asistencia` : ""}${sinLista ? `, ${sinLista} sin pasar lista` : ""}.`, "/coordinacion"));
+      }
+    }
+  } catch { /* que no rompa el resto de avisos */ }
+
   // 8) Fantasy Turó: viernes «haz tu equipo», 2 h antes del cierre, lunes «tus puntos», insignias nuevas y resumen del chat
   try {
     const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");

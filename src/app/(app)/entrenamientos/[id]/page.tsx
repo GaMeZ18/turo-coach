@@ -10,6 +10,9 @@ import Asistencia from "./Asistencia";
 import Objetivos from "./Objetivos";
 import AvisarStaff from "./AvisarStaff";
 import Anular from "./Anular";
+import CambioPista, { type UltimaSolicitud } from "./CambioPista";
+import { lunesDe, sumarDias } from "@/lib/pistas";
+import { aISO } from "@/lib/fechas";
 import Comentarios, { type ComentarioEntreno } from "./Comentarios";
 import Historial from "@/components/Historial";
 import type { Objetivo } from "@/lib/objetivos";
@@ -78,6 +81,22 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // Cambio de pista: entrenos de otros equipos esa semana (para intercambiar) y la última solicitud
+  const lunesE = lunesDe(diaInput(e.fecha));
+  const [{ data: ocSemana }, { data: eqsT }, { data: sol }] = await Promise.all([
+    supabase.rpc("ocupacion_pistas", { desde: aISO(lunesE, "00:00"), hasta: aISO(sumarDias(lunesE, 7), "00:00") }),
+    supabase.from("equipos").select("id, nombre, temporadas!inner(actual)").eq("temporadas.actual", true),
+    supabase.from("solicitudes_pista").select("id, estado, nueva_fecha, nuevo_lugar, intercambio_id, respuesta, solicitante_id").eq("entrenamiento_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const nomEq = new Map(((eqsT ?? []) as { id: string; nombre: string }[]).map((x) => [x.id, x.nombre]));
+  const opcionesIntercambio = ((ocSemana ?? []) as Ocupacion[]).filter((o) => o.tipo !== "partido" && o.equipo_id !== e.equipo_id)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .map((o) => ({ id: o.id, texto: `${nomEq.get(o.equipo_id) ?? "Otro equipo"} · ${fechaLarga(o.fecha)} ${hora(o.fecha)}${o.lugar ? ` · ${o.lugar}` : ""}` }));
+  const ultima: UltimaSolicitud = sol ? {
+    id: sol.id, estado: sol.estado, respuesta: sol.respuesta, mia: sol.solicitante_id === user.id,
+    texto: sol.intercambio_id ? `intercambiar con ${opcionesIntercambio.find((o) => o.id === sol.intercambio_id)?.texto ?? "otro equipo"}` : `pasar a ${sol.nueva_fecha ? `${fechaLarga(sol.nueva_fecha)} ${hora(sol.nueva_fecha)}` : ""}${sol.nuevo_lugar ? ` · ${sol.nuevo_lugar}` : ""}`,
+  } : null;
+
   const planesEntreno = ((planes ?? []) as unknown as { id: string; nombre: string; equipo_id: string | null; temporada_id: string | null; objetivos: Objetivo[] }[])
     .filter((p) => !p.temporada_id || p.temporada_id === temporada?.id)
     .sort((a, b) => (a.equipo_id ? 0 : 1) - (b.equipo_id ? 0 : 1))
@@ -127,6 +146,7 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
         </p>
       )}
       {e.notas && <p className="mt-3 whitespace-pre-line rounded-lg bg-oro/15 p-3 text-sm">{e.notas}</p>}
+      {!e.anulado_motivo && <CambioPista entrenoId={e.id} dia={diaInput(e.fecha)} hora={horaInput(e.fecha)} lugar={e.lugar} opciones={opcionesIntercambio} ultima={ultima} />}
 
       <details className="mt-3">
         <summary className="inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden gap-1 text-sm text-azul hover:underline">
