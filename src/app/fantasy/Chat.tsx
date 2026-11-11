@@ -17,12 +17,11 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
   const fin = useRef<HTMLDivElement>(null);
   // «@» al final: sugerir equipos para mencionar
   const arroba = texto.match(/@([^@]*)$/);
-  const sugerencias = arroba ? equipos.filter((a) => a.toLowerCase().startsWith(arroba[1].toLowerCase()) && a.toLowerCase() !== arroba[1].toLowerCase().trim()).slice(0, 5) : [];
+  const sugerencias = arroba ? ["all", ...equipos].filter((a) => a.toLowerCase().startsWith(arroba[1].toLowerCase()) && a.toLowerCase() !== arroba[1].toLowerCase().trim()).slice(0, 5) : [];
   const mencionar = (alias: string) => setTexto(texto.replace(/@([^@]*)$/, `@${alias} `));
   /** Resalta las menciones a equipos que existen */
   const conMenciones = (t: string) => {
-    const nombres = [...equipos].sort((a, b) => b.length - a.length).map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    if (!nombres.length) return t;
+    const nombres = ["all", ...equipos].sort((a, b) => b.length - a.length).map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const partes = t.split(new RegExp(`(@(?:${nombres.join("|")}))`, "gi"));
     return partes.map((x, i) => (i % 2 ? <strong key={i} className="text-[#1d4ed8]">{x}</strong> : x));
   };
@@ -66,7 +65,7 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
         <div className="relative flex gap-2 border-t border-[var(--fx-borde)] p-2">
           {sugerencias.length > 0 && (
             <ul className="absolute bottom-full left-2 right-2 mb-1 overflow-hidden rounded-xl border border-[var(--fx-borde)] bg-[#0c1430] shadow-lg">
-              {sugerencias.map((a) => <li key={a}><button type="button" onClick={() => mencionar(a)} className="w-full px-3 py-2 text-left text-sm hover:bg-white/10">@{a}</button></li>)}
+              {sugerencias.map((a) => <li key={a}><button type="button" onClick={() => mencionar(a)} className="w-full px-3 py-2 text-left text-sm hover:bg-white/10">@{a}{a === "all" && <span className="ml-2 text-xs fx-suave">avisa a todos</span>}</button></li>)}
             </ul>
           )}
           <input className="fx-input flex-1 !rounded-full" placeholder="Escribe un mensaje… (@ para mencionar)" maxLength={500} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && texto.trim() && enviar()} />

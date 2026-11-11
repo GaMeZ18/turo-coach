@@ -595,6 +595,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             <li>El <strong>suplente</strong> entra solo si un titular no juega.</li>
             <li>A quien fiches una jornada no lo puedes fichar la siguiente (el suplente, solo si llegó a entrar).</li>
             <li>Si alguien juega en dos equipos, eliges con cuál puntúa.</li>
+            <li>Algunas semanas el club las marca como <strong>«Sin Fantasy»</strong> (por ejemplo, cuando solo juegan uno o dos equipos): esa semana no hay jornada ni cuenta para los bloqueos. Lo verás en el <strong>Calendario</strong>, con el rival y la posición de cada equipo.</li>
             <li><strong>¿Quién se puede fichar?</strong> Los jugadores de los equipos que tienen estadísticas de la Federació en cada partido ({[...new Set([...liga.jugadores.values()].map((j) => j.equipo))].sort().join(", ")}). Los equipos de CEEB, minibásquet y los que no tienen estadísticas no salen porque no hay datos para puntuar.</li>
           </ul>
         </Acordeon>
@@ -612,12 +613,28 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           </tbody></table>
           <p className="mt-2 fx-suave">Cuesta de 3 a 8 ⭐ según sus últimos resultados, es obligatorio, no puede ser capitán y, como los jugadores, queda bloqueado la jornada siguiente. Si es el partido de la jornada, también puntúa ×1,5.</p>
         </Acordeon>
+        <Acordeon titulo="📈 Mercado y fichas">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Toca cualquier jugador o dúo en el <strong>Mercado</strong> para ver su ficha <strong>tipo bolsa</strong>: cómo ha subido o bajado su precio, sus puntos jornada a jornada, sus partidos y cuánta gente lo tiene fichado.</li>
+            <li>Mientras haces el equipo se guarda un borrador en tu móvil; no cuenta hasta que pulsas <strong>Guardar</strong>.</li>
+            <li>En <strong>Clasificación</strong> ves la general y la de cada jornada. Cuando se cierran los fichajes, puedes ver el equipo de los demás.</li>
+            <li>Hay <strong>30 insignias</strong> que se ganan solas a lo largo de la temporada (mira cómo conseguir cada una en <strong>Insignias</strong>).</li>
+          </ul>
+        </Acordeon>
         <Acordeon titulo="🃏 Comodines">
           <ul className="space-y-1">{(Object.keys(COMODINES) as Comodin[]).map((c) => <li key={c}><strong className="text-[var(--fx-oro)]">{COMODINES[c].nombre}:</strong> {COMODINES[c].texto}</li>)}</ul>
           <p className="mt-2 fx-suave">Cada uno se puede usar una vez por temporada, y solo uno por jornada.</p>
         </Acordeon>
+        <Acordeon titulo="🔔 Chat y avisos">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Escribe <strong>@</strong> y el nombre de un equipo para mencionarlo: le llega un aviso.</li>
+            <li><strong>@all</strong> avisa a todos los participantes. Úsalo para cosas importantes: cada persona puede usarlo <strong>una vez cada 12 horas</strong>.</li>
+            <li>Si activas los avisos (en tu perfil) te llegan: un recordatorio el <strong>viernes</strong> y otro <strong>2 horas antes</strong> de que se cierren los fichajes si aún no has hecho equipo, <strong>tus puntos</strong> el lunes, <strong>insignias nuevas</strong>, menciones y un <strong>resumen del chat</strong> por la noche si hay 3 mensajes o más sin leer.</li>
+          </ul>
+        </Acordeon>
         <Acordeon titulo="💬 Normas del chat">
           <ul className="list-disc space-y-1 pl-5">
+            <li>No abuses de <strong>@all</strong>: los avisos a todos, solo para cosas que interesen a todos.</li>
             <li>Respeto siempre: <strong>sin insultos</strong>, sin burlas ni comentarios ofensivos.</li>
             <li>No se habla mal de jugadores, entrenadores, familias, árbitros ni rivales.</li>
             <li>No compartas datos personales (teléfonos, direcciones…) ni fotos de otras personas.</li>
