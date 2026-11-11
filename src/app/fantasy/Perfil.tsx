@@ -63,7 +63,7 @@ function Recortador({ src, onListo, onCancelar }: { src: string; onListo: (dataU
     onListo(c.toDataURL("image/jpeg", 0.82));
   };
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4" data-sin-refresco>
+    <div className="zona-segura fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4" data-sin-refresco>
       <div className="fx-card w-full max-w-sm space-y-3 p-4 text-center">
         <p className="fx-display text-xl">Recorta tu foto</p>
         <p className="text-xs fx-suave">Mueve la foto con el dedo y haz zoom para dejar dentro del círculo lo que quieras.</p>
@@ -145,7 +145,7 @@ export function EditarPerfil({ alias, mostrar, avatar, publico, clavePublica }: 
     <>
       <button type="button" onClick={() => setAbierto(true)} className="rounded-md p-1 text-[var(--fx-suave)] hover:text-white" aria-label="Editar mi equipo"><Pencil size={14} /></button>
       {abierto && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center" onClick={() => setAbierto(false)}>
+        <div className="zona-segura fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center" onClick={() => setAbierto(false)}>
           <div className="fx-card w-full max-w-md space-y-3 p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between"><p className="fx-display text-xl">Mi equipo</p><button onClick={() => setAbierto(false)} aria-label="Cerrar"><X size={18} /></button></div>
             <label className="block text-xs fx-suave">Nombre del equipo (en grande)<input className="fx-input mt-1" maxLength={30} value={f.alias} onChange={(e) => setF({ ...f, alias: e.target.value })} /></label>

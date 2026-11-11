@@ -100,7 +100,7 @@ export default async function ImprimirEntreno({ params }: { params: Promise<{ id
                 )}
                 {pasos.length > 0 && (
                   // La jugada paso a paso: cada dibujo, con los jugadores donde están en ese momento y solo sus movimientos
-                  <div className={`mt-2 grid gap-2 ${pasos.length === 1 ? "grid-cols-2" : "grid-cols-3"}`}>
+                  <div className={`mt-2 grid gap-2 ${pasos.length === 1 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3 print:grid-cols-3"}`}>
                     {pasos.map((r, k) => (
                       <figure key={k} className="break-inside-avoid overflow-hidden rounded border border-linea">
                         <MiniPizarra pizarra={ej.pizarra} pasos={r} numeros className="w-full" />

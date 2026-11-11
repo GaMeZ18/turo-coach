@@ -15,7 +15,7 @@ export default function AltaRapida({ equipos }: { equipos: { id: string; nombre:
         <button type="button" className="btn-secundario" onClick={() => setAbierto("gestor_mesas")}><ClipboardCheck size={16} /> Gestor de mesas</button>
       </div>
       {abierto && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center" onClick={() => setAbierto(null)}>
+        <div className="zona-segura fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center" onClick={() => setAbierto(null)}>
           <div className="relative w-full max-w-xl" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setAbierto(null)} className="absolute right-3 top-3 z-10 text-tinta/50 hover:text-tinta" aria-label="Cerrar"><X size={18} /></button>
             <NuevaPersona key={abierto} equipos={equipos} rol={abierto === "coordinador" ? "coordinador" : "entrenador"} mesas={abierto === "gestor_mesas"}

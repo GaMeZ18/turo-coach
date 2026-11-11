@@ -161,3 +161,11 @@ html[data-tema="auto"] {
   html[data-tema="auto"] :is(.btn-azul, .bg-azul) { background-color: #1e3fa8; }
   html[data-tema="auto"] :is(.bg-azul.text-white, .bg-azul .text-white) { color: #fff; }
 }
+
+/* Ventanas a pantalla completa: que no queden debajo de la muesca ni de la barra de inicio (iPhone y Android con gestos) */
+.zona-segura {
+  padding-top: max(0.75rem, env(safe-area-inset-top)) !important;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+  padding-left: max(0px, env(safe-area-inset-left));
+  padding-right: max(0px, env(safe-area-inset-right));
+}

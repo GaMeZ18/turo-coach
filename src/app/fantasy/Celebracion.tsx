@@ -35,7 +35,7 @@ export default function Celebracion({ pid, insignias, campeon, temporada }: { pi
 
   if (verCampeon && campeon) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#070c1c]/95 p-6 text-center" onClick={() => { guardar(`fx-campeon-${temporada}`, "1"); setVerCampeon(false); }}>
+      <div className="zona-segura fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#070c1c]/95 p-6 text-center" onClick={() => { guardar(`fx-campeon-${temporada}`, "1"); setVerCampeon(false); }}>
         {Array.from({ length: 40 }, (_, i) => (
           <span key={i} className="pointer-events-none absolute top-[-10%] h-3 w-2 rounded-sm"
             style={{ left: `${(i * 37) % 100}%`, background: ["#f6c445", "#d81f2f", "#1d4ed8", "#22b04f", "#fff"][i % 5], animation: `fx-confeti ${2.5 + (i % 7) * 0.4}s linear ${(i % 10) * 0.25}s infinite` }} />
@@ -53,7 +53,7 @@ export default function Celebracion({ pid, insignias, campeon, temporada }: { pi
   }
   if (!nueva) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#070c1c]/95 p-6 text-center">
+    <div className="zona-segura fixed inset-0 z-50 flex items-center justify-center bg-[#070c1c]/95 p-6 text-center">
       <div className="fx-pop max-w-sm">
         <p className="fx-display fx-oro-texto text-4xl">¡Nueva insignia!</p>
         <img src={nueva.img} alt="" className="mx-auto my-3 h-48 w-48 drop-shadow-[0_0_30px_rgba(246,196,69,.5)]" />

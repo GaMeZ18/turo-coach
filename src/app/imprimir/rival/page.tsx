@@ -92,7 +92,7 @@ export default async function InformeRivalPDF({ searchParams }: { searchParams: 
         </div>
       </header>
 
-      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4 print:grid-cols-4">
         {[["Mete", jugados.length ? f1(pf / jugados.length) : "–"], ["Recibe", jugados.length ? f1(pc / jugados.length) : "–"], ["Triples", r.pj ? f1(r.t3 / r.pj) : "–"], ["Tiros libres", pct(r.tlm, r.tla)]].map(([t, v]) => (
           <div key={t} className="rounded-lg bg-suave p-2"><div className="text-xl font-bold text-azul">{v}</div><div className="text-[10px] uppercase tracking-wide text-tinta/60">{t}{t !== "Tiros libres" ? " / partido" : ""}</div></div>
         ))}
@@ -141,7 +141,7 @@ export default async function InformeRivalPDF({ searchParams }: { searchParams: 
       {top.length > 0 && (
         <section className="evitar">
           <H2>Máximos anotadores</H2>
-          <div className="mt-2 grid grid-cols-5 gap-1.5">
+          <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-5 print:grid-cols-5">
             {top.map((j, i) => {
               const f = fichaDe(j.nombre);
               return (

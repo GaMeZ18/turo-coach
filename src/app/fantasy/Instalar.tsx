@@ -64,7 +64,7 @@ export default function InstalarFantasy() {
       </div>
 
       {abierto && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-3 sm:items-center" onClick={() => setAbierto(false)}>
+        <div className="zona-segura fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-3 sm:items-center" onClick={() => setAbierto(false)}>
           <div className="fx-card w-full max-w-md space-y-3 p-4 text-sm" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between"><p className="fx-display text-xl">📲 Añadir a la pantalla de inicio</p><button onClick={() => setAbierto(false)} aria-label="Cerrar"><X size={18} /></button></div>
 

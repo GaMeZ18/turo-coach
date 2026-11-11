@@ -21,7 +21,7 @@ export default function Bienvenida({ abrir }: { abrir: boolean }) {
   const p = PASOS[i];
   const ultimo = i === PASOS.length - 1;
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 p-3 sm:items-center" onClick={cerrar}>
+    <div className="zona-segura fixed inset-0 z-[90] flex items-end justify-center bg-black/50 p-3 sm:items-center" onClick={cerrar}>
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="relative bg-azul px-6 pb-6 pt-8 text-center text-white">
           <button type="button" onClick={cerrar} className="absolute right-3 top-3 rounded-full p-1.5 text-white/70 hover:bg-white/10" aria-label="Cerrar"><X size={20} /></button>

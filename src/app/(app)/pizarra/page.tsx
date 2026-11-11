@@ -77,7 +77,7 @@ export default function PizarraLibre() {
         </div>
       </div>
       {sistema && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !guardando && setSistema(null)}>
+        <div className="zona-segura fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !guardando && setSistema(null)}>
           <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold">Guardar sistema</h2>

@@ -95,7 +95,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex h-[100dvh] items-stretch justify-center bg-black/50 sm:p-4" onClick={cerrar}>
+    <div className="zona-segura fixed inset-0 z-50 flex h-[100dvh] items-stretch justify-center bg-black/50 sm:p-4" onClick={cerrar}>
       <div className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-linea p-3">
           <Library size={18} className="text-azul" />

@@ -1145,7 +1145,7 @@ export default function Editor({ valor, onChange, registrarCaptura, altoMax = 60
   // =====================================================================
   return (
     <div
-      className={grande ? "fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-3" : "w-full min-w-0 max-w-full select-none space-y-2"}
+      className={grande ? "zona-segura fixed inset-0 z-50 flex flex-col gap-2 overflow-auto bg-suave p-2 sm:p-3" : "w-full min-w-0 max-w-full select-none space-y-2"}
       style={grande ? { paddingTop: "max(env(safe-area-inset-top), 8px)" } : undefined}
     >
       <div>
