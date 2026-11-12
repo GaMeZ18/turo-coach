@@ -19,7 +19,6 @@ const partesFecha = (iso: string) => {
   const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(g("weekday"));
   return { dia: `${DIAS[wd]} ${g("day")}/${g("month")}`, hora: `${g("hour")}:${g("minute")}`, minutos: Number(g("hour")) * 60 + Number(g("minute")) };
 };
-const hhmm = (m: number) => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, "0")}:${String(((m % 60) + 60) % 60).padStart(2, "0")}`;
 /** «Marc Puig Soler» → «MARC PUIG» */
 const corto = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ").toUpperCase();
 
@@ -49,10 +48,10 @@ async function dibujar(c: HTMLCanvasElement, p: DatosPartido, jugadores: Jug[], 
   // Debajo del título: equipo, rival y fecha
   sombra(true);
   ctx.textAlign = "center";
-  const cab = `${p.equipo.toUpperCase()}  ${p.local ? "VS" : "@"}  ${p.rival.toUpperCase()}  ·  ${f.dia}  ${f.hora}H`;
-  ajustar(ctx, cab, (t) => `600 ${t}px ${normal}`, 28, 1020);
+  const cab = `${p.equipo.toUpperCase()}  ${p.local ? "VS" : "@"}  ${p.rival.toUpperCase()}  ·  ${f.dia}`;
+  ajustar(ctx, cab, (t) => `600 ${t}px ${normal}`, 27, 1000);
   if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "2px";
-  ctx.fillText(cab, 600, 549);
+  ctx.fillText(cab, 600, 568);
   if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px";
 
   // Jugadores por dorsal: 1–6 a la izquierda, 7–12 a la derecha
@@ -68,10 +67,10 @@ async function dibujar(c: HTMLCanvasElement, p: DatosPartido, jugadores: Jug[], 
     ctx.fillText(n, col.nombre, y + 2);
   });
 
-  // Abajo, sobre la montaña: pista, hora de quedada y equipación
+  // Abajo, sobre la montaña: pista, hora del partido y equipación
   ctx.textAlign = "center";
   const l1 = p.lugar ? `📍 ${p.lugar.toUpperCase()}` : p.local ? "📍 A CASA" : "";
-  const l2 = [quedada ? `🕘 QUEDEM A LES ${quedada}` : "", equipacion.trim() ? `👕 EQUIPACIÓ ${equipacion.trim().toUpperCase()}` : ""].filter(Boolean).join("   ·   ");
+  const l2 = [quedada ? `🕘 PARTIT A LES ${quedada}H` : "", equipacion.trim() ? `👕 EQUIPACIÓ ${equipacion.trim().toUpperCase()}` : ""].filter(Boolean).join("   ·   ");
   if (l1) { ajustar(ctx, l1, (t) => `600 ${t}px ${normal}`, 30, 1060); ctx.fillText(l1, 600, l2 ? 1228 : 1250); }
   if (l2) { ajustar(ctx, l2, (t) => `600 ${t}px ${normal}`, 28, 1060); ctx.fillText(l2, 600, l1 ? 1272 : 1250); }
   sombra(false);
@@ -81,7 +80,7 @@ async function dibujar(c: HTMLCanvasElement, p: DatosPartido, jugadores: Jug[], 
 export default function ImagenConvocatoria({ partido, jugadores }: { partido: DatosPartido; jugadores: Jug[] }) {
   const [abierto, setAbierto] = useState(false);
   const f = partesFecha(partido.fecha);
-  const [quedada, setQuedada] = useState(hhmm(f.minutos - 45));
+  const [quedada, setQuedada] = useState(f.hora);
   const clave = `equipacion-${partido.equipo}`;
   const [equipacion, setEquipacion] = useState("");
   const [url, setUrl] = useState<string | null>(null);
@@ -118,7 +117,7 @@ export default function ImagenConvocatoria({ partido, jugadores }: { partido: Da
   return (
     <div className="tarjeta space-y-2 p-3">
       <div className="grid grid-cols-2 gap-2">
-        <div><label className="etiqueta">Hora de quedada</label><input type="time" value={quedada} onChange={(e) => setQuedada(e.target.value)} className="campo" /></div>
+        <div><label className="etiqueta">Hora del partido</label><input type="time" value={quedada} onChange={(e) => setQuedada(e.target.value)} className="campo" /></div>
         <div><label className="etiqueta">Equipación</label><input value={equipacion} maxLength={30} placeholder="Ej.: vermella" onChange={(e) => { setEquipacion(e.target.value); try { localStorage.setItem(clave, e.target.value); } catch { /* nada */ } }} className="campo" /></div>
       </div>
       {jugadores.length > 12 && <p className="text-xs text-amber-700">La plantilla tiene 12 huecos: salen los 12 primeros por dorsal.</p>}
