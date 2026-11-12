@@ -2,7 +2,9 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, nuevaSesion, pinOk, quienSoy } from "@/lib/fantasy/datos";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, nuevaSesion, pinOk, quienSoy, silencio } from "@/lib/fantasy/datos";
+import { REACCIONES } from "@/lib/fantasy/estilo";
+import { randomBytes } from "crypto";
 import { MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
 
 type R = { ok?: boolean; error?: string };
@@ -176,12 +178,18 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
 }
 
 // ---------- Chat ----------
-export async function enviarMensaje(jornada: string, texto: string): Promise<R> {
+export type Adjunto = { path: string; tipo: string; nombre: string };
+export async function enviarMensaje(jornada: string, texto: string, adjunto?: Adjunto | null): Promise<R> {
   const q = await quienSoy();
   if (!q.acceso || !q.participante) return { error: "No estás apuntado." };
-  if (q.participante.silenciado) return { error: "El administrador te ha silenciado en el chat." };
+  const sil = silencio(q.participante);
+  if (sil) return { error: sil };
   const t = limpiar(texto, 500);
-  if (!t) return { error: "Escribe algo." };
+  // Imágenes, vídeos y archivos: solo el administrador
+  const adj = adjunto && q.esAdmin && /^chat\/[\w.-]+$/.test(adjunto.path)
+    ? { path: adjunto.path, tipo: String(adjunto.tipo).slice(0, 60), nombre: limpiar(adjunto.nombre, 120), url: db().storage.from("fantasy-chat").getPublicUrl(adjunto.path).data.publicUrl }
+    : null;
+  if (!t && !adj) return { error: "Escribe algo." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(jornada)) return { error: "Jornada no válida." };
   // «@all» avisa a todos: como mucho una vez cada 12 horas por persona (el admin, sin límite)
   const aTodos = /(^|\s)@all\b/i.test(t);
@@ -190,7 +198,7 @@ export async function enviarMensaje(jornada: string, texto: string): Promise<R> 
     const { data: previos } = await db().from("fantasy_mensajes").select("id").eq("participante_id", q.participante.id).eq("borrado", false).ilike("texto", "%@all%").gte("created_at", hace12).limit(1);
     if (previos?.length) return { error: "Solo puedes usar @all una vez cada 12 horas." };
   }
-  const { error } = await db().from("fantasy_mensajes").insert({ jornada, participante_id: q.participante.id, texto: t });
+  const { error } = await db().from("fantasy_mensajes").insert({ jornada, participante_id: q.participante.id, texto: t, adjunto: adj });
   if (error) return { error: error.message };
   // Menciones: «@Nombre del equipo» avisa a esa persona; «@all», a todos
   if (t.includes("@")) {
@@ -208,16 +216,64 @@ export async function enviarMensaje(jornada: string, texto: string): Promise<R> 
 
 export async function leerMensajes(jornada: string) {
   const q = await quienSoy();
-  if (!q.acceso || !q.participante) return [];
+  if (!q.acceso || !q.participante) return { mensajes: [], avisos: [], silencio: null as string | null };
+  const yo = q.participante.id;
   // Apuntar que ha mirado el chat (para el resumen diario), como mucho cada 2 minutos
   const hace2 = new Date(Date.now() - 120e3).toISOString();
-  await db().from("fantasy_participantes").update({ chat_visto: new Date().toISOString() }).eq("id", q.participante.id).or(`chat_visto.is.null,chat_visto.lt.${hace2}`);
-  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, fantasy_participantes(alias, mostrar, emoji, color, foto)")
+  await db().from("fantasy_participantes").update({ chat_visto: new Date().toISOString() }).eq("id", yo).or(`chat_visto.is.null,chat_visto.lt.${hace2}`);
+  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, adjunto, fantasy_participantes(alias, mostrar, emoji, color, foto)")
     .eq("jornada", jornada).order("created_at").limit(300);
   type P = { alias: string; mostrar: string | null; emoji: string | null; color: string | null; foto: string | null };
-  return ((data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; fantasy_participantes: P | null }[])
-    .map((m) => ({ id: m.id, texto: m.borrado ? "" : m.texto, borrado: m.borrado, fecha: m.created_at, yo: m.participante_id === q.participante!.id,
-      alias: m.fantasy_participantes?.alias ?? "?", mostrar: m.fantasy_participantes?.mostrar ?? "", emoji: m.fantasy_participantes?.emoji ?? null, color: m.fantasy_participantes?.color ?? null, foto: m.fantasy_participantes?.foto ?? null }));
+  const filas = (data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; adjunto: (Adjunto & { url: string }) | null; fantasy_participantes: P | null }[];
+  const [{ data: reacc }, { data: avisos }] = await Promise.all([
+    filas.length ? db().from("fantasy_reacciones").select("mensaje_id, participante_id, emoji").in("mensaje_id", filas.map((m) => m.id)) : Promise.resolve({ data: [] }),
+    db().from("fantasy_moderacion").select("id, tipo, motivo, hasta, created_at").eq("participante_id", yo).eq("visto", false).order("created_at"),
+  ]);
+  const rs = (reacc ?? []) as { mensaje_id: string; participante_id: string; emoji: string }[];
+  const mensajes = filas.map((m) => {
+    const mias = rs.filter((r) => r.mensaje_id === m.id);
+    const cuenta: Record<string, number> = {};
+    for (const r of mias) cuenta[r.emoji] = (cuenta[r.emoji] ?? 0) + 1;
+    return {
+      id: m.id, texto: m.borrado ? "" : m.texto, borrado: m.borrado, fecha: m.created_at, yo: m.participante_id === yo, autor: m.participante_id,
+      alias: m.fantasy_participantes?.alias ?? "?", mostrar: m.fantasy_participantes?.mostrar ?? "", emoji: m.fantasy_participantes?.emoji ?? null, color: m.fantasy_participantes?.color ?? null, foto: m.fantasy_participantes?.foto ?? null,
+      adjunto: m.borrado ? null : m.adjunto, reacciones: cuenta, miReaccion: mias.find((r) => r.participante_id === yo)?.emoji ?? null,
+    };
+  });
+  const { data: fresco } = await db().from("fantasy_participantes").select("silenciado, silenciado_hasta").eq("id", yo).maybeSingle();
+  return { mensajes, avisos: (avisos ?? []) as { id: string; tipo: string; motivo: string | null; hasta: string | null; created_at: string }[], silencio: silencio(fresco as { silenciado: boolean; silenciado_hasta: string | null } | null) };
+}
+
+/** Reaccionar a un mensaje (una reacción por persona; el mismo emoji otra vez la quita) */
+export async function reaccionar(mensajeId: string, emoji: string | null): Promise<R> {
+  const q = await quienSoy();
+  if (!q.acceso || !q.participante) return { error: "No estás apuntado." };
+  if (!/^[0-9a-f-]{36}$/.test(mensajeId)) return { error: "No válido." };
+  const d = db();
+  if (!emoji) { await d.from("fantasy_reacciones").delete().eq("mensaje_id", mensajeId).eq("participante_id", q.participante.id); return { ok: true }; }
+  if (!(REACCIONES as readonly string[]).includes(emoji)) return { error: "Reacción no válida." };
+  const { error } = await d.from("fantasy_reacciones").upsert({ mensaje_id: mensajeId, participante_id: q.participante.id, emoji, created_at: new Date().toISOString() }, { onConflict: "mensaje_id,participante_id" });
+  return error ? { error: error.message } : { ok: true };
+}
+
+/** El participante ha leído el aviso del administrador */
+export async function avisoVisto(id: string): Promise<R> {
+  const q = await quienSoy();
+  if (!q.participante) return { error: "Sin permiso." };
+  await db().from("fantasy_moderacion").update({ visto: true }).eq("id", id).eq("participante_id", q.participante.id);
+  return { ok: true };
+}
+
+/** Subir una imagen, vídeo o archivo al chat (solo el administrador): devuelve dónde subirlo directamente */
+export async function urlSubidaChat(nombre: string, tipo: string, tam: number): Promise<{ path?: string; token?: string; error?: string }> {
+  await admin();
+  if (tam > 50 * 1024 * 1024) return { error: "Máximo 50 MB por archivo." };
+  if (!/^(image|video|audio)\/|^application\/pdf$/.test(tipo)) return { error: "Solo imágenes, vídeos, audios o PDF." };
+  const ext = (nombre.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? "bin").toLowerCase();
+  const path = `chat/${Date.now()}-${randomBytes(4).toString("hex")}.${ext}`;
+  const { data, error } = await db().storage.from("fantasy-chat").createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "No se ha podido preparar la subida." };
+  return { path, token: data.token };
 }
 
 export async function borrarMensaje(id: string): Promise<R> {
@@ -266,9 +322,37 @@ export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
   revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
+/** Moderación del chat: avisar a alguien por un comentario o silenciarle un tiempo (horas; 0 = quitar; -1 = indefinido) */
+export async function adminModerar(d: { participanteId: string; tipo: "aviso" | "silencio"; horas?: number; motivo: string; mensajeId?: string | null; borrar?: boolean }): Promise<R> {
+  await admin();
+  const dd = db();
+  const motivo = limpiar(d.motivo, 300) || null;
+  const { data: p } = await dd.from("fantasy_participantes").select("id, perfil_id, alias").eq("id", d.participanteId).maybeSingle();
+  if (!p) return { error: "No existe." };
+  if (d.mensajeId && d.borrar) await dd.from("fantasy_mensajes").update({ borrado: true }).eq("id", d.mensajeId);
+  const { notificarFantasy } = await import("@/lib/notificar");
+  if (d.tipo === "aviso") {
+    await dd.from("fantasy_moderacion").insert({ participante_id: p.id, tipo: "aviso", motivo, mensaje_id: d.mensajeId ?? null });
+    await notificarFantasy(dd, [p as { id: string; perfil_id: string | null }], "⚠️ Aviso del administrador", motivo ?? "Cuida lo que escribes en el chat del Fantasy.", "/fantasy?v=jornada");
+  } else {
+    const h = d.horas ?? 24;
+    if (h === 0) {
+      await dd.from("fantasy_participantes").update({ silenciado: false, silenciado_hasta: null }).eq("id", p.id);
+    } else {
+      const hasta = h < 0 ? null : new Date(Date.now() + h * 3600e3).toISOString();
+      await dd.from("fantasy_participantes").update(h < 0 ? { silenciado: true } : { silenciado_hasta: hasta }).eq("id", p.id);
+      await dd.from("fantasy_moderacion").insert({ participante_id: p.id, tipo: "silencio", motivo, hasta, mensaje_id: d.mensajeId ?? null });
+      const cuando = hasta ? new Date(hasta).toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" }) : null;
+      await notificarFantasy(dd, [p as { id: string; perfil_id: string | null }], "🔇 Te han silenciado en el chat", `${cuando ? `Hasta el ${cuando}.` : "Hasta nuevo aviso."}${motivo ? ` Motivo: ${motivo}` : ""}`, "/fantasy?v=jornada");
+    }
+  }
+  revalidatePath("/fantasy", "layout");
+  return { ok: true };
+}
+
 export async function adminSilenciar(id: string, silenciar: boolean): Promise<R> {
   await admin();
-  await db().from("fantasy_participantes").update({ silenciado: silenciar }).eq("id", id);
+  await db().from("fantasy_participantes").update(silenciar ? { silenciado: true } : { silenciado: false, silenciado_hasta: null }).eq("id", id);
   revalidatePath("/fantasy", "layout");
   return { ok: true };
 }

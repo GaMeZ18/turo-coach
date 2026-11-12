@@ -2,7 +2,7 @@ import Link from "next/link";
 import "../fantasy.css";
 import { Escudo } from "../ui";
 import { redirect } from "next/navigation";
-import { cargarClasificaciones, cargarLiga, db, posicion, quienSoy } from "@/lib/fantasy/datos";
+import { cargarClasificaciones, cargarLiga, db, posicion, quienSoy, silencio } from "@/lib/fantasy/datos";
 import { nombreJornada } from "@/lib/fantasy/motor";
 import { aISO, diaInput, fechaCorta, hora } from "@/lib/fechas";
 import { lunesDe, sumarDias } from "@/lib/pistas";
@@ -73,7 +73,7 @@ export default async function AdminFantasy() {
                 </div>
                 {p.foto && <QuitarFoto id={p.id} />}
                 <span className="text-xs text-white/60">{totalDe.get(p.id)?.jornadas ?? 0} j. · {totalDe.get(p.id)?.total ?? 0} pts</span>
-                <Silenciar id={p.id} silenciado={p.silenciado} />
+                <Silenciar id={p.id} silenciado={!!silencio(p)} />
                 <Borrar id={p.id} alias={p.alias} />
               </li>
             ))}

@@ -4,7 +4,7 @@ import { VAPID_PUBLICO } from "@/lib/notificar";
 import AvisosFantasy from "./Avisos";
 import InstalarFantasy from "./Instalar";
 import "./fantasy.css";
-import { cargarClasificaciones, cargarLiga, posicion, quienSoy } from "@/lib/fantasy/datos";
+import { cargarClasificaciones, cargarLiga, posicion, quienSoy, silencio } from "@/lib/fantasy/datos";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
 import { lunesDe, sumarDias } from "@/lib/pistas";
@@ -326,7 +326,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <p className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${jugada ? "bg-[#5e0f17] text-red-100" : "bg-[#155f2d] text-green-100"}`}>
           {jugada ? (liga.enJuego === jSel ? "🔴 En juego: los puntos se suman en cuanto entran las estadísticas." : "Terminada") : `📅 Fichajes abiertos hasta el ${fechaCorta(liga.cierre(jSel))} a las ${hora(liga.cierre(jSel))}`}
         </p>
-        <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={yo.silenciado} equipos={participantes.filter((p) => p.id !== yo.id).map((p) => p.alias)} />
+        <Chat jornada={jSel} esAdmin={q.esAdmin} silenciado={silencio(yo)} equipos={participantes.filter((p) => p.id !== yo.id).map((p) => p.alias)} />
         {(esp.length > 0 || gg || rev || ideal.length > 0) && <h2 className="fx-display pt-2 text-xl">Resumen de la jornada</h2>}
         {esp.length > 0 && (
           <div className="fx-card-rojo p-3 text-center">
@@ -628,6 +628,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <Acordeon titulo="🔔 Chat y avisos">
           <ul className="list-disc space-y-1 pl-5">
             <li>Escribe <strong>@</strong> y el nombre de un equipo para mencionarlo: le llega un aviso.</li>
+            <li>Toca 😊 en cualquier mensaje para <strong>reaccionar</strong> (👍🔥😂😮👏😢).</li>
             <li><strong>@all</strong> avisa a todos los participantes. Úsalo para cosas importantes: cada persona puede usarlo <strong>una vez cada 12 horas</strong>.</li>
             <li>Si activas los avisos (en tu perfil) te llegan: un recordatorio el <strong>viernes</strong> y otro <strong>2 horas antes</strong> de que se cierren los fichajes si aún no has hecho equipo, <strong>tus puntos</strong> el lunes, <strong>insignias nuevas</strong>, menciones y un <strong>resumen del chat</strong> por la noche si hay 3 mensajes o más sin leer.</li>
           </ul>
@@ -635,6 +636,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         <Acordeon titulo="💬 Normas del chat">
           <ul className="list-disc space-y-1 pl-5">
             <li>No abuses de <strong>@all</strong>: los avisos a todos, solo para cosas que interesen a todos.</li>
+            <li>Si alguien se pasa, el administrador puede mandarle un <strong>aviso</strong> o <strong>silenciarle en el chat</strong> unas horas, unos días o indefinidamente.</li>
             <li>Respeto siempre: <strong>sin insultos</strong>, sin burlas ni comentarios ofensivos.</li>
             <li>No se habla mal de jugadores, entrenadores, familias, árbitros ni rivales.</li>
             <li>No compartas datos personales (teléfonos, direcciones…) ni fotos de otras personas.</li>

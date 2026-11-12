@@ -25,3 +25,6 @@ export function colorEquipo(equipo: string) {
 
 export const EMOJIS_AVATAR = ["🏀", "🔥", "🦅", "⭐", "👑", "🚀", "⚡", "🐺", "🦁", "🐯", "🐉", "💎", "🎯", "🥇", "😎", "🤘", "🍀", "🌪️", "🧱", "🎩"];
 export const COLORES_AVATAR = ["#d81f2f", "#1d4ed8", "#0f9d58", "#7c3aed", "#e08a00", "#0891b2", "#db2777", "#111827"];
+
+/** Reacciones del chat del Fantasy */
+export const REACCIONES = ["👍", "🔥", "😂", "😮", "👏", "😢"] as const;

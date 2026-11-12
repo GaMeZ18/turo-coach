@@ -11,8 +11,8 @@ export const COOKIE_FANTASY = "fantasy_sesion";
 
 export type Prueba = { inicio: string; jornada: string; especial: string | null; alineacionAdmin: boolean };
 export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null; duos: Record<string, string> };
-export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
-export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, comodines, emoji, color, foto, created_at";
+export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; silenciado_hasta: string | null; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
+export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, silenciado_hasta, comodines, emoji, color, foto, created_at";
 /** "Juan Gámez Gómez" → "Juan G." */
 export const nombreCorto = (n: string) => { const p = n.trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[1][0].toUpperCase()}.` : p[0] ?? ""; };
 
@@ -126,4 +126,15 @@ export function posicion(c: Clasif | undefined, nombre: string | null | undefine
     : c.filas.find((f) => normEq(f[1] ?? "") === n) ?? (n.length > 5 ? c.filas.find((f) => { const m = normEq(f[1] ?? ""); return m.includes(n) || n.includes(m); }) : undefined);
   const pos = fila ? Number(fila[0]) : NaN;
   return Number.isFinite(pos) ? { pos, total: c.filas.length } : null;
+}
+
+/** ¿Está silenciado en el chat ahora mismo? Devuelve el texto para mostrarle, o null */
+export function silencio(p: { silenciado: boolean; silenciado_hasta: string | null } | null): string | null {
+  if (!p) return null;
+  if (p.silenciado) return "El administrador te ha silenciado en el chat.";
+  if (p.silenciado_hasta && Date.parse(p.silenciado_hasta) > Date.now()) {
+    const h = new Date(p.silenciado_hasta).toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+    return `El administrador te ha silenciado en el chat hasta el ${h}.`;
+  }
+  return null;
 }
