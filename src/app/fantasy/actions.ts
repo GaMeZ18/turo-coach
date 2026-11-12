@@ -221,7 +221,7 @@ export async function leerMensajes(jornada: string) {
   // Apuntar que ha mirado el chat (para el resumen diario), como mucho cada 2 minutos
   const hace2 = new Date(Date.now() - 120e3).toISOString();
   await db().from("fantasy_participantes").update({ chat_visto: new Date().toISOString() }).eq("id", yo).or(`chat_visto.is.null,chat_visto.lt.${hace2}`);
-  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, adjunto, fantasy_participantes(alias, mostrar, emoji, color, foto)")
+  const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, adjunto, fantasy_participantes!fantasy_mensajes_participante_id_fkey(alias, mostrar, emoji, color, foto)")
     .eq("jornada", jornada).order("created_at").limit(300);
   type P = { alias: string; mostrar: string | null; emoji: string | null; color: string | null; foto: string | null };
   const filas = (data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; adjunto: (Adjunto & { url: string }) | null; fantasy_participantes: P | null }[];
