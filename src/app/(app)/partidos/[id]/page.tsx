@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
+import { adminClient } from "@/lib/supabase/admin";
 import { diaInput, fechaCorta, fechaLarga, hora, horaInput } from "@/lib/fechas";
 import { informePartido } from "@/lib/informe-partido";
 import InformePartido from "./InformePartido";
@@ -55,9 +56,25 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
     .map((x) => [x.jugadores.id, { hasta: x.jugadores.no_disponible_hasta!, motivo: x.jugadores.no_disponible_motivo }]));
   const respuestas: Record<string, Respuesta> = Object.fromEntries(((respR ?? []) as (Respuesta & { jugador_id: string })[]).map(({ jugador_id, ...r }) => [jugador_id, r]));
   const jugadores = filasPl
-    .map((x) => ({ id: x.jugadores.id, nombre: `${x.jugadores.nombre} ${x.jugadores.apellidos ?? ""}`.trim(), dorsal: x.dorsal }))
+    .map((x): { id: string; nombre: string; dorsal: number | null; equipo?: string } => ({ id: x.jugadores.id, nombre: `${x.jugadores.nombre} ${x.jugadores.apellidos ?? ""}`.trim(), dorsal: x.dorsal }))
     .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
   const convocados = (conv ?? []).map((c) => c.jugador_id);
+  // Convocados de otros equipos (p. ej. un U16 que sube): el staff no ve otras plantillas, se leen con el cliente de servidor
+  const enPlantilla = new Set(jugadores.map((j) => j.id));
+  const fuera = convocados.filter((c) => !enPlantilla.has(c));
+  const { data: eqsTemp } = await supabase.from("equipos").select("id, nombre, temporadas!inner(actual)").eq("temporadas.actual", true).neq("id", p.equipo_id).order("nombre");
+  const otrosEquipos = ((eqsTemp ?? []) as { id: string; nombre: string }[]).map((x) => ({ id: x.id, nombre: x.nombre }));
+  const adm = fuera.length ? adminClient() : null;
+  if (adm) {
+    const [{ data: js }, { data: rels }] = await Promise.all([
+      adm.from("jugadores").select("id, nombre, apellidos").in("id", fuera),
+      adm.from("equipo_jugadores").select("jugador_id, dorsal, equipo_id").in("jugador_id", fuera).in("equipo_id", otrosEquipos.map((x) => x.id)),
+    ]);
+    for (const j of (js ?? []) as { id: string; nombre: string; apellidos: string | null }[]) {
+      const r = ((rels ?? []) as { jugador_id: string; dorsal: number | null; equipo_id: string }[]).find((x) => x.jugador_id === j.id);
+      jugadores.push({ id: j.id, nombre: `${j.nombre} ${j.apellidos ?? ""}`.trim(), dorsal: r?.dorsal ?? null, equipo: otrosEquipos.find((x) => x.id === r?.equipo_id)?.nombre ?? "Otro equipo" });
+    }
+  }
 
   const local = p.local ? equipo : p.rival;
   const visitante = p.local ? p.rival : equipo;
@@ -205,7 +222,7 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           </details>
         </div>
 
-        <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} respuestas={respuestas} noDisp={noDisp} equipoId={p.equipo_id}
+        <Convocatoria partidoId={p.id} jugadores={jugadores} convocados={convocados} otrosEquipos={otrosEquipos} respuestas={respuestas} noDisp={noDisp} equipoId={p.equipo_id}
           partido={{ equipo, rival: p.rival, local: !!p.local, fecha: p.fecha, lugar: p.lugar ?? null }} />
       </div>
       ) : (

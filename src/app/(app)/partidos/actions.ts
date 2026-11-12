@@ -146,3 +146,28 @@ export async function marcarAplazados(ids: string[]) {
   revalidatePath("/partidos");
   revalidatePath("/calendario");
 }
+
+/** Para convocar a alguien de otro equipo (p. ej. un U16 que sube al U18): la plantilla de ese equipo.
+ *  Solo el staff del equipo del partido (o coordinación); se lee con el cliente de servidor porque el staff no ve otras plantillas. */
+export async function jugadoresDeEquipo(partidoId: string, equipoId: string): Promise<{ jugadores?: { id: string; nombre: string; dorsal: number | null }[]; error?: string }> {
+  const supabase = await createClient();
+  const { data: cl } = await supabase.auth.getClaims();
+  const uid = cl?.claims?.sub as string | undefined;
+  if (!uid) return { error: "Sin sesión." };
+  const { data: p } = await supabase.from("partidos").select("equipo_id").eq("id", partidoId).maybeSingle();
+  if (!p) return { error: "Partido no encontrado." };
+  const [{ data: st }, { data: yo }] = await Promise.all([
+    supabase.from("equipo_staff").select("perfil_id").eq("equipo_id", p.equipo_id).eq("perfil_id", uid).maybeSingle(),
+    supabase.from("perfiles").select("rol").eq("id", uid).maybeSingle(),
+  ]);
+  if (!st && yo?.rol !== "coordinador") return { error: "Solo el cuerpo técnico del equipo." };
+  const { adminClient } = await import("@/lib/supabase/admin");
+  const db = adminClient();
+  if (!db) return { error: "Falta la configuración del servidor." };
+  const { data } = await db.from("equipo_jugadores").select("dorsal, jugadores(id, nombre, apellidos)").eq("equipo_id", equipoId);
+  const jugadores = ((data ?? []) as unknown as { dorsal: number | null; jugadores: { id: string; nombre: string; apellidos: string | null } | null }[])
+    .filter((x) => x.jugadores)
+    .map((x) => ({ id: x.jugadores!.id, nombre: `${x.jugadores!.nombre} ${x.jugadores!.apellidos ?? ""}`.trim(), dorsal: x.dorsal }))
+    .sort((a, b) => (a.dorsal ?? 999) - (b.dorsal ?? 999));
+  return { jugadores };
+}

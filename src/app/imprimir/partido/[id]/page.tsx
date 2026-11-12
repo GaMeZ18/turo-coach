@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
+import { adminClient } from "@/lib/supabase/admin";
 import { fechaLarga, hora } from "@/lib/fechas";
 import type { StatsPartido } from "@/lib/stats-fcbq";
 import BoxScore, { Parciales } from "@/components/BoxScore";
@@ -19,7 +20,7 @@ export default async function InformePartido({ params }: { params: Promise<{ id:
 
   const [{ data: staff }, { data: conv }, { data: periodos }, { data: stats }, { data: sistemas }, { data: ficha }] = await Promise.all([
     supabase.from("equipo_staff").select("perfil_id").eq("equipo_id", p.equipo_id).eq("perfil_id", user.id).maybeSingle(),
-    supabase.from("convocatorias").select("jugadores(id, nombre, apellidos)").eq("partido_id", id),
+    supabase.from("convocatorias").select("jugador_id, jugadores(id, nombre, apellidos)").eq("partido_id", id),
     supabase.from("partido_periodos").select("jugador_id, periodos").eq("partido_id", id),
     p.fcbq_stats_id ? supabase.from("fcbq_stats").select("datos").eq("equipo_id", p.equipo_id).eq("stats_id", p.fcbq_stats_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("partido_ejercicios").select("ejercicios(titulo, pizarra, preview)").eq("partido_id", id).order("orden"),
@@ -29,7 +30,12 @@ export default async function InformePartido({ params }: { params: Promise<{ id:
   const notasRival = (ficha as { notas?: string | null } | null)?.notas ?? null;
   const esStaff = perfil.rol === "coordinador" || !!staff;
   const st = (stats as { datos: StatsPartido } | null)?.datos ?? null;
-  const convocados = ((conv ?? []) as unknown as { jugadores: { id: string; nombre: string; apellidos: string | null } | null }[]).map((c) => c.jugadores).filter(Boolean) as { id: string; nombre: string; apellidos: string | null }[];
+  const filasConv = (conv ?? []) as unknown as { jugador_id: string; jugadores: { id: string; nombre: string; apellidos: string | null } | null }[];
+  const convocados = filasConv.map((c) => c.jugadores).filter(Boolean) as { id: string; nombre: string; apellidos: string | null }[];
+  // Convocados de otros equipos: el staff no los ve por permisos, se leen con el cliente de servidor
+  const fuera = filasConv.filter((c) => !c.jugadores).map((c) => c.jugador_id);
+  const adm = fuera.length ? adminClient() : null;
+  if (adm) { const { data } = await adm.from("jugadores").select("id, nombre, apellidos").in("id", fuera); convocados.push(...((data ?? []) as { id: string; nombre: string; apellidos: string | null }[])); }
   const per = new Map((periodos ?? []).map((x) => [x.jugador_id as string, (x.periodos as number[]) ?? []]));
   const numPer = p.num_periodos ?? st?.numPeriodos ?? 4;
   const jugado = p.puntos_favor !== null && p.puntos_contra !== null;
