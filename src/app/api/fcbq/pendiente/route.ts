@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * ¿Hay algún partido ya terminado sin estadísticas? Lo consulta la extensión cada 30 minutos:
+ * ¿Hay algún partido ya terminado sin estadísticas? Lo consulta la extensión cada 10 minutos:
  * si dice que sí, carga los datos de la FCBQ en ese momento (así los puntos del Fantasy salen al acabar el partido).
  * Solo cuentan los equipos que tienen estadísticas en la FCBQ, y durante 30 horas después del partido.
  */
@@ -14,7 +14,7 @@ export async function GET() {
   if (!db) return NextResponse.json({ pendiente: false }, { headers: cabeceras });
   const ahora = Date.now();
   const desde = new Date(ahora - 30 * 3600e3).toISOString();
-  const hasta = new Date(ahora - 2 * 3600e3).toISOString(); // empezó hace más de 2 h: ya ha terminado
+  const hasta = new Date(ahora - 105 * 60e3).toISOString(); // empezó hace más de 1 h 45: ya ha terminado
   const { data: conStats } = await db.from("fcbq_stats").select("equipo_id").gte("fecha", new Date(ahora - 120 * 864e5).toISOString()).limit(1000);
   const equipos = [...new Set((conStats ?? []).map((x) => x.equipo_id as string))];
   if (!equipos.length) return NextResponse.json({ pendiente: false }, { headers: cabeceras });
