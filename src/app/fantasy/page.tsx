@@ -462,14 +462,36 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                     </li>
                   );
                 })}
-                {duoR && duo && (
-                  <li className="flex items-center gap-2.5 px-3 py-2">
-                    <span className="w-4" />
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">📋</span>
-                    <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{duo.nombre}</span><span className="block text-[11px] fx-suave">Dúo técnico{(fichado.get(duo.id) ?? 0) > 0 ? ` · 👥 ${fichado.get(duo.id)}` : ""}</span></span>
-                    <span className={duoR.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(duoR.puntos)} pts</span>
-                  </li>
-                )}
+                {duoR && duo && pa && pa.puntos_favor != null && pa.puntos_contra != null && (() => {
+                  const pf = pa.puntos_favor!, pc = pa.puntos_contra!, gana = pf > pc, dif = pf - pc;
+                  const margen = Math.max(-4, Math.min(4, Math.trunc(dif / 5)));
+                  const bonus = duoR.base - ((gana ? 4 : -1) + margen);
+                  const filasD: [string, number][] = [
+                    [gana ? "Victoria" : "Derrota", gana ? 4 : -1],
+                    [`Diferencia ${dif > 0 ? "+" : ""}${dif} (±1 cada 5, máx. ±4)`, margen],
+                    ...(bonus ? [["Gana a un rival mejor clasificado", bonus] as [string, number]] : []),
+                  ];
+                  const n = fichado.get(duo.id) ?? 0;
+                  return (
+                    <li>
+                      <details>
+                        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2">
+                          <span className="w-4" />
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">📋</span>
+                          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{duo.nombre}</span><span className="block text-[11px] fx-suave">Dúo técnico{n > 0 ? ` · 👥 ${n}` : ""}</span></span>
+                          <span className={duoR.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(duoR.puntos)} pts</span>
+                        </summary>
+                        <div className="mx-3 mb-2 rounded-lg bg-white/5 p-2 text-xs">
+                          <ul className="space-y-0.5">
+                            {filasD.map(([t, v]) => <li key={t} className="flex justify-between"><span className="fx-suave">{t}</span><span className={v < 0 ? "text-red-300" : "text-green-300"}>{f(v)}</span></li>)}
+                          </ul>
+                          <p className="mt-1 flex justify-between border-t border-white/10 pt-1 font-semibold"><span>{g.especial ? `${pts(duoR.base)} × 1,5 (partido de la jornada)` : "Total"}</span><span>{pts(duoR.puntos)}</span></p>
+                          <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(duo.id)}`} className="mt-1 inline-block text-[var(--fx-oro)] underline">Ver su ficha →</Link>
+                        </div>
+                      </details>
+                    </li>
+                  );
+                })()}
               </ul>
               {noJugaron.length > 0 && <p className="border-t border-white/10 px-3 py-1.5 text-[11px] fx-suave">No jugaron: {noJugaron.map((a) => liga.jugadores.get(a.jugador)?.nombre).filter(Boolean).join(", ")}</p>}
             </section>
