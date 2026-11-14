@@ -763,6 +763,8 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <ul className="list-disc space-y-1 pl-5">
             <li>Escribe <strong>@</strong> y el nombre de un equipo para mencionarlo: le llega un aviso.</li>
             <li>Toca 😊 en cualquier mensaje para <strong>reaccionar</strong> (👍🔥😂😮👏😢).</li>
+            <li>Para <strong>responder</strong> a un mensaje, toca ↩ o desliza el mensaje hacia la derecha (como en WhatsApp).</li>
+            <li>Con 📷 puedes enviar <strong>fotos</strong> desde el móvil (hasta 15 al día). Nada de fotos de otras personas sin su permiso.</li>
             <li><strong>@all</strong> avisa a todos los participantes. Úsalo para cosas importantes: cada persona puede usarlo <strong>una vez cada 12 horas</strong>.</li>
             <li>Si activas los avisos (en tu perfil) te llegan: un recordatorio el <strong>viernes</strong> y otro <strong>2 horas antes</strong> de que se cierren los fichajes si aún no has hecho equipo, <strong>tus puntos</strong> el lunes, <strong>insignias nuevas</strong>, menciones y un <strong>resumen del chat</strong> por la noche si hay 3 mensajes o más sin leer.</li>
           </ul>

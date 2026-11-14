@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { AlertTriangle, FileText, Loader2, MessageCircle, MoreVertical, Paperclip, Send, SmilePlus, Trash2, X } from "lucide-react";
+import { AlertTriangle, Camera, FileText, Loader2, MessageCircle, MoreVertical, Paperclip, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
 import { adminModerar, avisoVisto, borrarMensaje, enviarMensaje, leerMensajes, reaccionar, urlSubidaChat, type Adjunto } from "./actions";
 import { REACCIONES } from "@/lib/fantasy/estilo";
 import { createClient } from "@/lib/supabase/client";
@@ -83,6 +83,15 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
   const [moderando, setModerando] = useState<string | null>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [respondiendo, setRespondiendo] = useState<Msg | null>(null);
+  const [resaltado, setResaltado] = useState<string | null>(null);
+  const toque = useRef<{ id: string; x: number; y: number } | null>(null);
+  const campo = useRef<HTMLInputElement>(null);
+  const responder = (m: Msg) => { setRespondiendo(m); setSelector(null); setTimeout(() => campo.current?.focus(), 50); };
+  const irA = (id: string) => {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setResaltado(id); setTimeout(() => setResaltado(null), 1500);
+  };
   const [pend, start] = useTransition();
   const fin = useRef<HTMLDivElement>(null);
   const inputArchivo = useRef<HTMLInputElement>(null);
@@ -123,8 +132,8 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
       } catch (e) { setError(e instanceof Error ? e.message : "No se ha podido subir."); setSubiendo(false); return; }
       setSubiendo(false);
     }
-    const r = await enviarMensaje(jornada, texto, adjunto);
-    if (r.error) setError(r.error); else { setTexto(""); setArchivo(null); await cargar(); }
+    const r = await enviarMensaje(jornada, texto, adjunto, respondiendo?.id ?? null);
+    if (r.error) setError(r.error); else { setTexto(""); setArchivo(null); setRespondiendo(null); await cargar(); }
   });
   const borrar = (id: string) => { if (confirm("¿Borrar este mensaje?")) start(async () => { await borrarMensaje(id); await cargar(); }); };
   // Reacción al momento (luego se confirma en la siguiente carga)
@@ -161,19 +170,31 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
           : msgs.map((m) => {
             const reacc = Object.entries(m.reacciones);
             return (
-              <div key={m.id} className={`flex flex-col ${m.yo ? "items-end" : "items-start"}`}>
+              <div key={m.id} id={`msg-${m.id}`} className={`flex flex-col rounded-xl transition-colors ${m.yo ? "items-end" : "items-start"} ${resaltado === m.id ? "bg-[var(--fx-oro)]/20" : ""}`}
+                onTouchStart={(e) => { toque.current = { id: m.id, x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+                onTouchEnd={(e) => { const t = toque.current; toque.current = null; if (!t || t.id !== m.id || m.borrado || sil) return; const dx = e.changedTouches[0].clientX - t.x, dy = Math.abs(e.changedTouches[0].clientY - t.y); if (dx > 60 && dy < 40) responder(m); }}>
                 <div className={`flex w-full items-end gap-2 ${m.yo ? "justify-end" : "justify-start"}`}>
                   {!m.yo && <Escudo alias={m.alias} emoji={m.emoji} color={m.color} foto={m.foto} size={30} />}
                   <div className={`relative max-w-[80%] px-3 py-1.5 text-sm shadow ${m.yo ? "fx-burbuja-yo" : "fx-burbuja"}`}>
                     <p className="text-[12px] font-bold leading-tight">{m.alias} {m.mostrar && <span className="font-normal opacity-60">· {m.mostrar}</span>}</p>
                     {m.borrado ? <p className="italic opacity-60">Mensaje borrado</p> : (
                       <>
+                        {m.cita && (
+                          <button type="button" onClick={() => m.cita!.alias && irA(m.cita!.id)} className="mt-1 flex w-full items-center gap-2 rounded-md border-l-4 border-[var(--fx-oro)] bg-black/20 px-2 py-1 text-left">
+                            <span className="min-w-0 flex-1">
+                              {m.cita.alias && <span className="block text-[11px] font-bold text-[var(--fx-oro)]">{m.cita.alias}</span>}
+                              <span className="line-clamp-2 block text-xs opacity-80">{m.cita.texto}</span>
+                            </span>
+                            {m.cita.foto && <img src={m.cita.foto} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />}
+                          </button>
+                        )}
                         {m.adjunto && <VerAdjunto a={m.adjunto} />}
                         {m.texto && <p className="whitespace-pre-line break-words">{conMenciones(m.texto)}</p>}
                       </>
                     )}
                     <p className="flex items-center justify-end gap-2 text-[10px] opacity-70">
                       {hora(m.fecha)}{m.yo && " ✓✓"}
+                      {!m.borrado && !sil && <button type="button" onClick={() => responder(m)} aria-label="Responder" className="-m-1 p-1"><Reply size={13} /></button>}
                       {!m.borrado && <button type="button" onClick={(e) => { e.stopPropagation(); setSelector(selector === m.id ? null : m.id); }} aria-label="Reaccionar" className="-m-1 p-1"><SmilePlus size={13} /></button>}
                       {!m.borrado && (m.yo || esAdmin) && <button type="button" onClick={() => borrar(m.id)} aria-label="Borrar" className="-m-1 p-1 hover:text-red-600"><Trash2 size={12} /></button>}
                       {esAdmin && !m.yo && <button type="button" onClick={() => setModerando(moderando === m.id ? null : m.id)} aria-label="Moderar" className="-m-1 p-1"><MoreVertical size={13} /></button>}
@@ -205,6 +226,16 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
               {sugerencias.map((a) => <li key={a}><button type="button" onClick={() => mencionar(a)} className="w-full px-3 py-2 text-left text-sm hover:bg-white/10">@{a}{a === "all" && <span className="ml-2 text-xs fx-suave">avisa a todos</span>}</button></li>)}
             </ul>
           )}
+          {respondiendo && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-[var(--fx-oro)] bg-white/10 px-2 py-1.5 text-xs">
+              <Reply size={14} className="shrink-0 text-[var(--fx-oro)]" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-[var(--fx-oro)]">Respondiendo a {respondiendo.yo ? "ti" : respondiendo.alias}</span>
+                <span className="block truncate opacity-80">{respondiendo.texto || (respondiendo.adjunto ? "📷 Foto" : "")}</span>
+              </span>
+              <button type="button" onClick={() => setRespondiendo(null)} aria-label="Cancelar respuesta"><X size={14} /></button>
+            </div>
+          )}
           {archivo && (
             <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/10 px-2 py-1.5 text-xs">
               {vista ? <img src={vista} alt="" className="h-10 w-10 rounded object-cover" /> : <FileText size={18} />}
@@ -213,13 +244,17 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
             </div>
           )}
           <div className="flex gap-2">
-            {esAdmin && (
-              <>
-                <input ref={inputArchivo} type="file" accept="image/*,video/*,audio/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.size > 50 * 1048576 && !f.type.startsWith("image/")) setError("Máximo 50 MB por archivo."); else { setError(null); setArchivo(f); } } e.target.value = ""; }} />
-                <button type="button" onClick={() => inputArchivo.current?.click()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label="Adjuntar imagen o vídeo"><Paperclip size={16} /></button>
-              </>
-            )}
-            <input className="fx-input min-w-0 flex-1 !rounded-full" placeholder={archivo ? "Añade un texto (opcional)" : "Escribe un mensaje… (@ para mencionar)"} maxLength={500} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (texto.trim() || archivo) && enviar()} />
+            <input ref={inputArchivo} type="file" accept={esAdmin ? "image/*,video/*,audio/*,application/pdf" : "image/*"} className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) {
+                if (!esAdmin && !f.type.startsWith("image/")) setError("Solo se pueden enviar fotos.");
+                else if (f.size > 50 * 1048576 && !f.type.startsWith("image/")) setError("Máximo 50 MB por archivo.");
+                else { setError(null); setArchivo(f); }
+              }
+              e.target.value = "";
+            }} />
+            <button type="button" onClick={() => inputArchivo.current?.click()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label={esAdmin ? "Adjuntar foto, vídeo o archivo" : "Enviar una foto"}>{esAdmin ? <Paperclip size={16} /> : <Camera size={16} />}</button>
+            <input ref={campo} className="fx-input min-w-0 flex-1 !rounded-full" placeholder={archivo ? "Añade un texto (opcional)" : "Escribe un mensaje… (@ para mencionar)"} maxLength={500} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (texto.trim() || archivo) && enviar()} />
             <button onClick={enviar} disabled={pend || (!texto.trim() && !archivo)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--fx-rojo)] text-white disabled:opacity-50" aria-label="Enviar">{pend ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}</button>
           </div>
           {subiendo && <p className="mt-1 flex items-center gap-1 text-xs fx-suave"><Loader2 size={12} className="animate-spin" /> Subiendo…</p>}
