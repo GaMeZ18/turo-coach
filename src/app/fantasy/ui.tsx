@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BookOpen, CalendarDays, ClipboardList, MessageCircle, Settings, Trophy, Users } from "lucide-react";
+import { Award, BookOpen, CalendarDays, ClipboardList, MessageCircle, Settings, Trophy, Users, Zap } from "lucide-react";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import AutoRefresco from "@/components/AutoRefresco";
 
@@ -46,6 +46,7 @@ export const VISTAS = [
   { v: "equipo", t: "Mi equipo", i: Users },
   { v: "mercado", t: "Mercado", i: ClipboardList },
   { v: "clasificacion", t: "Clasificación", i: Trophy },
+  { v: "puntos", t: "Puntos", i: Zap },
   { v: "jornada", t: "Chat", i: MessageCircle },
   { v: "calendario", t: "Calendario", i: CalendarDays },
   { v: "insignias", t: "Insignias", i: Award },

@@ -76,7 +76,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = ["equipo", "mercado", "clasificacion", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const vista = ["equipo", "mercado", "clasificacion", "puntos", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
   const part = new Map(participantes.map((p) => [p.id, p]));
   const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
@@ -367,6 +367,118 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                 );
               })}
             </div>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  if (vista === "puntos") {
+    // Puntos de cada jugador en su partido de la jornada, con el desglose
+    const opciones = [...new Set([...liga.cerradas, ...(liga.abierta ? [liga.abierta] : [])])].sort();
+    const conDatos = opciones.filter((l) => liga.actuaciones.some((a) => a.lunes === l && a.jugo));
+    const jSel = sp.j && opciones.includes(sp.j) ? sp.j : (liga.enJuego ?? [...conDatos].pop() ?? liga.abierta ?? liga.lunesHoy);
+    const cerrada = liga.cerradas.includes(jSel);
+    // Cuántos lo llevan (solo cuando ya se ven los equipos de los demás)
+    const fichado = new Map<string, number>();
+    if (cerrada) for (const p of participantes) {
+      const al = liga.alineacion(p.id, jSel);
+      for (const t of al?.titulares ?? []) fichado.set(t.id, (fichado.get(t.id) ?? 0) + 1);
+      if (al?.duo) fichado.set(al.duo.id, (fichado.get(al.duo.id) ?? 0) + 1);
+    }
+    type Act = (typeof liga.actuaciones)[number];
+    const grupos = new Map<string, { eq: string; partidoId: string | null; marcador: string; gana: boolean; especial: boolean; fecha: string; acts: Act[] }>();
+    for (const a of liga.actuaciones.filter((x) => x.lunes === jSel)) {
+      const j = liga.jugadores.get(a.jugador); if (!j) continue;
+      const k = `${j.equipoId}|${a.partido}`;
+      const g = grupos.get(k) ?? { eq: j.equipoId, partidoId: a.partidoId, marcador: a.s.marcador, gana: a.s.gana, especial: a.especial, fecha: a.fecha, acts: [] };
+      g.acts.push(a); grupos.set(k, g);
+    }
+    const lista = [...grupos.values()].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const pendientesJ = partidos.filter((p) => lunesDe(diaInput(p.fecha)) === jSel && liga.pool.has(p.equipo_id) && !lista.some((g) => g.partidoId === p.id)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const eqNom = (id: string) => equipos.find((e) => e.id === id)?.nombre ?? "";
+    const desglose = (a: Act) => {
+      const s = a.s, fallados = Math.max(0, s.tla - s.tlm);
+      const partes: [string, number][] = [
+        [`${s.pts} puntos`, s.pts * 0.5], ...(s.t3 ? [[`${s.t3} triples`, s.t3 * 0.5] as [string, number]] : []),
+        ...(s.tla ? [[`TL ${s.tlm}/${s.tla}`, s.tlm * 0.25 - fallados * 0.5] as [string, number]] : []),
+        ...(s.titular ? [["Titular", 1] as [string, number]] : []),
+        [`+/- ${s.mm > 0 ? "+" : ""}${s.mm}`, Math.max(-6, Math.min(6, s.mm / 4))],
+        ...(s.gana ? [["Victoria", 1] as [string, number]] : []),
+        ...(s.fc > 2 ? [[`${s.fc} faltas`, -0.5 * (s.fc - 2) - (s.fc >= 5 ? 2 : 0)] as [string, number]] : []),
+      ];
+      const sinMin = partes.reduce((x, [, v]) => x + v, 0);
+      const minutos = Math.max(0, Math.round((a.base - sinMin) * 4) / 4);
+      return [...partes.slice(0, 1), [`${s.min} minutos`, a.base <= -5 ? Math.floor(s.min / 5) : minutos] as [string, number], ...partes.slice(1)];
+    };
+    const f = (x: number) => `${x > 0 ? "+" : ""}${pts(x)}`;
+    cuerpo = (
+      <div className="space-y-3">
+        {opciones.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">{opciones.map((l) => <Link key={l} href={`/fantasy?v=puntos&j=${l}`} className="fx-chip" data-on={l === jSel ? "1" : "0"}>{nombreJornada(q.config.inicio, l, q.config.anuladas)}</Link>)}</div>
+        )}
+        <h1 className="fx-display text-2xl">Puntos · {nombreJornada(q.config.inicio, jSel, q.config.anuladas)}</h1>
+        <p className="text-sm fx-suave">Lo que ha sumado cada jugador en su partido. Toca un jugador para ver de dónde salen sus puntos.</p>
+        {lista.length === 0 && <p className="fx-card p-4 text-sm fx-suave">Aún no hay partidos con estadísticas esta jornada. Se cargan solos al poco de acabar cada partido.</p>}
+        {lista.map((g) => {
+          const pa = g.partidoId ? partidos.find((p) => p.id === g.partidoId) : undefined;
+          const duoR = g.partidoId ? liga.resDuo.find((r) => r.partidoId === g.partidoId) : undefined;
+          const duo = liga.duos.get(`duo:${g.eq}`);
+          const jugaron = g.acts.filter((a) => a.jugo).sort((a, b) => b.puntos - a.puntos);
+          const noJugaron = g.acts.filter((a) => !a.jugo);
+          return (
+            <section key={`${g.eq}|${g.partidoId ?? g.fecha}`} className="fx-card overflow-hidden">
+              <div className="fx-cab-rojo flex items-center gap-2 px-3 py-2">
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="fx-display truncate text-lg">{eqNom(g.eq)} {pa?.rival ? <span className="font-normal opacity-80">vs {pa.rival}</span> : null}</p>
+                  <p className="text-xs opacity-80">{fechaCorta(g.fecha)} · {g.gana ? "Victoria" : "Derrota"} {g.marcador}</p>
+                </div>
+                {g.especial && <span className="rounded-full bg-[var(--fx-oro)] px-2 py-0.5 text-xs font-black text-black">×1,5</span>}
+              </div>
+              <ul className="fx-sep">
+                {jugaron.map((a, i) => {
+                  const j = liga.jugadores.get(a.jugador)!;
+                  const n = fichado.get(a.jugador) ?? 0;
+                  return (
+                    <li key={a.jugador}>
+                      <details>
+                        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2">
+                          <span className="w-4 text-right text-xs fx-suave">{i + 1}</span>
+                          <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={28} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold">{j.nombre}</span>
+                            <span className="block text-[11px] fx-suave">{a.s.pts} pts · {a.s.min}′ · {a.s.mm > 0 ? "+" : ""}{a.s.mm}{n > 0 ? ` · 👥 ${n}` : ""}</span>
+                          </span>
+                          <span className={a.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(a.puntos)} pts</span>
+                        </summary>
+                        <div className="mx-3 mb-2 rounded-lg bg-white/5 p-2 text-xs">
+                          <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                            {desglose(a).map(([t, v]) => <li key={t} className="flex justify-between"><span className="fx-suave">{t}</span><span className={v < 0 ? "text-red-300" : "text-green-300"}>{f(v)}</span></li>)}
+                          </ul>
+                          <p className="mt-1 flex justify-between border-t border-white/10 pt-1 font-semibold"><span>{a.especial ? `${pts(a.base)} × 1,5 (partido de la jornada)` : "Total"}{a.base <= -5 ? " · mínimo −5" : ""}</span><span>{pts(a.puntos)}</span></p>
+                          <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(a.jugador)}`} className="mt-1 inline-block text-[var(--fx-oro)] underline">Ver su ficha →</Link>
+                        </div>
+                      </details>
+                    </li>
+                  );
+                })}
+                {duoR && duo && (
+                  <li className="flex items-center gap-2.5 px-3 py-2">
+                    <span className="w-4" />
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">📋</span>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{duo.nombre}</span><span className="block text-[11px] fx-suave">Dúo técnico{(fichado.get(duo.id) ?? 0) > 0 ? ` · 👥 ${fichado.get(duo.id)}` : ""}</span></span>
+                    <span className={duoR.puntos < 0 ? "fx-pill-rojo" : "fx-pill-verde"}>{pts(duoR.puntos)} pts</span>
+                  </li>
+                )}
+              </ul>
+              {noJugaron.length > 0 && <p className="border-t border-white/10 px-3 py-1.5 text-[11px] fx-suave">No jugaron: {noJugaron.map((a) => liga.jugadores.get(a.jugador)?.nombre).filter(Boolean).join(", ")}</p>}
+            </section>
+          );
+        })}
+        {pendientesJ.length > 0 && (
+          <section className="fx-card p-3 text-sm">
+            <p className="font-semibold">Por jugar o sin estadísticas todavía</p>
+            <ul className="mt-1 space-y-0.5 fx-suave">{pendientesJ.map((p) => <li key={p.id}>{eqNom(p.equipo_id)}{p.rival ? ` vs ${p.rival}` : ""} · {fechaCorta(p.fecha)} {hora(p.fecha)}</li>)}</ul>
           </section>
         )}
       </div>
