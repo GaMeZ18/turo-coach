@@ -14,7 +14,7 @@ export async function GET() {
   if (!db) return NextResponse.json({ pendiente: false }, { headers: cabeceras });
   const ahora = Date.now();
   const desde = new Date(ahora - 30 * 3600e3).toISOString();
-  const hasta = new Date(ahora - 105 * 60e3).toISOString(); // empezó hace más de 1 h 45: ya ha terminado
+  const hasta = new Date(ahora - 90 * 60e3).toISOString(); // empezó hace más de 1 h 30: ya ha terminado (si el acta aún no está, se vuelve a mirar cada 10 min)
   const { data: conStats } = await db.from("fcbq_stats").select("equipo_id").gte("fecha", new Date(ahora - 120 * 864e5).toISOString()).limit(1000);
   const equipos = [...new Set((conStats ?? []).map((x) => x.equipo_id as string))];
   if (!equipos.length) return NextResponse.json({ pendiente: false }, { headers: cabeceras });
