@@ -97,6 +97,20 @@ const datosBase = unstable_cache(async (inicio: string) => {
   };
 }, ["fantasy-base-v1"], { revalidate: 600, tags: [TAG_FANTASY] });
 
+/** Lo que cambia al jugar (participantes, equipos fichados, precios guardados, mensajes por persona):
+ *  en caché hasta que alguien guarda algo (revalidateTag(TAG_DATOS) en las acciones) o 5 minutos */
+export const TAG_DATOS = "fantasy-datos";
+const datosJuego = unstable_cache(async () => {
+  const d = db();
+  const [{ data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
+    d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
+    d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste, duo"),
+    d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
+    d.from("fantasy_precios").select("jornada, precios"),
+  ]);
+  return { parts, als, msgs, fijos };
+}, ["fantasy-juego-v1"], { revalidate: 300, tags: [TAG_DATOS] });
+
 /** Todo lo necesario para calcular la liga */
 export async function cargarLiga(config: Config) {
   const d = db();
@@ -104,12 +118,7 @@ export async function cargarLiga(config: Config) {
   const { equipos } = base;
   const partidos = base.partidos;
   const filas = base.filas;
-  const [{ data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
-    d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
-    d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste, duo"),
-    d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
-    d.from("fantasy_precios").select("jornada, precios"),
-  ]);
+  const { parts, als, msgs, fijos } = await datosJuego();
   // Para el dúo técnico: ¿el rival de cada partido va por encima en la clasificación?
   const clas = new Map(base.ligas.map((x) => [x.equipo_id, x.clasificacion!]));
   const rivalArriba: Record<string, boolean> = {};

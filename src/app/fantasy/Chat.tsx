@@ -107,7 +107,16 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
     const partes = t.split(new RegExp(`(@(?:${nombres.join("|")}))`, "gi"));
     return partes.map((x, i) => (i % 2 ? <strong key={i} className="text-[#1d4ed8]">{x}</strong> : x));
   };
-  const cargar = useCallback(async () => { try { setDatos(await leerMensajes(jornada)); } catch { /* sin conexión */ } }, [jornada]);
+  // Solo se descargan los mensajes si algo ha cambiado (nuevo mensaje, reacción o borrado): ahorra datos
+  const firma = useRef<string | null>(null);
+  const cargar = useCallback(async (forzar = false) => {
+    try {
+      const r = await leerMensajes(jornada, forzar ? null : firma.current);
+      firma.current = r.firma;
+      if (r.sinCambios) setDatos((d) => (d ? { ...d, avisos: r.avisos, silencio: r.silencio } : d));
+      else setDatos(r);
+    } catch { /* sin conexión */ }
+  }, [jornada]);
   useEffect(() => {
     void cargar();
     const t = setInterval(() => { if (document.visibilityState === "visible") void cargar(); }, 15000);

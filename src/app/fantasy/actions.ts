@@ -1,8 +1,8 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, pinOk, quienSoy, silencio } from "@/lib/fantasy/datos";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, pinOk, quienSoy, silencio, TAG_DATOS } from "@/lib/fantasy/datos";
 import { REACCIONES } from "@/lib/fantasy/estilo";
 import { randomBytes } from "crypto";
 import { MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
@@ -47,7 +47,7 @@ export async function unirseStaff(alias: string, avatar?: Avatar, nombreReal?: s
   if (!guardado) await db().from("perfiles").update({ nombre }).eq("id", q.perfil.id);
   const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...(await avatarGuardable(avatar)) });
   if (error) return { error: error.message };
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -65,7 +65,7 @@ export async function registrar(d: { alias: string; nombre: string; contacto: st
   const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, mostrar: nombreCorto(nombre), contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t), ...(await avatarGuardable(d)) });
   if (error) return { error: error.message };
   await guardarCookie(t);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -81,7 +81,7 @@ export async function entrar(quien: string, pin: string): Promise<R> {
   const t = nuevaSesion();
   await d.from("fantasy_participantes").update({ sesion_hash: hashSesion(t) }).eq("id", p.id);
   await guardarCookie(t);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -91,7 +91,7 @@ export async function darmeDeBaja(): Promise<R> {
   if (!q.participante) return { error: "No estás apuntado." };
   await db().from("fantasy_participantes").delete().eq("id", q.participante.id);
   (await cookies()).delete(COOKIE_FANTASY);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -110,13 +110,13 @@ export async function entrarConCuenta(email: string, password: string): Promise<
   const supa = await createClient();
   const { error } = await supa.auth.signInWithPassword({ email: String(email ?? "").trim().toLowerCase(), password: String(password ?? "") });
   if (error) return { error: error.code === "invalid_credentials" ? "Email o contraseña incorrectos." : `No se ha podido entrar (${error.message}).` };
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
 export async function salir() {
   (await cookies()).delete(COOKIE_FANTASY);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
 }
 
 /** Cambiar el nombre del equipo, el nombre visible y el avatar */
@@ -128,7 +128,7 @@ export async function guardarPerfil(d: { alias: string; mostrar: string } & Avat
   if (m.length < 2) return { error: "Pon cómo quieres que te vean (p. ej. Juan G.)." };
   if (!(await aliasLibre(a, q.participante.id))) return { error: "Ese nombre de equipo ya existe." };
   await db().from("fantasy_participantes").update({ alias: a, mostrar: m, ...(await avatarGuardable(d)) }).eq("id", q.participante.id);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -178,7 +178,7 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   for (const k of Object.keys(nuevos) as Comodin[]) if (nuevos[k] === l && k !== d.comodin) delete nuevos[k];
   if (d.comodin) nuevos[d.comodin] = l;
   await db().from("fantasy_participantes").update({ comodines: nuevos }).eq("id", q.participante.id);
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -229,26 +229,33 @@ export async function enviarMensaje(jornada: string, texto: string, adjunto?: Ad
       await notificarFantasy(db(), mencionados as { id: string; perfil_id: string | null }[], aTodos ? `📣 ${q.participante.alias} en el chat` : `💬 ${q.participante.alias} te ha mencionado`, t.length > 200 ? `${t.slice(0, 197)}…` : t, `/fantasy?v=jornada&j=${jornada}`);
     }
   }
-  revalidatePath("/fantasy");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
-export async function leerMensajes(jornada: string) {
+export async function leerMensajes(jornada: string, firmaAnterior?: string | null) {
   const q = await quienSoy();
-  if (!q.acceso || !q.participante) return { mensajes: [], avisos: [], silencio: null as string | null };
+  if (!q.acceso || !q.participante) return { mensajes: [], avisos: [], silencio: null as string | null, firma: "", sinCambios: false };
   const yo = q.participante.id;
   // Apuntar que ha mirado el chat (para el resumen diario), como mucho cada 2 minutos
   const hace2 = new Date(Date.now() - 120e3).toISOString();
   await db().from("fantasy_participantes").update({ chat_visto: new Date().toISOString() }).eq("id", yo).or(`chat_visto.is.null,chat_visto.lt.${hace2}`);
+  // «Firma» del chat: cuántos mensajes hay y cuándo cambió el último. Si es la misma, no se vuelve a descargar todo
+  const { data: ult, count } = await db().from("fantasy_mensajes").select("actualizado", { count: "exact" }).eq("jornada", jornada).order("actualizado", { ascending: false }).limit(1);
+  const firma = `${count ?? 0}|${(ult?.[0]?.actualizado as string | undefined) ?? ""}`;
+  const [{ data: avisosP }, { data: fresco }] = await Promise.all([
+    db().from("fantasy_moderacion").select("id, tipo, motivo, hasta, created_at").eq("participante_id", yo).eq("visto", false).order("created_at"),
+    db().from("fantasy_participantes").select("silenciado, silenciado_hasta").eq("id", yo).maybeSingle(),
+  ]);
+  const avisosLista = (avisosP ?? []) as { id: string; tipo: string; motivo: string | null; hasta: string | null; created_at: string }[];
+  const sil = silencio(fresco as { silenciado: boolean; silenciado_hasta: string | null } | null);
+  if (firmaAnterior && firmaAnterior === firma) return { mensajes: [] as never[], avisos: avisosLista, silencio: sil, firma, sinCambios: true };
   const { data } = await db().from("fantasy_mensajes").select("id, texto, created_at, participante_id, borrado, adjunto, respuesta_a, fantasy_participantes!fantasy_mensajes_participante_id_fkey(alias, mostrar, emoji, color, foto)")
     .eq("jornada", jornada).order("created_at").limit(300);
   type P = { alias: string; mostrar: string | null; emoji: string | null; color: string | null; foto: string | null };
   const filas = (data ?? []) as unknown as { id: string; texto: string; created_at: string; participante_id: string; borrado: boolean; adjunto: (Adjunto & { url: string }) | null; respuesta_a: string | null; fantasy_participantes: P | null }[];
   const porId = new Map(filas.map((m) => [m.id, m]));
-  const [{ data: reacc }, { data: avisos }] = await Promise.all([
-    filas.length ? db().from("fantasy_reacciones").select("mensaje_id, participante_id, emoji").in("mensaje_id", filas.map((m) => m.id)) : Promise.resolve({ data: [] }),
-    db().from("fantasy_moderacion").select("id, tipo, motivo, hasta, created_at").eq("participante_id", yo).eq("visto", false).order("created_at"),
-  ]);
+  const { data: reacc } = filas.length ? await db().from("fantasy_reacciones").select("mensaje_id, participante_id, emoji").in("mensaje_id", filas.map((m) => m.id)) : { data: [] };
   const rs = (reacc ?? []) as { mensaje_id: string; participante_id: string; emoji: string }[];
   const mensajes = filas.map((m) => {
     const mias = rs.filter((r) => r.mensaje_id === m.id);
@@ -261,8 +268,7 @@ export async function leerMensajes(jornada: string) {
       cita: m.respuesta_a ? (() => { const c = porId.get(m.respuesta_a!); return c ? { id: c.id, alias: c.fantasy_participantes?.alias ?? "?", texto: c.borrado ? "Mensaje borrado" : c.texto || (c.adjunto ? (c.adjunto.tipo.startsWith("image/") ? "📷 Foto" : c.adjunto.tipo.startsWith("video/") ? "🎬 Vídeo" : "📎 Archivo") : ""), foto: !c.borrado && c.adjunto?.tipo.startsWith("image/") ? c.adjunto.url : null } : { id: m.respuesta_a!, alias: "", texto: "Mensaje de otra jornada", foto: null }; })() : null, miReaccion: mias.find((r) => r.participante_id === yo)?.emoji ?? null,
     };
   });
-  const { data: fresco } = await db().from("fantasy_participantes").select("silenciado, silenciado_hasta").eq("id", yo).maybeSingle();
-  return { mensajes, avisos: (avisos ?? []) as { id: string; tipo: string; motivo: string | null; hasta: string | null; created_at: string }[], silencio: silencio(fresco as { silenciado: boolean; silenciado_hasta: string | null } | null) };
+  return { mensajes, avisos: avisosLista, silencio: sil, firma, sinCambios: false };
 }
 
 /** Reaccionar a un mensaje (una reacción por persona; el mismo emoji otra vez la quita) */
@@ -271,9 +277,11 @@ export async function reaccionar(mensajeId: string, emoji: string | null): Promi
   if (!q.acceso || !q.participante) return { error: "No estás apuntado." };
   if (!/^[0-9a-f-]{36}$/.test(mensajeId)) return { error: "No válido." };
   const d = db();
-  if (!emoji) { await d.from("fantasy_reacciones").delete().eq("mensaje_id", mensajeId).eq("participante_id", q.participante.id); return { ok: true }; }
+  const tocar = () => d.from("fantasy_mensajes").update({ actualizado: new Date().toISOString() }).eq("id", mensajeId);
+  if (!emoji) { await d.from("fantasy_reacciones").delete().eq("mensaje_id", mensajeId).eq("participante_id", q.participante.id); await tocar(); return { ok: true }; }
   if (!(REACCIONES as readonly string[]).includes(emoji)) return { error: "Reacción no válida." };
   const { error } = await d.from("fantasy_reacciones").upsert({ mensaje_id: mensajeId, participante_id: q.participante.id, emoji, created_at: new Date().toISOString() }, { onConflict: "mensaje_id,participante_id" });
+  if (!error) await tocar();
   return error ? { error: error.message } : { ok: true };
 }
 
@@ -314,8 +322,8 @@ export async function borrarMensaje(id: string): Promise<R> {
   const { data: m } = await d.from("fantasy_mensajes").select("participante_id").eq("id", id).maybeSingle();
   if (!m) return { error: "No existe." };
   if (!q.esAdmin && m.participante_id !== q.participante?.id) return { error: "Solo puedes borrar tus mensajes." };
-  await d.from("fantasy_mensajes").update({ borrado: true }).eq("id", id);
-  revalidatePath("/fantasy");
+  await d.from("fantasy_mensajes").update({ borrado: true, actualizado: new Date().toISOString() }).eq("id", id);
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -332,7 +340,7 @@ export async function adminConfig(c: { abierto?: boolean; premio?: string; inici
   if (c.premio !== undefined) fila.premio = limpiar(c.premio, 200) || null;
   if (c.inicio && /^\d{4}-\d{2}-\d{2}$/.test(c.inicio)) fila.inicio = c.inicio;
   const { error } = await db().from("fantasy_config").update(fila).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return error ? { error: error.message } : { ok: true };
 }
 export async function adminEspecial(lunes: string, partidoId: string, poner: boolean): Promise<R> {
@@ -342,7 +350,7 @@ export async function adminEspecial(lunes: string, partidoId: string, poner: boo
   esp[lunes] = poner ? [partidoId] : (esp[lunes] ?? []).filter((x) => x !== partidoId);
   if (!esp[lunes].length) delete esp[lunes];
   await db().from("fantasy_config").update({ especiales: esp }).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
@@ -350,7 +358,7 @@ export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
   const s = new Set(q.config.anuladas);
   if (anular) s.add(lunes); else s.delete(lunes);
   await db().from("fantasy_config").update({ anuladas: [...s] }).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 /** Moderación del chat: avisar a alguien por un comentario o silenciarle un tiempo (horas; 0 = quitar; -1 = indefinido) */
@@ -360,7 +368,7 @@ export async function adminModerar(d: { participanteId: string; tipo: "aviso" | 
   const motivo = limpiar(d.motivo, 300) || null;
   const { data: p } = await dd.from("fantasy_participantes").select("id, perfil_id, alias").eq("id", d.participanteId).maybeSingle();
   if (!p) return { error: "No existe." };
-  if (d.mensajeId && d.borrar) await dd.from("fantasy_mensajes").update({ borrado: true }).eq("id", d.mensajeId);
+  if (d.mensajeId && d.borrar) await dd.from("fantasy_mensajes").update({ borrado: true, actualizado: new Date().toISOString() }).eq("id", d.mensajeId);
   const { notificarFantasy } = await import("@/lib/notificar");
   if (d.tipo === "aviso") {
     await dd.from("fantasy_moderacion").insert({ participante_id: p.id, tipo: "aviso", motivo, mensaje_id: d.mensajeId ?? null });
@@ -377,32 +385,32 @@ export async function adminModerar(d: { participanteId: string; tipo: "aviso" | 
       await notificarFantasy(dd, [p as { id: string; perfil_id: string | null }], "🔇 Te han silenciado en el chat", `${cuando ? `Hasta el ${cuando}.` : "Hasta nuevo aviso."}${motivo ? ` Motivo: ${motivo}` : ""}`, "/fantasy?v=jornada");
     }
   }
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
 export async function adminSilenciar(id: string, silenciar: boolean): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").update(silenciar ? { silenciado: true } : { silenciado: false, silenciado_hasta: null }).eq("id", id);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminQuitarFoto(id: string): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").update({ foto: null }).eq("id", id);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminBorrarParticipante(id: string): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").delete().eq("id", id);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 /** Cerrar la temporada: el primero de la general es el campeón (y sale en Noticias) */
 export async function adminCerrarTemporada(cerrar: boolean): Promise<R> {
   const q = await admin();
-  if (!cerrar) { await db().from("fantasy_config").update({ cerrada: false, campeon: null }).eq("id", 1); revalidatePath("/fantasy", "layout"); return { ok: true }; }
+  if (!cerrar) { await db().from("fantasy_config").update({ cerrada: false, campeon: null }).eq("id", 1); revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout"); return { ok: true }; }
   const { liga } = await cargarLiga(q.config);
   const campeon = liga.general[0];
   if (!campeon) return { error: "No hay participantes." };
@@ -414,7 +422,7 @@ export async function adminCerrarTemporada(cerrar: boolean): Promise<R> {
     resumen: `${campeon.alias} gana el Fantasy Turó con ${campeon.total} puntos.`,
     autor_id: q.perfil!.id, publicada_en: new Date().toISOString(),
   });
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   revalidatePath("/noticias");
   return { ok: true };
 }
@@ -483,7 +491,7 @@ export async function adminCrearPrueba(): Promise<R> {
     { jornada, participante_id: creados[2].id, texto: "¿Alguien sabe si el U18 juega el sábado o el domingo?" },
   ]);
   await d.from("fantasy_config").update({ inicio: jornada, especiales: esp, prueba: { inicio: q.config.inicio, jornada, especial, alineacionAdmin } }).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
@@ -499,7 +507,7 @@ export async function adminBorrarPrueba(): Promise<R> {
   const esp = { ...q.config.especiales };
   if (p.especial && esp[p.jornada]) { esp[p.jornada] = esp[p.jornada].filter((x) => x !== p.especial); if (!esp[p.jornada].length) delete esp[p.jornada]; }
   await d.from("fantasy_config").update({ inicio: p.inicio, especiales: esp, prueba: null }).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
@@ -510,6 +518,6 @@ export async function adminDuo(equipoId: string, nombre: string): Promise<R> {
   const duos = { ...q.config.duos };
   if (n) duos[equipoId] = n; else delete duos[equipoId];
   await db().from("fantasy_config").update({ duos }).eq("id", 1);
-  revalidatePath("/fantasy", "layout");
+  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
