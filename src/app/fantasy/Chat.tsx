@@ -174,7 +174,7 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
                 onTouchStart={(e) => { toque.current = { id: m.id, x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
                 onTouchEnd={(e) => { const t = toque.current; toque.current = null; if (!t || t.id !== m.id || m.borrado || sil) return; const dx = e.changedTouches[0].clientX - t.x, dy = Math.abs(e.changedTouches[0].clientY - t.y); if (dx > 60 && dy < 40) responder(m); }}>
                 <div className={`flex w-full items-end gap-2 ${m.yo ? "justify-end" : "justify-start"}`}>
-                  {!m.yo && <Escudo alias={m.alias} emoji={m.emoji} color={m.color} foto={m.foto} size={30} />}
+                  {!m.yo && <a href={`/fantasy?v=manager&id=${m.autor}`} aria-label={`Perfil de ${m.alias}`}><Escudo alias={m.alias} emoji={m.emoji} color={m.color} foto={m.foto} size={30} /></a>}
                   <div className={`relative max-w-[80%] px-3 py-1.5 text-sm shadow ${m.yo ? "fx-burbuja-yo" : "fx-burbuja"}`}>
                     <p className="text-[12px] font-bold leading-tight">{m.alias} {m.mostrar && <span className="font-normal opacity-60">· {m.mostrar}</span>}</p>
                     {m.borrado ? <p className="italic opacity-60">Mensaje borrado</p> : (

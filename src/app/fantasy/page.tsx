@@ -76,7 +76,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = ["equipo", "mercado", "clasificacion", "puntos", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const vista = ["equipo", "mercado", "clasificacion", "manager", "puntos", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
   const part = new Map(participantes.map((p) => [p.id, p]));
   const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
@@ -152,6 +152,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--fx-oro)]">Mi equipo</p>
               <h2 className="fx-display break-words text-[1.7rem] leading-[1.05]">{yo.alias}</h2>
               {yo.mostrar && <p className="mt-0.5 text-sm text-white/70">{yo.mostrar}</p>}
+              <Link href={`/fantasy?v=manager&id=${yo.id}`} className="mt-1 inline-block text-xs font-semibold text-[var(--fx-oro)] underline">📊 Mis estadísticas de mánager</Link>
             </div>
           </div>
           <div className="relative mt-4 grid grid-cols-3 gap-2 text-center">
@@ -228,9 +229,10 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <>
             <section className="fx-card fx-sep overflow-hidden">
               <div className="flex px-3 py-2 text-xs font-bold uppercase fx-suave"><span className="w-6">#</span><span className="ml-10 flex-1">Equipo</span><span className="w-8 text-center">J</span><span className="w-14 text-right">Pts</span></div>
-              {general.map((g, i) => <Fila key={g.id} pos={i + 1} id={g.id} d={<span className="w-8 text-center text-sm fx-suave">{g.jornadas}</span>}>{pts(g.total)}</Fila>)}
+              {general.map((g, i) => <Link key={g.id} href={`/fantasy?v=manager&id=${g.id}`} className="block hover:bg-white/5"><Fila pos={i + 1} id={g.id} d={<span className="w-8 text-center text-sm fx-suave">{g.jornadas}</span>}>{pts(g.total)}</Fila></Link>)}
               {!general.length && <p className="p-3 text-sm fx-suave">Aún no hay nadie.</p>}
             </section>
+            <p className="text-center text-xs fx-suave">Toca un equipo para ver su perfil de mánager.</p>
             {miPos > 0 && (
               <div className="fx-card-oro flex items-center justify-center gap-4 p-4 text-center">
                 <span className="text-4xl">🌿</span>
@@ -369,6 +371,120 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             </div>
           </section>
         )}
+      </div>
+    );
+  }
+
+  if (vista === "manager") {
+    // Perfil público de cada mánager con sus estadísticas
+    const pid = sp.id && part.has(sp.id) ? sp.id : yo.id;
+    const p = part.get(pid)!;
+    const jugadas = liga.terminadas.filter((l) => liga.resultados.has(`${pid}|${l}`) && !q.config.anuladas.includes(l));
+    const res = jugadas.map((l) => ({ l, r: liga.resultados.get(`${pid}|${l}`)!, al: liga.alineacion(pid, l)!, pos: (liga.porJornada.get(l) ?? []).find((x) => x.id === pid)?.pos ?? null, n: (liga.porJornada.get(l) ?? []).length }));
+    const posG = general.findIndex((g) => g.id === pid) + 1;
+    const totalG = general.find((g) => g.id === pid)?.total ?? 0;
+    const media = res.length ? totalG / res.length : 0;
+    const mejor = [...res].sort((a, b) => b.r.total - a.r.total)[0];
+    const peor = [...res].sort((a, b) => a.r.total - b.r.total)[0];
+    // Capitán: aciertos = el capitán fue el que más puntuó de sus titulares
+    const conCap = res.filter((x) => x.r.filas.some((f) => f.capitan && f.jugo));
+    const aciertos = conCap.filter((x) => { const c = x.r.filas.find((f) => f.capitan)!; return x.r.filas.every((f) => f.puntos <= c.puntos); }).length;
+    const puntosCap = res.reduce((s, x) => s + x.r.filas.filter((f) => f.capitan).reduce((a, f) => a + f.puntos + f.extra, 0), 0);
+    // Banquillo: puntos del suplente que jugó pero no entró
+    const banquillo = res.reduce((s, x) => s + (x.r.suplente && x.r.suplente.jugo && !x.r.suplente.entro ? x.r.suplente.puntos : 0), 0);
+    // Lo que le ha dado cada jugador (titulares, con el extra de capitán y el suplente si entró)
+    const aporte = new Map<string, { pts: number; veces: number }>();
+    const suma = (id: string, v: number) => { const a = aporte.get(id) ?? { pts: 0, veces: 0 }; a.pts += v; a.veces++; aporte.set(id, a); };
+    for (const x of res) {
+      for (const f of x.r.filas) suma(f.id, f.puntos + f.extra);
+      if (x.r.suplente?.entro) suma(x.r.suplente.id, x.r.suplente.puntos);
+      if (x.r.duo) suma(x.r.duo.id, x.r.duo.puntos);
+    }
+    const nombreDe = (id: string) => liga.jugadores.get(id)?.nombre ?? liga.duos.get(id)?.nombre ?? "?";
+    const equipoDe = (id: string) => liga.jugadores.get(id)?.equipo ?? liga.duos.get(id)?.equipo ?? "";
+    const mejores = [...aporte.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 3);
+    const favorito = [...aporte.entries()].filter(([id]) => !id.startsWith("duo:")).sort((a, b) => b[1].veces - a[1].veces || b[1].pts - a[1].pts)[0];
+    const capVeces = new Map<string, number>();
+    for (const x of res) capVeces.set(x.al.capitan, (capVeces.get(x.al.capitan) ?? 0) + 1);
+    const capFav = [...capVeces.entries()].sort((a, b) => b[1] - a[1])[0];
+    // Su mejor fichaje en una sola jornada
+    let mejorDia: { id: string; pts: number; l: string } | null = null;
+    for (const x of res) for (const f of x.r.filas) if (f.jugo && (!mejorDia || f.puntos + f.extra > mejorDia.pts)) mejorDia = { id: f.id, pts: f.puntos + f.extra, l: x.l };
+    const comodines = Object.entries(p.comodines ?? {}) as [Comodin, string][];
+    const ins = liga.insignias(pid);
+    const conseguidas = INSIGNIAS.filter((i) => ins.has(i.codigo));
+    const J = (l: string) => nombreJornada(q.config.inicio, l, q.config.anuladas);
+    const Dato = ({ t, v, s: sub }: { t: string; v: React.ReactNode; s?: React.ReactNode }) => (
+      <div className="fx-card p-3"><p className="text-[11px] font-bold uppercase fx-suave">{t}</p><p className="fx-display text-2xl leading-tight">{v}</p>{sub && <p className="text-xs fx-suave">{sub}</p>}</div>
+    );
+    const maxT = Math.max(1, ...res.map((x) => x.r.total));
+    cuerpo = (
+      <div className="space-y-3">
+        <Link href="/fantasy?v=clasificacion" className="fx-btn-sec">← Clasificación</Link>
+        <section className="fx-card-oro flex items-center gap-4 p-4">
+          <Escudo alias={p.alias} emoji={p.emoji} color={p.color} foto={p.foto} size={72} />
+          <div className="min-w-0 flex-1">
+            <p className="fx-display truncate text-3xl leading-none">{p.alias}</p>
+            <p className="text-sm fx-suave">{p.mostrar}{pid === yo.id ? " · tú" : ""}</p>
+            <p className="mt-1 text-sm">{posG ? <><strong className="text-[var(--fx-oro)]">{posG}º</strong> de {general.length} · </> : null}{pts(totalG)} pts · {res.length} {res.length === 1 ? "jornada" : "jornadas"}</p>
+          </div>
+        </section>
+        {res.length === 0 ? <p className="fx-card p-4 text-sm fx-suave">Todavía no ha terminado ninguna jornada con equipo. Las estadísticas salen al acabar la primera.</p> : (
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Dato t="Media por jornada" v={pts(Math.round(media * 4) / 4)} />
+              {mejor && <Dato t="Mejor jornada" v={`${pts(mejor.r.total)} pts`} s={`${J(mejor.l)}${mejor.pos ? ` · ${mejor.pos}º` : ""}`} />}
+              {peor && res.length > 1 && <Dato t="Peor jornada" v={`${pts(peor.r.total)} pts`} s={J(peor.l)} />}
+              <Dato t="Acierto con el capitán" v={conCap.length ? `${Math.round((aciertos * 100) / conCap.length)}%` : "–"} s={`${aciertos} de ${conCap.length} veces fue su mejor jugador`} />
+              <Dato t="Puntos del capitán" v={pts(puntosCap)} s="contando el doble (o triple)" />
+              <Dato t="Puntos en el banquillo" v={pts(banquillo)} s="del suplente que jugó y no entró" />
+            </div>
+            <section className="fx-card p-3">
+              <p className="text-[11px] font-bold uppercase fx-suave">Puntos por jornada</p>
+              <div className="mt-2 flex h-28 items-end gap-1.5">
+                {res.map((x) => (
+                  <div key={x.l} className="flex flex-1 flex-col items-center gap-1" title={`${J(x.l)}: ${pts(x.r.total)} pts`}>
+                    <span className="text-[10px]">{pts(x.r.total)}</span>
+                    <div className="w-full rounded-t bg-gradient-to-t from-[#b3121f] to-[#f0323f]" style={{ height: `${Math.max(4, (Math.max(0, x.r.total) / maxT) * 80)}px` }} />
+                    <span className="text-[10px] fx-suave">{J(x.l).replace("Jornada ", "J")}{x.pos ? ` · ${x.pos}º` : ""}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="fx-card p-3">
+              <p className="text-[11px] font-bold uppercase fx-suave">Los que más puntos le han dado</p>
+              <ul className="mt-1 fx-sep">
+                {mejores.map(([id, a], i) => (
+                  <li key={id} className="flex items-center gap-2 py-1.5 text-sm">
+                    <span className="w-5 text-center">{["🥇", "🥈", "🥉"][i]}</span>
+                    <span className="min-w-0 flex-1 truncate"><strong>{nombreDe(id)}</strong> <span className="text-xs fx-suave">{equipoDe(id)}</span></span>
+                    <span className="text-xs fx-suave">{a.veces}×</span>
+                    <span className="fx-pill-verde">{pts(a.pts)} pts</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+                {favorito && <p>💙 <span className="fx-suave">Jugador favorito:</span> <strong>{nombreDe(favorito[0])}</strong> ({favorito[1].veces} jornadas)</p>}
+                {capFav && <p>©️ <span className="fx-suave">Capitán favorito:</span> <strong>{nombreDe(capFav[0])}</strong> ({capFav[1]}×)</p>}
+                {mejorDia && <p>💥 <span className="fx-suave">Mejor fichaje en una jornada:</span> <strong>{nombreDe(mejorDia.id)}</strong>, {pts(mejorDia.pts)} pts ({J(mejorDia.l)})</p>}
+                <p>🃏 <span className="fx-suave">Comodines usados:</span> {comodines.length ? comodines.map(([c]) => COMODINES[c]?.nombre ?? c).join(", ") : "ninguno"}</p>
+              </div>
+            </section>
+          </>
+        )}
+        <section className="fx-card p-3">
+          <p className="text-[11px] font-bold uppercase fx-suave">Insignias · {conseguidas.length} de {INSIGNIAS.length}</p>
+          {conseguidas.length ? (
+            <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {conseguidas.map((i) => (
+                <Link key={i.codigo} href={`/fantasy?v=insignias&i=${i.codigo}`} className="text-center">
+                  <img src={i.img} alt="" className="mx-auto h-14 w-14" loading="lazy" />
+                  <span className="block text-[10px] leading-tight">{i.nombre}</span>
+                </Link>
+              ))}
+            </div>
+          ) : <p className="mt-1 text-sm fx-suave">Aún ninguna.</p>}
+        </section>
       </div>
     );
   }
@@ -785,7 +901,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   }
 
   return (
-    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista === "jugador" ? "mercado" : vista} temporada={temporada}>
+    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista === "jugador" ? "mercado" : vista === "manager" ? "clasificacion" : vista} temporada={temporada}>
       {cuerpo}
       <Celebracion pid={`${yo.id}-${q.config.inicio}`} temporada={temporada} campeon={campeon}
         insignias={INSIGNIAS.filter((x) => misInsignias.has(x.codigo)).map(({ codigo, nombre, texto, img }) => ({ codigo, nombre, texto, img }))} />
