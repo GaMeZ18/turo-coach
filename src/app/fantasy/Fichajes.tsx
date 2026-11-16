@@ -10,6 +10,7 @@ import { Camiseta, Sigla } from "./ui";
 export type JugadorMercado = {
   id: string; persona: string; nombre: string; dorsal: string; equipo: string; equipoId: string; chica: boolean;
   precio: number; media: number | null; pj: number; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean; rival: string | null;
+  forma?: number; // 1 en forma (últimos 3 partidos muy por encima de su media), -1 de bajón
 };
 export type DuoMercado = { id: string; nombre: string; equipo: string; equipoId: string; precio: number; media: number | null; tendencia: number; ultimo: number | null; descansa: boolean; bloqueado: boolean; rival: string | null };
 type Equipo = { titulares: string[]; suplente: string | null; capitan: string | null; comodin: Comodin | null; duo?: string | null };
@@ -169,6 +170,8 @@ export default function Fichajes({ modo, jornada, nombre, cierre, mercado, duos 
                     <Sigla equipo={j.equipo} />
                     <span>Media {j.media !== null ? n(j.media) : "–"}</span>
                     <span>Últ: {j.ultimo !== null ? n(j.ultimo) : "–"}</span>
+                    {j.forma === 1 && <span className="font-semibold text-orange-300" title="Sus últimos 3 partidos, muy por encima de su media">🔥 En forma</span>}
+                    {j.forma === -1 && <span className="font-semibold text-sky-300" title="Sus últimos 3 partidos, muy por debajo de su media">🧊 De bajón</span>}
                   </p>
                   {j.rival && <p className="truncate text-[11px] text-white/80">🏀 {j.rival}</p>}
                   {(j.descansa || j.bloqueado) && (

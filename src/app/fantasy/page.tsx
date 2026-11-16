@@ -14,6 +14,7 @@ import Alta from "./Alta";
 import Fichajes, { type DuoMercado, type JugadorMercado } from "./Fichajes";
 import Chat from "./Chat";
 import Celebracion from "./Celebracion";
+import Compartir from "./Compartir";
 import { EditarPerfil } from "./Perfil";
 import { MiJornada } from "./Piezas";
 import { BarrasPuntos, GraficaPrecio } from "./Bolsa";
@@ -76,7 +77,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   const yo = q.participante;
   const { liga, participantes, partidos, equipos } = await cargarLiga(q.config);
-  const vista = ["equipo", "mercado", "clasificacion", "manager", "puntos", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
+  const vista = ["equipo", "mercado", "clasificacion", "manager", "resumen", "puntos", "jornada", "calendario", "insignias", "reglas", "jugador"].includes(sp.v ?? "") ? sp.v! : "equipo";
   const part = new Map(participantes.map((p) => [p.id, p]));
   const jug = (id: string) => liga.jugadores.get(id);
   const general = liga.general;
@@ -103,6 +104,26 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         ultimo: semUlt.get(d.id)?.jugo ? semUlt.get(d.id)!.puntos : null, descansa: desc.has(d.equipoId), bloqueado: bloq.has(d.id), rival: rivalDe(d.equipoId, l) };
     }).sort((a, b) => b.precio - a.precio);
   };
+  // Forma (últimos 3 partidos frente a su media) y rentabilidad (puntos por estrella en la temporada)
+  const porJugador = new Map<string, { base: number; fecha: string; lunes: string }[]>();
+  for (const a of liga.actuaciones) if (a.jugo) { const x = porJugador.get(a.jugador) ?? []; x.push({ base: a.base, fecha: a.fecha, lunes: a.lunes }); porJugador.set(a.jugador, x); }
+  const formaDe = (id: string) => {
+    const xs = [...(porJugador.get(id) ?? [])].sort((a, b) => b.fecha.localeCompare(a.fecha));
+    if (xs.length < 4) return 0;
+    const media = xs.reduce((s, x) => s + x.base, 0) / xs.length, ult = xs.slice(0, 3).reduce((s, x) => s + x.base, 0) / 3;
+    return ult >= media + 2 && ult >= media * 1.25 ? 1 : ult <= media - 2 && ult <= media * 0.75 ? -1 : 0;
+  };
+  const rentables = () => {
+    const precios = new Map<string, ReturnType<typeof liga.precio>>();
+    const pr = (l: string) => { if (!precios.has(l)) precios.set(l, liga.precio(l)); return precios.get(l)!; };
+    const inicioT = q.config.inicio;
+    return [...porJugador.entries()].map(([id, xs]) => {
+      const temporada = xs.filter((x) => x.lunes >= inicioT);
+      const estrellas = temporada.reduce((s, x) => s + (pr(x.lunes).get(id)?.precio ?? 6), 0);
+      const puntos = temporada.reduce((s, x) => s + x.base, 0);
+      return { id, pj: temporada.length, puntos, ratio: estrellas ? puntos / estrellas : 0 };
+    }).filter((x) => x.pj >= 2 && liga.jugadores.has(x.id)).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
+  };
   const mercadoDe = (l: string): JugadorMercado[] => {
     const pr = liga.precio(l), prAntes = liga.precio(sumarDias(l, -7));
     const ultima = liga.terminadas[liga.terminadas.length - 1] ?? sumarDias(l, -7);
@@ -113,7 +134,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         id: j.id, persona: j.persona, nombre: j.nombre, dorsal: j.dorsal, equipo: j.equipo, equipoId: j.equipoId, chica: j.chica,
         precio: p.precio, media: p.media, pj: p.pj, tendencia: a ? Math.sign(p.precio - a.precio) : 0,
         ultimo: semUlt.get(j.id)?.jugo ? semUlt.get(j.id)!.puntos : null, descansa: desc.has(j.equipoId), bloqueado: bloq.has(j.persona),
-        rival: rivalDe(j.equipoId, l),
+        rival: rivalDe(j.equipoId, l), forma: formaDe(j.id),
       };
     });
   };
@@ -193,11 +214,34 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
 
   if (vista === "mercado") {
     const l = liga.abierta;
-    cuerpo = l ? (
+    const top = rentables();
+    const pl = l ? liga.precio(l) : null;
+    const Rentables = top.length > 0 && (
+      <details className="fx-card overflow-hidden" open={!l}>
+        <summary className="cursor-pointer px-3 py-2.5 fx-display text-lg">💎 Los más rentables de la temporada</summary>
+        <p className="px-3 text-xs fx-suave">Los que más puntos dan por cada estrella que cuestan (mínimo 2 partidos).</p>
+        <ol className="fx-sep mt-1">
+          {top.map((x, i) => {
+            const j = liga.jugadores.get(x.id)!;
+            return (
+              <li key={x.id}>
+                <Link href={`/fantasy?v=jugador&id=${encodeURIComponent(x.id)}`} className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/5">
+                  <span className="w-4 text-center text-sm font-bold">{i + 1}</span>
+                  <Camiseta dorsal={j.dorsal} equipo={j.equipo} size={28} />
+                  <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{j.nombre}</span><span className="block text-[11px] fx-suave">{j.equipo} · {x.pj} partidos · {pts(Math.round(x.puntos * 4) / 4)} pts</span></span>
+                  <span className="text-right"><span className="block fx-display text-lg leading-none text-[var(--fx-oro)]">{x.ratio.toFixed(2)}</span><span className="block text-[10px] fx-suave">pts/⭐{pl?.get(x.id) ? ` · ahora ${pl.get(x.id)!.precio}⭐` : ""}</span></span>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </details>
+    );
+    cuerpo = l ? (<div className="space-y-3">{Rentables}
       <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)} duos={duosDe(l)}
         actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null, duo: al.duo?.id ?? null } : null; })()}
-        comodinesUsados={{}} presupuesto={PRESUPUESTO} />
-    ) : <Cerrado />;
+        comodinesUsados={{}} presupuesto={PRESUPUESTO} /></div>
+    ) : <div className="space-y-3"><Cerrado />{Rentables}</div>;
   }
 
   if (vista === "clasificacion") {
@@ -375,44 +419,55 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     );
   }
 
+  /** Estadísticas de un mánager (perfil y resumen de temporada) */
+  const statsManager = (pid: string) => {
+    const p = part.get(pid)!;
+      const jugadas = liga.terminadas.filter((l) => liga.resultados.has(`${pid}|${l}`) && !q.config.anuladas.includes(l));
+      const res = jugadas.map((l) => ({ l, r: liga.resultados.get(`${pid}|${l}`)!, al: liga.alineacion(pid, l)!, pos: (liga.porJornada.get(l) ?? []).find((x) => x.id === pid)?.pos ?? null, n: (liga.porJornada.get(l) ?? []).length }));
+      const posG = general.findIndex((g) => g.id === pid) + 1;
+      const totalG = general.find((g) => g.id === pid)?.total ?? 0;
+      const media = res.length ? totalG / res.length : 0;
+      const mejor = [...res].sort((a, b) => b.r.total - a.r.total)[0];
+      const peor = [...res].sort((a, b) => a.r.total - b.r.total)[0];
+      // Capitán: aciertos = el capitán fue el que más puntuó de sus titulares
+      const conCap = res.filter((x) => x.r.filas.some((f) => f.capitan && f.jugo));
+      const aciertos = conCap.filter((x) => { const c = x.r.filas.find((f) => f.capitan)!; return x.r.filas.every((f) => f.puntos <= c.puntos); }).length;
+      const puntosCap = res.reduce((s, x) => s + x.r.filas.filter((f) => f.capitan).reduce((a, f) => a + f.puntos + f.extra, 0), 0);
+      // Banquillo: puntos del suplente que jugó pero no entró
+      const banquillo = res.reduce((s, x) => s + (x.r.suplente && x.r.suplente.jugo && !x.r.suplente.entro ? x.r.suplente.puntos : 0), 0);
+      // Lo que le ha dado cada jugador (titulares, con el extra de capitán y el suplente si entró)
+      const aporte = new Map<string, { pts: number; veces: number }>();
+      const suma = (id: string, v: number) => { const a = aporte.get(id) ?? { pts: 0, veces: 0 }; a.pts += v; a.veces++; aporte.set(id, a); };
+      for (const x of res) {
+        for (const f of x.r.filas) suma(f.id, f.puntos + f.extra);
+        if (x.r.suplente?.entro) suma(x.r.suplente.id, x.r.suplente.puntos);
+        if (x.r.duo) suma(x.r.duo.id, x.r.duo.puntos);
+      }
+      const nombreDe = (id: string) => liga.jugadores.get(id)?.nombre ?? liga.duos.get(id)?.nombre ?? "?";
+      const equipoDe = (id: string) => liga.jugadores.get(id)?.equipo ?? liga.duos.get(id)?.equipo ?? "";
+      const mejores = [...aporte.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 3);
+      const favorito = [...aporte.entries()].filter(([id]) => !id.startsWith("duo:")).sort((a, b) => b[1].veces - a[1].veces || b[1].pts - a[1].pts)[0];
+      const capVeces = new Map<string, number>();
+      for (const x of res) capVeces.set(x.al.capitan, (capVeces.get(x.al.capitan) ?? 0) + 1);
+      const capFav = [...capVeces.entries()].sort((a, b) => b[1] - a[1])[0];
+      // Su mejor fichaje en una sola jornada
+      let mejorDia: { id: string; pts: number; l: string } | null = null;
+      for (const x of res) for (const f of x.r.filas) if (f.jugo && (!mejorDia || f.puntos + f.extra > mejorDia.pts)) mejorDia = { id: f.id, pts: f.puntos + f.extra, l: x.l };
+      const comodines = Object.entries(p.comodines ?? {}) as [Comodin, string][];
+      const ins = liga.insignias(pid);
+      const conseguidas = INSIGNIAS.filter((i) => ins.has(i.codigo));
+    // Equipo del club del que más ha fichado
+    const porEquipo = new Map<string, number>();
+    for (const x of res) for (const t of x.al.titulares) { const e = liga.jugadores.get(t.id)?.equipo; if (e) porEquipo.set(e, (porEquipo.get(e) ?? 0) + 1); }
+    const equipoFav = [...porEquipo.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    const estrellas = res.reduce((s, x) => s + x.al.coste, 0);
+    return { p, res, posG, totalG, media, mejor, peor, conCap, aciertos, puntosCap, banquillo, mejores, favorito, capFav, mejorDia, comodines, ins, conseguidas, nombreDe, equipoDe, equipoFav, estrellas };
+  };
+
   if (vista === "manager") {
     // Perfil público de cada mánager con sus estadísticas
     const pid = sp.id && part.has(sp.id) ? sp.id : yo.id;
-    const p = part.get(pid)!;
-    const jugadas = liga.terminadas.filter((l) => liga.resultados.has(`${pid}|${l}`) && !q.config.anuladas.includes(l));
-    const res = jugadas.map((l) => ({ l, r: liga.resultados.get(`${pid}|${l}`)!, al: liga.alineacion(pid, l)!, pos: (liga.porJornada.get(l) ?? []).find((x) => x.id === pid)?.pos ?? null, n: (liga.porJornada.get(l) ?? []).length }));
-    const posG = general.findIndex((g) => g.id === pid) + 1;
-    const totalG = general.find((g) => g.id === pid)?.total ?? 0;
-    const media = res.length ? totalG / res.length : 0;
-    const mejor = [...res].sort((a, b) => b.r.total - a.r.total)[0];
-    const peor = [...res].sort((a, b) => a.r.total - b.r.total)[0];
-    // Capitán: aciertos = el capitán fue el que más puntuó de sus titulares
-    const conCap = res.filter((x) => x.r.filas.some((f) => f.capitan && f.jugo));
-    const aciertos = conCap.filter((x) => { const c = x.r.filas.find((f) => f.capitan)!; return x.r.filas.every((f) => f.puntos <= c.puntos); }).length;
-    const puntosCap = res.reduce((s, x) => s + x.r.filas.filter((f) => f.capitan).reduce((a, f) => a + f.puntos + f.extra, 0), 0);
-    // Banquillo: puntos del suplente que jugó pero no entró
-    const banquillo = res.reduce((s, x) => s + (x.r.suplente && x.r.suplente.jugo && !x.r.suplente.entro ? x.r.suplente.puntos : 0), 0);
-    // Lo que le ha dado cada jugador (titulares, con el extra de capitán y el suplente si entró)
-    const aporte = new Map<string, { pts: number; veces: number }>();
-    const suma = (id: string, v: number) => { const a = aporte.get(id) ?? { pts: 0, veces: 0 }; a.pts += v; a.veces++; aporte.set(id, a); };
-    for (const x of res) {
-      for (const f of x.r.filas) suma(f.id, f.puntos + f.extra);
-      if (x.r.suplente?.entro) suma(x.r.suplente.id, x.r.suplente.puntos);
-      if (x.r.duo) suma(x.r.duo.id, x.r.duo.puntos);
-    }
-    const nombreDe = (id: string) => liga.jugadores.get(id)?.nombre ?? liga.duos.get(id)?.nombre ?? "?";
-    const equipoDe = (id: string) => liga.jugadores.get(id)?.equipo ?? liga.duos.get(id)?.equipo ?? "";
-    const mejores = [...aporte.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 3);
-    const favorito = [...aporte.entries()].filter(([id]) => !id.startsWith("duo:")).sort((a, b) => b[1].veces - a[1].veces || b[1].pts - a[1].pts)[0];
-    const capVeces = new Map<string, number>();
-    for (const x of res) capVeces.set(x.al.capitan, (capVeces.get(x.al.capitan) ?? 0) + 1);
-    const capFav = [...capVeces.entries()].sort((a, b) => b[1] - a[1])[0];
-    // Su mejor fichaje en una sola jornada
-    let mejorDia: { id: string; pts: number; l: string } | null = null;
-    for (const x of res) for (const f of x.r.filas) if (f.jugo && (!mejorDia || f.puntos + f.extra > mejorDia.pts)) mejorDia = { id: f.id, pts: f.puntos + f.extra, l: x.l };
-    const comodines = Object.entries(p.comodines ?? {}) as [Comodin, string][];
-    const ins = liga.insignias(pid);
-    const conseguidas = INSIGNIAS.filter((i) => ins.has(i.codigo));
+    const { p, res, posG, totalG, media, mejor, peor, conCap, aciertos, puntosCap, banquillo, mejores, favorito, capFav, mejorDia, comodines, conseguidas, nombreDe, equipoDe } = statsManager(pid);
     const J = (l: string) => nombreJornada(q.config.inicio, l, q.config.anuladas);
     const Dato = ({ t, v, s: sub }: { t: string; v: React.ReactNode; s?: React.ReactNode }) => (
       <div className="fx-card p-3"><p className="text-[11px] font-bold uppercase fx-suave">{t}</p><p className="fx-display text-2xl leading-tight">{v}</p>{sub && <p className="text-xs fx-suave">{sub}</p>}</div>
@@ -420,7 +475,10 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const maxT = Math.max(1, ...res.map((x) => x.r.total));
     cuerpo = (
       <div className="space-y-3">
-        <Link href="/fantasy?v=clasificacion" className="fx-btn-sec">← Clasificación</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/fantasy?v=clasificacion" className="fx-btn-sec">← Clasificación</Link>
+          {res.length > 0 && <Link href={`/fantasy?v=resumen&id=${pid}`} className="fx-btn-sec">🎁 Resumen de temporada</Link>}
+        </div>
         <section className="fx-card-oro flex items-center gap-4 p-4">
           <Escudo alias={p.alias} emoji={p.emoji} color={p.color} foto={p.foto} size={72} />
           <div className="min-w-0 flex-1">
@@ -485,6 +543,55 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             </div>
           ) : <p className="mt-1 text-sm fx-suave">Aún ninguna.</p>}
         </section>
+      </div>
+    );
+  }
+
+  if (vista === "resumen") {
+    // Resumen de la temporada (hasta ahora), en tarjetas para pasar con el dedo, como un «Wrapped»
+    const pid = sp.id && part.has(sp.id) ? sp.id : yo.id;
+    const st = statsManager(pid);
+    const J = (l: string) => nombreJornada(q.config.inicio, l, q.config.anuladas);
+    const tuyo = pid === yo.id;
+    const pctCap = st.conCap.length ? Math.round((st.aciertos * 100) / st.conCap.length) : null;
+    const estrella = st.mejores.find(([id]) => !id.startsWith("duo:"));
+    const tarjetas: { fondo: string; contenido: React.ReactNode }[] = [
+      { fondo: "from-[#b3121f] to-[#3d0d19]", contenido: <><Escudo alias={st.p.alias} emoji={st.p.emoji} color={st.p.color} foto={st.p.foto} size={96} /><p className="mt-4 text-sm uppercase tracking-[0.25em] text-[var(--fx-oro)]">{temporada}</p><p className="fx-display mt-1 text-4xl leading-none">{tuyo ? "Tu temporada" : "La temporada de"}</p><p className="fx-display fx-oro-texto mt-1 text-5xl leading-none">{st.p.alias}</p><p className="mt-6 text-sm text-white/70">Desliza →</p></> },
+      { fondo: "from-[#1d2f70] to-[#0a1024]", contenido: <><p className="text-lg">{tuyo ? "Has sumado" : "Ha sumado"}</p><p className="fx-display fx-oro-texto text-8xl leading-none">{pts(st.totalG)}</p><p className="text-lg">puntos en {st.res.length} {st.res.length === 1 ? "jornada" : "jornadas"}</p>{st.posG > 0 && <p className="mt-6 fx-display text-3xl">{st.posG}º de {general.length}</p>}<p className="text-sm text-white/70">Media de {pts(Math.round(st.media * 4) / 4)} por jornada</p></> },
+      ...(st.mejor ? [{ fondo: "from-[#5e0f17] to-[#1a0a10]", contenido: <><p className="text-lg">{tuyo ? "Tu mejor jornada" : "Su mejor jornada"}</p><p className="fx-display text-4xl">{J(st.mejor.l)}</p><p className="fx-display fx-oro-texto text-8xl leading-none">{pts(st.mejor.r.total)}</p><p className="text-lg">puntos{st.mejor.pos ? ` · ${st.mejor.pos}º de ${st.mejor.n}` : ""}</p>{st.mejor.pos === 1 && <p className="mt-4 text-2xl">👑 ¡Ganó la jornada!</p>}</> }] : []),
+      ...(estrella ? [{ fondo: "from-[#155f2d] to-[#06210f]", contenido: <><p className="text-lg">{tuyo ? "Tu jugador estrella" : "Su jugador estrella"}</p><p className="mt-2 text-6xl">⭐</p><p className="fx-display mt-2 text-4xl leading-tight">{st.nombreDe(estrella[0])}</p><p className="text-sm text-white/70">{st.equipoDe(estrella[0])}</p><p className="mt-4 fx-display fx-oro-texto text-5xl">{pts(Math.round(estrella[1].pts * 4) / 4)} pts</p><p className="text-sm">en {estrella[1].veces} {estrella[1].veces === 1 ? "jornada" : "jornadas"}</p></> }] : []),
+      ...(st.capFav ? [{ fondo: "from-[#3d2a8a] to-[#120a33]", contenido: <><p className="text-lg">El brazalete</p><p className="mt-2 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-b from-[#ffe27a] to-[#e2a414] text-3xl font-black text-black">C</p><p className="fx-display mt-3 text-3xl leading-tight">{st.nombreDe(st.capFav[0])}</p><p className="text-sm text-white/70">capitán {st.capFav[1]} {st.capFav[1] === 1 ? "vez" : "veces"}</p>{pctCap !== null && <><p className="mt-4 fx-display fx-oro-texto text-7xl leading-none">{pctCap}%</p><p className="text-sm">de acierto con el capitán</p></>}<p className="mt-2 text-sm text-white/70">{pts(st.puntosCap)} pts sumados por {tuyo ? "tus" : "sus"} capitanes</p></> }] : []),
+      ...(st.equipoFav ? [{ fondo: "from-[#0f4c75] to-[#071a2b]", contenido: <><p className="text-lg">{tuyo ? "Tu equipo del Turó" : "Su equipo del Turó"}</p><p className="mt-2 text-6xl">🏀</p><p className="fx-display mt-2 text-5xl leading-tight">{st.equipoFav[0]}</p><p className="mt-2 text-lg">{st.equipoFav[1]} fichajes de titular</p></> }] : []),
+      { fondo: "from-[#7a5a00] to-[#1f1600]", contenido: <><p className="text-lg">Insignias</p><p className="fx-display fx-oro-texto text-8xl leading-none">{st.conseguidas.length}<span className="text-4xl text-white/60">/{INSIGNIAS.length}</span></p><div className="mt-4 flex max-w-xs flex-wrap justify-center gap-2">{st.conseguidas.slice(0, 8).map((i) => <img key={i.codigo} src={i.img} alt={i.nombre} title={i.nombre} className="h-12 w-12" />)}</div></> },
+      { fondo: "from-[#1d2f70] to-[#3d0d19]", contenido: <><p className="fx-display text-3xl">Curiosidades</p><ul className="mt-4 space-y-3 text-left text-base">
+        <li>⭐ <strong>{st.estrellas}</strong> estrellas gastadas en fichajes</li>
+        <li>🪑 <strong>{pts(st.banquillo)}</strong> pts se quedaron en el banquillo</li>
+        {st.mejorDia && <li>💥 Mejor fichaje en una jornada: <strong>{st.nombreDe(st.mejorDia.id)}</strong> con {pts(st.mejorDia.pts)} pts</li>}
+        <li>🃏 Comodines usados: <strong>{st.comodines.length}</strong> de 3</li>
+        {st.peor && st.res.length > 1 && <li>😅 Peor jornada: {pts(st.peor.r.total)} pts ({J(st.peor.l)})</li>}
+      </ul></> },
+    ];
+    const texto = `🏀 ${tuyo ? "Mi" : "La"} temporada en el Fantasy Turó${tuyo ? "" : ` de ${st.p.alias}`}:\n` +
+      `• ${pts(st.totalG)} puntos en ${st.res.length} jornadas${st.posG ? ` (${st.posG}º de ${general.length})` : ""}\n` +
+      (st.mejor ? `• Mejor jornada: ${pts(st.mejor.r.total)} pts\n` : "") +
+      (estrella ? `• Jugador estrella: ${st.nombreDe(estrella[0])}\n` : "") +
+      (pctCap !== null ? `• Acierto con el capitán: ${pctCap}%\n` : "") +
+      `• Insignias: ${st.conseguidas.length}/${INSIGNIAS.length}\n¿Te atreves? 👉 coach.cbturo.com/fantasy`;
+    cuerpo = st.res.length === 0 ? (
+      <div className="space-y-3"><Link href={`/fantasy?v=manager&id=${pid}`} className="fx-btn-sec">← Perfil</Link><p className="fx-card p-4 text-sm fx-suave">El resumen sale cuando termina la primera jornada con equipo.</p></div>
+    ) : (
+      <div className="space-y-3">
+        <Link href={`/fantasy?v=manager&id=${pid}`} className="fx-btn-sec">← Perfil</Link>
+        <div className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
+          {tarjetas.map((t, i) => (
+            <section key={i} className={`flex aspect-[9/16] max-h-[70vh] w-[82%] shrink-0 snap-center flex-col items-center justify-center rounded-3xl bg-gradient-to-b ${t.fondo} p-6 text-center shadow-2xl ring-1 ring-white/10 sm:w-80`}>
+              {t.contenido}
+              <p className="mt-auto pt-4 text-[10px] uppercase tracking-[0.3em] text-white/40">Fantasy Turó · {i + 1}/{tarjetas.length}</p>
+            </section>
+          ))}
+        </div>
+        <div className="flex justify-center"><Compartir texto={texto} etiqueta={tuyo ? "Compartir mi resumen" : "Compartir"} /></div>
+        <p className="text-center text-xs fx-suave">Es la temporada hasta hoy: se va actualizando cada jornada.</p>
       </div>
     );
   }
@@ -901,7 +1008,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
   }
 
   return (
-    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista === "jugador" ? "mercado" : vista === "manager" ? "clasificacion" : vista} temporada={temporada}>
+    <Marco perfil={!!q.perfil} esAdmin={q.esAdmin} vista={vista === "jugador" ? "mercado" : vista === "manager" || vista === "resumen" ? "clasificacion" : vista} temporada={temporada}>
       {cuerpo}
       <Celebracion pid={`${yo.id}-${q.config.inicio}`} temporada={temporada} campeon={campeon}
         insignias={INSIGNIAS.filter((x) => misInsignias.has(x.codigo)).map(({ codigo, nombre, texto, img }) => ({ codigo, nombre, texto, img }))} />
