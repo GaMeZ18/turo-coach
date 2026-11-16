@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { notificarEquipo } from "@/lib/notificar";
 import { createClient } from "@/lib/supabase/server";
 import { buscarExistente, cambiosFCBQ, datosFCBQ, unirResultados, type LigaFCBQ, type PartidoFCBQ, type ResultadoLiga } from "@/lib/fcbq";
@@ -111,6 +111,7 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
     }
   }
 
+  revalidateTag("fantasy-stats"); // el Fantasy y el próximo rival vuelven a leer las estadísticas
   revalidatePath("/partidos");
   revalidatePath("/calendario");
   return res;

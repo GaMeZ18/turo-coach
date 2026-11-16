@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
 import { VERSION_STATS, type StatsPartido } from "@/lib/stats-fcbq";
@@ -34,6 +34,7 @@ export async function guardarStatsFCBQ(equipoId: string, items: StatsPartido[]) 
     const p = (partidos ?? []).find((x) => !x.fcbq_stats_id && dia(x.fecha) === dia(s.fecha!));
     if (p) await supabase.from("partidos").update({ fcbq_stats_id: s.id }).eq("id", p.id);
   }
+  revalidateTag("fantasy-stats"); // el Fantasy y el próximo rival vuelven a leer las estadísticas
   revalidatePath("/scouting", "layout");
   return items.length;
 }

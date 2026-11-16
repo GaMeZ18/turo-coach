@@ -283,7 +283,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
 
   // 8) Fantasy Turó: viernes «haz tu equipo», 2 h antes del cierre, lunes «tus puntos», insignias nuevas y resumen del chat
   try {
-    const { leerConfig, cargarLiga, ADMIN_FANTASY } = await import("./fantasy/datos");
+    const { leerConfig, cargarLiga, ADMIN_FANTASY, migrarFotosFantasy } = await import("./fantasy/datos");
+    await migrarFotosFantasy().catch(() => null); // fotos de perfil antiguas → almacenamiento
     const { nombreJornada, INSIGNIAS } = await import("./fantasy/motor");
     const { notificarFantasy } = await import("./notificar");
     const cfg = await leerConfig();

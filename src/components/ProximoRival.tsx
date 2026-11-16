@@ -5,6 +5,16 @@ import { informeRival } from "@/lib/informe-rival";
 import type { ResultadoLiga, TablaFCBQ } from "@/lib/fcbq";
 import type { StatsPartido } from "@/lib/stats-fcbq";
 import { diaInput, fechaLarga, hora, hoyLocal } from "@/lib/fechas";
+import { unstable_cache } from "next/cache";
+import { adminClient } from "@/lib/supabase/admin";
+
+/** Estadísticas del equipo (las suyas y las de sus rivales): en caché 1 hora o hasta que entren nuevas */
+const statsEquipo = unstable_cache(async (equipoId: string) => {
+  const db = adminClient();
+  if (!db) return [] as StatsPartido[];
+  const { data } = await db.from("fcbq_stats").select("datos").eq("equipo_id", equipoId);
+  return ((data ?? []) as { datos: StatsPartido }[]).map((f) => f.datos);
+}, ["proximo-rival-stats-v1"], { revalidate: 3600, tags: ["fantasy-stats"] });
 
 /** Tarjeta de Inicio: el próximo partido del equipo con las claves del rival */
 export default async function ProximoRival({ supabase, equipoId }: { supabase: SupabaseClient; equipoId: string }) {
@@ -12,15 +22,15 @@ export default async function ProximoRival({ supabase, equipoId }: { supabase: S
     .eq("equipo_id", equipoId).gte("fecha", new Date(Date.now() - 2 * 3600e3).toISOString()).or("estado.is.null,estado.neq.aplazado")
     .order("fecha").limit(1).maybeSingle();
   if (!p) return null;
-  const [{ data: liga }, { data: filas }] = await Promise.all([
+  const [{ data: liga }, stats] = await Promise.all([
     supabase.from("ligas_fcbq").select("resultados, clasificacion").eq("equipo_id", equipoId).maybeSingle(),
-    supabase.from("fcbq_stats").select("datos").eq("equipo_id", equipoId),
+    statsEquipo(equipoId),
   ]);
   const resultados = (liga?.resultados ?? []) as ResultadoLiga[];
   const propio = [...resultados.map((r) => r.local), ...resultados.map((r) => r.visitante)].find((n) => /TUR[OÓ]/i.test(n)) ?? null;
   const lineas = informeRival(p.rival as string, {
     resultados, clasificacion: (liga?.clasificacion ?? null) as TablaFCBQ | null,
-    stats: ((filas ?? []) as { datos: StatsPartido }[]).map((f) => f.datos), nuestro: propio,
+    stats, nuestro: propio,
   }).slice(0, 3);
   const dias = Math.round((Date.parse(diaInput(p.fecha as string)) - Date.parse(hoyLocal())) / 864e5);
   const cuando = dias <= 0 ? "Hoy" : dias === 1 ? "Mañana" : `En ${dias} días`;

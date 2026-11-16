@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, nuevaSesion, pinOk, quienSoy, silencio } from "@/lib/fantasy/datos";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, pinOk, quienSoy, silencio } from "@/lib/fantasy/datos";
 import { REACCIONES } from "@/lib/fantasy/estilo";
 import { randomBytes } from "crypto";
 import { MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
@@ -14,8 +14,13 @@ function avatarValido(a?: Avatar) {
   if (!a) return {};
   const emoji = a.emoji && [...a.emoji].length <= 4 && !/[<>]/.test(a.emoji) ? a.emoji : null;
   const color = a.color && /^#[0-9a-f]{6}$/i.test(a.color) ? a.color : null;
-  const foto = a.foto && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a.foto) && a.foto.length < 90_000 ? a.foto : null;
+  const foto = a.foto && ((/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a.foto) && a.foto.length < 90_000) || esFotoGuardada(a.foto)) ? a.foto : null;
   return { emoji, color, foto };
+}
+/** Igual, pero la foto nueva se sube al almacenamiento y se guarda solo su dirección */
+async function avatarGuardable(a?: Avatar) {
+  const v = avatarValido(a);
+  return "foto" in v ? { ...v, foto: (await fotoAStorage(v.foto)) ?? null } : v;
 }
 const limpiar = (s: unknown, max: number) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const aliasValido = (a: string) => a.length >= 3 && a.length <= 30;
@@ -40,7 +45,7 @@ export async function unirseStaff(alias: string, avatar?: Avatar, nombreReal?: s
   if (nombre.split(" ").filter(Boolean).length < 2) return { error: "Pon tu nombre y apellido." };
   // Si en la app no teníamos su nombre, se guarda también en su perfil
   if (!guardado) await db().from("perfiles").update({ nombre }).eq("id", q.perfil.id);
-  const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...avatarValido(avatar) });
+  const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...(await avatarGuardable(avatar)) });
   if (error) return { error: error.message };
   revalidatePath("/fantasy");
   return { ok: true };
@@ -57,7 +62,7 @@ export async function registrar(d: { alias: string; nombre: string; contacto: st
   if (!/^\d{4,6}$/.test(pin)) return { error: "El PIN debe tener de 4 a 6 números." };
   if (!(await aliasLibre(alias))) return { error: "Ese nombre de equipo ya existe. Elige otro." };
   const t = nuevaSesion();
-  const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, mostrar: nombreCorto(nombre), contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t), ...avatarValido(d) });
+  const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, mostrar: nombreCorto(nombre), contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t), ...(await avatarGuardable(d)) });
   if (error) return { error: error.message };
   await guardarCookie(t);
   revalidatePath("/fantasy");
@@ -122,7 +127,7 @@ export async function guardarPerfil(d: { alias: string; mostrar: string } & Avat
   if (!aliasValido(a)) return { error: "El nombre del equipo debe tener entre 3 y 30 letras." };
   if (m.length < 2) return { error: "Pon cómo quieres que te vean (p. ej. Juan G.)." };
   if (!(await aliasLibre(a, q.participante.id))) return { error: "Ese nombre de equipo ya existe." };
-  await db().from("fantasy_participantes").update({ alias: a, mostrar: m, ...avatarValido(d) }).eq("id", q.participante.id);
+  await db().from("fantasy_participantes").update({ alias: a, mostrar: m, ...(await avatarGuardable(d)) }).eq("id", q.participante.id);
   revalidatePath("/fantasy");
   return { ok: true };
 }

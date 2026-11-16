@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -70,25 +71,49 @@ export async function quienSoy() {
   return { config, perfil, participante, esAdmin, cargaPuntos, acceso: config.abierto || esAdmin };
 }
 
-/** Todo lo necesario para calcular la liga */
-export async function cargarLiga(config: Config) {
+/** Etiqueta de la caché: se invalida al entrar estadísticas nuevas (revalidateTag) */
+export const TAG_FANTASY = "fantasy-stats";
+
+/** Lo pesado y que cambia poco (equipos, estadísticas, partidos, clasificaciones): se guarda 10 minutos
+ *  o hasta que entran estadísticas nuevas. Así no se descarga todo en cada visita (consumo de Supabase). */
+const datosBase = unstable_cache(async (inicio: string) => {
   const d = db();
   const { data: eqs } = await d.from("equipos").select("id, nombre, temporadas!inner(actual)").eq("temporadas.actual", true);
   const equipos = ((eqs ?? []) as { id: string; nombre: string }[]).map((e) => ({ id: e.id, nombre: e.nombre }));
-  const ids = equipos.map((e) => e.id);
-  const desde = new Date(Date.parse(config.inicio) - 120 * 864e5).toISOString();
-  const [{ data: filas }, { data: partidos }, { data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
-    d.from("fcbq_stats").select("equipo_id, stats_id, fecha, datos").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).or("local.ilike.%tur%,visitante.ilike.%tur%").limit(2000),
-    d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id, rival, local, puntos_favor, puntos_contra").in("equipo_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("fecha", desde).limit(2000),
+  const ids = equipos.length ? equipos.map((e) => e.id) : ["00000000-0000-0000-0000-000000000000"];
+  const desde = new Date(Date.parse(inicio) - 120 * 864e5).toISOString();
+  const [{ data: filas }, { data: partidos }, { data: ligas }] = await Promise.all([
+    // Solo lo que usa el Fantasy (sin la jugada a jugada ni el marcador minuto a minuto)
+    d.from("fcbq_stats").select("equipo_id, stats_id, fecha, local:datos->local, visitante:datos->visitante, dfecha:datos->fecha").in("equipo_id", ids).or("local.ilike.%tur%,visitante.ilike.%tur%").limit(2000),
+    d.from("partidos").select("id, equipo_id, fecha, fcbq_stats_id, rival, local, puntos_favor, puntos_contra").in("equipo_id", ids).gte("fecha", desde).limit(2000),
+    d.from("ligas_fcbq").select("equipo_id, clasificacion"),
+  ]);
+  return {
+    equipos,
+    filas: ((filas ?? []) as unknown as { equipo_id: string; stats_id: string; fecha: string | null; local: unknown; visitante: unknown; dfecha: string | null }[])
+      .map((f) => ({ equipo_id: f.equipo_id, stats_id: f.stats_id, fecha: f.fecha, datos: { local: f.local, visitante: f.visitante, fecha: f.dfecha } })) as unknown as FilaStats[],
+    partidos: (partidos ?? []) as PartidoCal[],
+    ligas: ((ligas ?? []) as { equipo_id: string; clasificacion: Clasif | null }[]).filter((x) => x.clasificacion?.filas?.length),
+  };
+}, ["fantasy-base-v1"], { revalidate: 600, tags: [TAG_FANTASY] });
+
+/** Todo lo necesario para calcular la liga */
+export async function cargarLiga(config: Config) {
+  const d = db();
+  const base = await datosBase(config.inicio);
+  const { equipos } = base;
+  const partidos = base.partidos;
+  const filas = base.filas;
+  const [{ data: parts }, { data: als }, { data: msgs }, { data: fijos }] = await Promise.all([
     d.from("fantasy_participantes").select(CAMPOS_PARTICIPANTE).order("created_at"),
     d.from("fantasy_alineaciones").select("participante_id, jornada, titulares, suplente, capitan, comodin, coste, duo"),
     d.from("fantasy_mensajes").select("participante_id").eq("borrado", false),
     d.from("fantasy_precios").select("jornada, precios"),
   ]);
   // Para el dúo técnico: ¿el rival de cada partido va por encima en la clasificación?
-  const clas = await cargarClasificaciones();
+  const clas = new Map(base.ligas.map((x) => [x.equipo_id, x.clasificacion!]));
   const rivalArriba: Record<string, boolean> = {};
-  for (const p of (partidos ?? []) as PartidoCal[]) {
+  for (const p of partidos) {
     const c = clas.get(p.equipo_id), r = posicion(c, p.rival), n = posicion(c, null, true);
     if (r && n) rivalArriba[p.id] = r.pos < n.pos;
   }
@@ -98,7 +123,7 @@ export async function cargarLiga(config: Config) {
   for (const m of msgs ?? []) mensajes[m.participante_id as string] = (mensajes[m.participante_id as string] ?? 0) + 1;
   const liga = calcularLiga({
     inicio: config.inicio, hoy: hoyLocal(), ahora: new Date().toISOString(),
-    equipos, filas: (filas ?? []) as FilaStats[], partidos: (partidos ?? []) as PartidoCal[],
+    equipos, filas, partidos,
     especiales: config.especiales, anuladas: config.anuladas,
     alineaciones: (als ?? []) as Alineacion[], participantes: participantes.map((p) => ({ id: p.id, alias: p.alias })),
     mensajes, cerrada: config.cerrada, campeon: config.campeon, preciosFijos, duosNombres: config.duos, rivalArriba,
@@ -108,15 +133,19 @@ export async function cargarLiga(config: Config) {
     const p = [...liga.precio(liga.abierta), ...liga.precioDuo(liga.abierta)];
     await d.from("fantasy_precios").upsert({ jornada: liga.abierta, precios: Object.fromEntries(p.map(([id, x]) => [id, [x.precio, x.media, x.pj]])) }, { onConflict: "jornada", ignoreDuplicates: true });
   }
-  return { liga, participantes, partidos: (partidos ?? []) as PartidoCal[], equipos };
+  return { liga, participantes, partidos, equipos };
 }
 
 /** Clasificación de la liga de cada equipo (la que trae la extensión de la FCBQ): para saber en qué posición va cada uno */
 export type Clasif = { filas: string[][] };
 export async function cargarClasificaciones(): Promise<Map<string, Clasif>> {
-  const { data } = await db().from("ligas_fcbq").select("equipo_id, clasificacion");
-  return new Map(((data ?? []) as { equipo_id: string; clasificacion: Clasif | null }[]).filter((x) => x.clasificacion?.filas?.length).map((x) => [x.equipo_id, x.clasificacion!]));
+  const { data } = await cargarLigasCache();
+  return new Map(data.map((x) => [x.equipo_id, x.clasificacion!]));
 }
+const cargarLigasCache = unstable_cache(async () => {
+  const { data } = await db().from("ligas_fcbq").select("equipo_id, clasificacion");
+  return { data: ((data ?? []) as { equipo_id: string; clasificacion: Clasif | null }[]).filter((x) => x.clasificacion?.filas?.length) };
+}, ["fantasy-ligas-v1"], { revalidate: 600, tags: [TAG_FANTASY] });
 const normEq = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
 /** Posición de un equipo en la tabla (por nombre; el Turó se busca por «TURÓ») */
 export function posicion(c: Clasif | undefined, nombre: string | null | undefined, turo = false): { pos: number; total: number } | null {
@@ -137,4 +166,26 @@ export function silencio(p: { silenciado: boolean; silenciado_hasta: string | nu
     return `El administrador te ha silenciado en el chat hasta el ${h}.`;
   }
   return null;
+}
+
+/** Fotos de perfil: se guardan en el almacenamiento (y no dentro de la base de datos), con una URL
+ *  que el navegador guarda en caché. Antes iban como texto «data:» y se descargaban en cada visita. */
+const BASE_FOTOS = () => `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/fantasy-chat/avatares/`;
+export const esFotoGuardada = (f: string) => !!process.env.NEXT_PUBLIC_SUPABASE_URL && f.startsWith(BASE_FOTOS()) && /^[\w./:-]+$/.test(f);
+export async function fotoAStorage(foto: string | null | undefined): Promise<string | null | undefined> {
+  if (!foto || !foto.startsWith("data:")) return foto;
+  const m = foto.match(/^data:(image\/(jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return null;
+  const path = `avatares/${Date.now()}-${randomBytes(4).toString("hex")}.${m[2] === "jpeg" ? "jpg" : m[2]}`;
+  const { error } = await db().storage.from("fantasy-chat").upload(path, Buffer.from(m[3], "base64"), { contentType: m[1], cacheControl: "31536000", upsert: false });
+  if (error) return foto; // si falla, se guarda como antes
+  return db().storage.from("fantasy-chat").getPublicUrl(path).data.publicUrl;
+}
+/** Pasa al almacenamiento las fotos antiguas guardadas como texto (lo hace el aviso cada 15 min, de 10 en 10) */
+export async function migrarFotosFantasy() {
+  const { data } = await db().from("fantasy_participantes").select("id, foto").like("foto", "data:%").limit(10);
+  for (const p of (data ?? []) as { id: string; foto: string }[]) {
+    const url = await fotoAStorage(p.foto);
+    if (url && !url.startsWith("data:")) await db().from("fantasy_participantes").update({ foto: url }).eq("id", p.id);
+  }
 }
