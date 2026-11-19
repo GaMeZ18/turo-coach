@@ -14,8 +14,9 @@ export type Equipo = {
   temporada_id: string;
 };
 
-/** Equipos de la temporada actual. El coordinador ve todos; el entrenador, los suyos primero. */
-export async function equiposDeTemporada(supabase: SupabaseClient) {
+/** Equipos de la temporada actual. El coordinador ve todos; el entrenador, los suyos primero.
+ *  Una sola consulta por petición aunque lo pidan el menú, la página y el equipo activo (cache de React). */
+export const equiposDeTemporada = cache(async (supabase: SupabaseClient) => {
   // Equipos y temporada en una sola consulta (antes eran dos seguidas)
   const { data } = await supabase
     .from("equipos")
@@ -28,8 +29,8 @@ export async function equiposDeTemporada(supabase: SupabaseClient) {
     return { temporada: { id: t.id, nombre: t.nombre }, equipos: filas.map(({ temporadas: _t, ...e }) => e as Equipo) };
   }
   const { data: temporada } = await supabase.from("temporadas").select("id, nombre").eq("actual", true).maybeSingle();
-  return { temporada: temporada ?? null, equipos: [] as Equipo[] };
-}
+  return { temporada: (temporada ?? null) as { id: string; nombre: string } | null, equipos: [] as Equipo[] };
+});
 
 /** Equipos con los que puede trabajar el usuario: el coordinador, todos; el resto, donde es staff */
 export const misEquipos = cache(async (supabase: SupabaseClient) => {
@@ -46,11 +47,9 @@ export const equipoActivo = cache(async (supabase: SupabaseClient): Promise<Equi
   const id = (await cookies()).get(COOKIE_EQUIPO)?.value;
   const { perfil } = await requireUser();
   if (id) {
-    const { data } = await supabase
-      .from("equipos")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    // Casi siempre es de esta temporada: se saca de la lista que ya está cargada (sin otra consulta)
+    const { equipos: todos } = await equiposDeTemporada(supabase);
+    const data = todos.find((e) => e.id === id) ?? ((await supabase.from("equipos").select("*").eq("id", id).maybeSingle()).data as Equipo | null);
     if (data && perfil.rol === "coordinador") return data as Equipo;
     if (data) {
       const { equipos } = await misEquipos(supabase);

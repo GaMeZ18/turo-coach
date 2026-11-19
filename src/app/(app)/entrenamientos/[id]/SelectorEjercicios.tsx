@@ -1,9 +1,9 @@
 "use client";
 
 // Elegir ejercicios para el entreno viendo su ficha completa (pizarra, objetivos, correcciones…)
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowLeft, Check, Library, Loader2, Plus, Search, X } from "lucide-react";
-import { anadirActividad } from "../actions";
+import { anadirActividad, catalogoEjercicios } from "../actions";
 import FichaEjercicio from "@/components/FichaEjercicio";
 import { CATEGORIAS } from "@/lib/categorias";
 import { EDADES } from "@/lib/edades";
@@ -15,12 +15,38 @@ export type EjercicioLista = {
   visibilidad?: string | null;
 };
 
+// La lista se guarda en memoria y en el navegador 30 minutos: abrir el selector otra vez es instantáneo
+const CLAVE = "catalogo-ejercicios-v1", VIDA = 30 * 60e3;
+let enMemoria: { t: number; lista: EjercicioLista[] } | null = null;
+function guardado(): EjercicioLista[] | null {
+  if (enMemoria && Date.now() - enMemoria.t < VIDA) return enMemoria.lista;
+  try { const x = JSON.parse(sessionStorage.getItem(CLAVE) ?? "null") as { t: number; lista: EjercicioLista[] } | null; if (x && Date.now() - x.t < VIDA) { enMemoria = x; return x.lista; } } catch { /* sin almacenamiento */ }
+  return null;
+}
+async function pedirCatalogo(): Promise<EjercicioLista[]> {
+  const lista = ((await catalogoEjercicios()) ?? []) as unknown as EjercicioLista[];
+  enMemoria = { t: Date.now(), lista };
+  try { sessionStorage.setItem(CLAVE, JSON.stringify(enMemoria)); } catch { /* lleno o bloqueado */ }
+  return lista;
+}
+
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEquipo, favoritos = [] }: {
-  entrenoId: string; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null; favoritos?: string[];
+export default function SelectorEjercicios({ entrenoId, yo, edadEquipo, favoritos = [] }: {
+  entrenoId: string; yo: string; edadEquipo?: string | null; favoritos?: string[];
 }) {
   const [abierto, setAbierto] = useState(false);
+  const [ejercicios, setEjercicios] = useState<EjercicioLista[]>([]);
+  const [cargando, setCargando] = useState(false);
+  // Al abrirlo: lo guardado si es reciente; si no, se pide (y se precarga al pasar el ratón o tocar el botón)
+  const cargar = () => {
+    const g = guardado();
+    if (g) { setEjercicios(g); return; }
+    if (cargando) return;
+    setCargando(true);
+    pedirCatalogo().then(setEjercicios).catch(() => null).finally(() => setCargando(false));
+  };
+  useEffect(() => { if (abierto) cargar(); }, [abierto]); // eslint-disable-line react-hooks/exhaustive-deps
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [edad, setEdad] = useState(edadEquipo ?? "");
@@ -82,7 +108,7 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
   if (!abierto) {
     return (
       <>
-        <button type="button" onClick={() => setAbierto(true)} className="btn-primario w-full">
+        <button type="button" onPointerEnter={() => { if (!guardado()) void pedirCatalogo().catch(() => null); }} onClick={() => setAbierto(true)} className="btn-primario w-full">
           <Library size={16} /> Elegir ejercicio de la biblioteca
         </button>
         {/* En el móvil, siempre a mano sin tener que bajar hasta el final */}
@@ -147,7 +173,8 @@ export default function SelectorEjercicios({ entrenoId, ejercicios, yo, edadEqui
                   </button>
                 </li>
               ))}
-              {lista.length === 0 && <li className="p-4 text-sm text-tinta/50">No hay ejercicios con esos filtros.</li>}
+              {cargando && ejercicios.length === 0 && <li className="flex items-center gap-2 p-4 text-sm text-tinta/50"><Loader2 size={15} className="animate-spin" /> Cargando ejercicios…</li>}
+              {!cargando && lista.length === 0 && <li className="p-4 text-sm text-tinta/50">No hay ejercicios con esos filtros.</li>}
             </ul>
             <p className="border-t border-linea px-3 py-1.5 text-[11px] text-tinta/50">{lista.length} ejercicios</p>
           </div>

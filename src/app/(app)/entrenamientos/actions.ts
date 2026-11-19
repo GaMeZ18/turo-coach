@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { aISO } from "@/lib/fechas";
-import { check } from "@/lib/db";
+import { check, todas } from "@/lib/db";
 
 const ruta = (id: string) => `/entrenamientos/${id}`;
 
@@ -375,4 +375,12 @@ export async function anularEntreno(entrenoId: string, motivo: string | null, av
     }
   }
   return { ok: true };
+}
+
+/** Lista de ejercicios para el selector del entreno: se pide solo al abrirlo (antes se descargaba
+ *  entera, unos 400 KB, cada vez que se abría un entreno) y el navegador la guarda un rato */
+export async function catalogoEjercicios() {
+  const supabase = await createClient();
+  const { data } = await todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles!ejercicios_autor_id_fkey(nombre)").order("titulo").range(d, h));
+  return data;
 }

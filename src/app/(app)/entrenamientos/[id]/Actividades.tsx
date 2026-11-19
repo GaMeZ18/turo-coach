@@ -8,7 +8,7 @@ import {
 } from "../actions";
 import Enviar from "@/components/Enviar";
 import FichaEjercicio, { useFicha } from "@/components/FichaEjercicio";
-import SelectorEjercicios, { type EjercicioLista } from "./SelectorEjercicios";
+import SelectorEjercicios from "./SelectorEjercicios";
 import Cronometro from "./Cronometro";
 
 type Actividad = {
@@ -72,9 +72,9 @@ const TZ = "Europe/Madrid";
 const hhmm = (d: Date) => d.toLocaleTimeString("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 
 export default function Actividades({
-  entrenoId, inicio, prevista, actividades, ejercicios, yo, edadEquipo, favoritos = [],
+  entrenoId, inicio, prevista, actividades, yo, edadEquipo, favoritos = [],
 }: {
-  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; ejercicios: EjercicioLista[]; yo: string; edadEquipo?: string | null; favoritos?: string[];
+  entrenoId: string; inicio: string; prevista: number; actividades: Actividad[]; yo: string; edadEquipo?: string | null; favoritos?: string[];
 }) {
   const [lista, setLista] = useState(actividades);
   const [arrastrando, setArrastrando] = useState<number | null>(null);
@@ -216,7 +216,7 @@ export default function Actividades({
       </ol>
 
       <div className="mt-3">
-        <SelectorEjercicios entrenoId={entrenoId} ejercicios={ejercicios} yo={yo} edadEquipo={edadEquipo} favoritos={favoritos} />
+        <SelectorEjercicios entrenoId={entrenoId} yo={yo} edadEquipo={edadEquipo} favoritos={favoritos} />
       </div>
       <form
         ref={formAlta}

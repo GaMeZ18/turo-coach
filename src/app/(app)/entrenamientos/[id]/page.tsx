@@ -1,7 +1,5 @@
-import type { EjercicioLista } from "./SelectorEjercicios";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { todas } from "@/lib/db";
 import { requireUser } from "@/lib/supabase/server";
 import { diaInput, fechaLarga, hora, horaInput } from "@/lib/fechas";
 import { borrarEntreno, duplicarEntreno, editarEntreno, guardarComoPlantilla } from "../actions";
@@ -44,14 +42,12 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!e) notFound();
 
-  const [{ data: actividades }, { data: ejercicios }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }, { data: favs }, { data: comentarios }, { data: respR }] = await Promise.all([
+  const [{ data: actividades }, { data: plantilla }, { data: asistencias }, { data: planes }, { data: marcados }, { data: temporada }, { data: favs }, { data: comentarios }, { data: respR }] = await Promise.all([
     supabase
       .from("entreno_actividades")
       .select("id, orden, tipo, titulo, duracion, notas, objetivos, descripcion, hecho, ejercicio_id, ejercicios(titulo, preview, descripcion)")
       .eq("entrenamiento_id", id)
       .order("orden"),
-    // Más de 1000 ejercicios: se piden por páginas
-    todas((d, h) => supabase.from("ejercicios").select("id, titulo, tipo, categoria, duracion, edades, etiquetas, en_biblioteca, autor_id, visibilidad, perfiles!ejercicios_autor_id_fkey(nombre)").order("titulo").range(d, h)),
     supabase
       .from("equipo_jugadores")
       .select("dorsal, jugadores(id, nombre, apellidos, no_disponible_hasta, no_disponible_motivo)")
@@ -185,7 +181,6 @@ export default async function EntrenoPage({ params }: { params: Promise<{ id: st
           inicio={e.fecha}
           prevista={e.duracion_prevista}
           actividades={(actividades ?? []) as never}
-          ejercicios={(ejercicios ?? []) as unknown as EjercicioLista[]}
           yo={user.id}
           favoritos={(favs ?? []).map((f) => f.ejercicio_id as string)}
           edadEquipo={edadDe(`${(e.equipos as { nombre: string; categoria: string | null } | null)?.categoria ?? ""} ${(e.equipos as { nombre: string } | null)?.nombre ?? ""}`)}
