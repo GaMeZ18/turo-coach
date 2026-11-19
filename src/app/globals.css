@@ -169,3 +169,9 @@ html[data-tema="auto"] {
   padding-left: max(0px, env(safe-area-inset-left));
   padding-right: max(0px, env(safe-area-inset-right));
 }
+
+/* Barra de carga al cambiar de página (Transicion) */
+@keyframes barra { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* Sin espera de doble toque en móviles: el toque se registra al instante */
+a, button, [role="button"], summary { touch-action: manipulation; }

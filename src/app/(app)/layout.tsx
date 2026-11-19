@@ -1,3 +1,4 @@
+import Transicion from "@/components/Transicion";
 import Link from "next/link";
 import { veFantasy } from "@/lib/fantasy/menu";
 import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
@@ -57,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="filete" />
       </header>
       <PedirAvisos clavePublica={VAPID_PUBLICO} />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6"><Transicion>{children}</Transicion></main>
       <RegistrarSW />
       <AutoRefresco />
     </div>
