@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { Award, BookOpen, CalendarDays, ClipboardList, MessageCircle, Settings, Trophy, Users, Zap } from "lucide-react";
+import { Settings } from "lucide-react";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import AutoRefresco from "@/components/AutoRefresco";
+import Transicion from "@/components/Transicion";
+import Pestanas from "./Pestanas";
+import { Suspense } from "react";
 
 /** Camiseta con el dorsal, del color del equipo */
 export function Camiseta({ dorsal, equipo, size = 30 }: { dorsal: string | number; equipo: string; size?: number }) {
@@ -42,16 +45,6 @@ export function Nombre({ alias, mostrar, className = "" }: { alias: string; most
   );
 }
 
-export const VISTAS = [
-  { v: "equipo", t: "Mi equipo", i: Users },
-  { v: "mercado", t: "Mercado", i: ClipboardList },
-  { v: "clasificacion", t: "Clasificación", i: Trophy },
-  { v: "puntos", t: "Puntos", i: Zap },
-  { v: "jornada", t: "Chat", i: MessageCircle },
-  { v: "calendario", t: "Calendario", i: CalendarDays },
-  { v: "insignias", t: "Insignias", i: Award },
-  { v: "reglas", t: "Reglas", i: BookOpen },
-] as const;
 
 /** Cabecera del juego con las pestañas */
 export function Marco({ children, perfil, esAdmin, vista, conMenu = true, temporada }: { children: React.ReactNode; perfil: boolean; esAdmin: boolean; vista?: string; conMenu?: boolean; temporada: string }) {
@@ -67,17 +60,9 @@ export function Marco({ children, perfil, esAdmin, vista, conMenu = true, tempor
           {esAdmin && <Link href="/fantasy/admin" className="rounded-lg p-1.5 text-white/80 hover:bg-white/10" title="Administrar"><Settings size={20} /></Link>}
           {perfil && <Link href="/" className="rounded-full border border-white/40 px-2.5 py-0.5 text-xs font-semibold">← App</Link>}
         </div>
-        {conMenu && (
-          <nav className="mx-auto flex max-w-3xl overflow-x-auto [scrollbar-width:none]">
-            {VISTAS.map(({ v, t, i: I }) => (
-              <Link key={v} href={`/fantasy?v=${v}`} className={`flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 px-1 py-1.5 text-[10px] font-semibold sm:text-xs ${vista === v ? "bg-gradient-to-b from-[#f0323f] to-[#a3121e] text-white" : "text-white/70"}`}>
-                <I size={18} />{t}
-              </Link>
-            ))}
-          </nav>
-        )}
+        {conMenu && <Suspense fallback={null}><Pestanas vista={vista} /></Suspense>}
       </header>
-      <main className="mx-auto max-w-3xl px-3 py-4">{children}</main>
+      <main className="mx-auto max-w-3xl px-3 py-4"><Transicion>{children}</Transicion></main>
       <AutoRefresco oscuro />
     </div>
   );
