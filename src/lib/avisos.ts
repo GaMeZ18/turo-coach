@@ -200,8 +200,9 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
       }
     }
 
-    // 11) 3 entrenos seguidos sin venir y sin justificar → entrenadores del equipo y coordinación (una vez por racha)
-    const { data: pasados } = await db.from("entrenamientos").select("id, equipo_id, fecha").is("anulado_motivo", null).in("equipo_id", ids)
+    // 11) 3 entrenos seguidos sin venir y sin justificar → entrenadores del equipo y coordinación (una vez por racha).
+    //     Se mira una vez al día, a las 22:00 (antes, cada 15 minutos: mucha consulta para nada)
+    const { data: pasados } = !(horaLocal === 22 && new Date(ahora).getUTCMinutes() < 15) ? { data: [] } : await db.from("entrenamientos").select("id, equipo_id, fecha").is("anulado_motivo", null).in("equipo_id", ids)
       .gte("fecha", aISO(sumarDias(hoy, -45), "00:00")).lt("fecha", new Date(ahora).toISOString()).order("fecha", { ascending: false });
     const pas = (pasados ?? []) as { id: string; equipo_id: string; fecha: string }[];
     if (pas.length) {
@@ -320,8 +321,9 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
           `${nombreJornada(cfg.inicio, t, cfg.anuladas)}: quedaste ${r.pos}º de ${ranking.length}. En la general vas ${pos}º. ¡Ya puedes fichar para la próxima!`, "/fantasy?v=clasificacion"));
       }
     }
-    // Insignias nuevas (en cuanto se consiguen; se apuntan para no repetir el aviso)
-    const { data: avisadas } = await db.from("fantasy_insignias_avisadas").select("participante_id, codigo");
+    // Insignias nuevas (se mira una vez por hora; se apuntan para no repetir el aviso)
+    const { data: avisadas } = new Date(ahora).getUTCMinutes() >= 15 ? { data: null } : await db.from("fantasy_insignias_avisadas").select("participante_id, codigo");
+    if (avisadas) {
     const hechas = new Set((avisadas ?? []).map((a) => `${a.participante_id}|${a.codigo}`));
     for (const p of activos) {
       const nuevas = INSIGNIAS.filter((x) => liga.insignias(p.id).has(x.codigo) && !hechas.has(`${p.id}|${x.codigo}`));
@@ -333,6 +335,8 @@ export async function enviarAvisos(db: SupabaseClient, hoy = hoyLocal()) {
         nuevas.length === 1 ? nuevas[0].texto : nuevas.map((x) => x.nombre).join(", "),
         nuevas.length === 1 ? `/fantasy?v=insignias&i=${nuevas[0].codigo}` : "/fantasy?v=insignias");
     }
+    }
+
     // Resumen del chat (20:00): solo si hay 3 mensajes o más de otros que aún no has visto
     if (horaLocal >= 20) {
       const desde = new Date(ahora - 24 * 3600e3).toISOString();

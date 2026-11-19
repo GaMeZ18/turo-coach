@@ -95,7 +95,7 @@ const datosBase = unstable_cache(async (inicio: string) => {
     partidos: (partidos ?? []) as PartidoCal[],
     ligas: ((ligas ?? []) as { equipo_id: string; clasificacion: Clasif | null }[]).filter((x) => x.clasificacion?.filas?.length),
   };
-}, ["fantasy-base-v1"], { revalidate: 600, tags: [TAG_FANTASY] });
+}, ["fantasy-base-v1"], { revalidate: 1800, tags: [TAG_FANTASY] });
 
 /** Lo que cambia al jugar (participantes, equipos fichados, precios guardados, mensajes por persona):
  *  en caché hasta que alguien guarda algo (revalidateTag(TAG_DATOS) en las acciones) o 5 minutos */
