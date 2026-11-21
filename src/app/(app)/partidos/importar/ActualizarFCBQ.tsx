@@ -1,6 +1,6 @@
 "use client";
 
-const VERSION_EXTENSION = "1.10.0";
+const VERSION_EXTENSION = "1.11.0";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -186,9 +186,14 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         if (equipoDeStats.current.size) { setAvisos((a) => [...a, `Estadísticas: ${d.texto}`]); equipoDeStats.current = new Map(); terminarRef.current(); }
         else { setEstado("error"); setTexto(d.texto ?? "Error"); }
       }
-      if (d.tipo === "turo-fcbq-fin" && !recibido) setTexto("Se ha cortado la conexión con la extensión. Vuelve a pulsar Actualizar.");
+      if (d.tipo === "turo-fcbq-fin" && !recibido) {
+        // Si la extensión se corta, se reintenta sola una vez antes de dar error
+        if (reintentos.current < 1) { reintentos.current++; setTexto("La conexión con la extensión se ha cortado: reintentando…"); setTimeout(() => actualizarRef.current(), 1500); return; }
+        setTexto(versionExt.current && versionExt.current < "1.11" ? "Se ha cortado la conexión con la extensión. Actualízala a la versión 1.11 (aviso de arriba) y vuelve a pulsar Actualizar." : "Se ha cortado la conexión con la extensión. Vuelve a pulsar Actualizar.");
+        setEstado((s) => (s === "trabajando" ? "error" : s));
+      }
       if (d.tipo === "turo-fcbq-inicio") recibido = false;
-      if (d.tipo === "turo-fcbq-fin" && !recibido) setEstado((s) => (s === "trabajando" ? "error" : s));
+      if (d.tipo === "turo-fcbq-datos" || d.tipo === "turo-fcbq-stats") reintentos.current = 0;
       if (d.tipo === "turo-fcbq-error") recibido = true;
       if (d.tipo === "turo-fcbq-datos" && d.paginas) {
         recibido = true;
@@ -243,6 +248,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
     window.postMessage({ tipo: "turo-fcbq-pedir", club: CLUB }, location.origin);
   };
   const actualizarRef = useRef(actualizar);
+  const reintentos = useRef(0);
   actualizarRef.current = actualizar;
 
   if (instalada === false) {

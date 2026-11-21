@@ -48,7 +48,7 @@ async function revisarPendiente() {
   const ultimoLunes = proximoLunes6() - 864e5;
   if (ultimaAuto < ultimoLunes && Date.now() > ultimoLunes) await lanzarAuto();
 }
-// ---------- Al acabar cada partido (versión 1.10) ----------
+// ---------- Al acabar cada partido (desde la versión 1.10) ----------
 // Cada 10 minutos se pregunta a Coach Manager si hay algún partido ya terminado sin estadísticas.
 // Si lo hay, se cargan los datos en ese momento (como mucho una vez cada 20 minutos), y así resultados y puntos del Fantasy salen enseguida.
 async function programarPartidos() {
@@ -121,6 +121,9 @@ chrome.runtime.onConnect.addListener((puerto) => {
   if (puerto.name !== "fcbq") return;
   puerto.onMessage.addListener(async (pedido) => {
     const avisar = (texto) => { try { puerto.postMessage({ tipo: "progreso", texto }); } catch {} };
+    // 1.11: Chrome apaga la extensión tras 30 s «sin actividad» aunque esté descargando de la FCBQ, y se cortaba
+    // la conexión. Un latido cada 20 s la mantiene despierta hasta terminar.
+    const latido = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => {}); puerto.postMessage({ tipo: "latido" }); } catch {} }, 20000);
     const pestanaApp = puerto.sender?.tab;
     const junto = pestanaApp ? { windowId: pestanaApp.windowId, index: pestanaApp.index + 1 } : {};
     let tab;
@@ -155,6 +158,7 @@ chrome.runtime.onConnect.addListener((puerto) => {
       if (/error page|Cannot access/i.test(texto)) texto = "No se ha podido abrir basquetcatala.cat. Comprueba la conexión y vuelve a probar.";
       try { puerto.postMessage({ tipo: "error", texto }); } catch {}
     } finally {
+      clearInterval(latido);
       if (tab) chrome.tabs.remove(tab.id).catch(() => {});
       if (pestanaApp?.id) chrome.tabs.update(pestanaApp.id, { active: true }).catch(() => {});
       try { puerto.disconnect(); } catch {}
