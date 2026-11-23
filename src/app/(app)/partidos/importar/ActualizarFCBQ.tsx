@@ -198,7 +198,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
         if (d.version) {
           versionExt.current = d.version;
           const num = (v: string) => v.split(".").map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
-          setVersionVieja(num(d.version) < num(VERSION_EXTENSION) ? d.version : null);
+          setVersionVieja(/^\d/.test(d.version) && num(d.version) < num(VERSION_EXTENSION) ? d.version : null);
         }
       }
       if (d.tipo === "turo-fcbq-progreso") setTexto(d.texto ?? "");
