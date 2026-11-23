@@ -2,7 +2,10 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, misEspias, pinOk, quienSoy, silencio, TAG_DATOS } from "@/lib/fantasy/datos";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, misEspias, pinOk, quienSoy, silencio, TAG_DATOS, olvidarLiga } from "@/lib/fantasy/datos";
+
+/** Tras cualquier cambio: borra el cálculo en memoria y la caché de datos del juego */
+function refrescarJuego() { olvidarLiga(); revalidateTag(TAG_DATOS); }
 import { REACCIONES } from "@/lib/fantasy/estilo";
 import { randomBytes } from "crypto";
 import { COSTE_ESPIA, MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
@@ -47,7 +50,7 @@ export async function unirseStaff(alias: string, avatar?: Avatar, nombreReal?: s
   if (!guardado) await db().from("perfiles").update({ nombre }).eq("id", q.perfil.id);
   const { error } = await db().from("fantasy_participantes").insert({ perfil_id: q.perfil.id, alias: a, nombre, mostrar: nombreCorto(nombre), ...(await avatarGuardable(avatar)) });
   if (error) return { error: error.message };
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -65,7 +68,7 @@ export async function registrar(d: { alias: string; nombre: string; contacto: st
   const { error } = await db().from("fantasy_participantes").insert({ alias, nombre, mostrar: nombreCorto(nombre), contacto, pin_hash: hashPin(pin), sesion_hash: hashSesion(t), ...(await avatarGuardable(d)) });
   if (error) return { error: error.message };
   await guardarCookie(t);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -81,7 +84,7 @@ export async function entrar(quien: string, pin: string): Promise<R> {
   const t = nuevaSesion();
   await d.from("fantasy_participantes").update({ sesion_hash: hashSesion(t) }).eq("id", p.id);
   await guardarCookie(t);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -91,7 +94,7 @@ export async function darmeDeBaja(): Promise<R> {
   if (!q.participante) return { error: "No estás apuntado." };
   await db().from("fantasy_participantes").delete().eq("id", q.participante.id);
   (await cookies()).delete(COOKIE_FANTASY);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -110,13 +113,13 @@ export async function entrarConCuenta(email: string, password: string): Promise<
   const supa = await createClient();
   const { error } = await supa.auth.signInWithPassword({ email: String(email ?? "").trim().toLowerCase(), password: String(password ?? "") });
   if (error) return { error: error.code === "invalid_credentials" ? "Email o contraseña incorrectos." : `No se ha podido entrar (${error.message}).` };
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
 export async function salir() {
   (await cookies()).delete(COOKIE_FANTASY);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
 }
 
 /** Cambiar el nombre del equipo, el nombre visible y el avatar */
@@ -128,7 +131,7 @@ export async function guardarPerfil(d: { alias: string; mostrar: string } & Avat
   if (m.length < 2) return { error: "Pon cómo quieres que te vean (p. ej. Juan G.)." };
   if (!(await aliasLibre(a, q.participante.id))) return { error: "Ese nombre de equipo ya existe." };
   await db().from("fantasy_participantes").update({ alias: a, mostrar: m, ...(await avatarGuardable(d)) }).eq("id", q.participante.id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -179,7 +182,7 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   for (const k of Object.keys(nuevos) as Comodin[]) if (nuevos[k] === l && k !== d.comodin) delete nuevos[k];
   if (d.comodin) nuevos[d.comodin] = l;
   await db().from("fantasy_participantes").update({ comodines: nuevos }).eq("id", q.participante.id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -251,7 +254,7 @@ export async function enviarMensaje(jornada: string, texto: string, adjunto?: Ad
       await notificarFantasy(db(), mencionados as { id: string; perfil_id: string | null }[], aTodos ? `📣 ${q.participante.alias} en el chat` : `💬 ${q.participante.alias} te ha mencionado`, t.length > 200 ? `${t.slice(0, 197)}…` : t, `/fantasy?v=jornada&j=${jornada}`);
     }
   }
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -345,7 +348,7 @@ export async function borrarMensaje(id: string): Promise<R> {
   if (!m) return { error: "No existe." };
   if (!q.esAdmin && m.participante_id !== q.participante?.id) return { error: "Solo puedes borrar tus mensajes." };
   await d.from("fantasy_mensajes").update({ borrado: true, actualizado: new Date().toISOString() }).eq("id", id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  refrescarJuego(); revalidatePath("/fantasy");
   return { ok: true };
 }
 
@@ -362,7 +365,7 @@ export async function adminConfig(c: { abierto?: boolean; premio?: string; inici
   if (c.premio !== undefined) fila.premio = limpiar(c.premio, 200) || null;
   if (c.inicio && /^\d{4}-\d{2}-\d{2}$/.test(c.inicio)) fila.inicio = c.inicio;
   const { error } = await db().from("fantasy_config").update(fila).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return error ? { error: error.message } : { ok: true };
 }
 export async function adminEspecial(lunes: string, partidoId: string, poner: boolean): Promise<R> {
@@ -372,7 +375,7 @@ export async function adminEspecial(lunes: string, partidoId: string, poner: boo
   esp[lunes] = poner ? [partidoId] : (esp[lunes] ?? []).filter((x) => x !== partidoId);
   if (!esp[lunes].length) delete esp[lunes];
   await db().from("fantasy_config").update({ especiales: esp }).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
@@ -380,7 +383,7 @@ export async function adminAnular(lunes: string, anular: boolean): Promise<R> {
   const s = new Set(q.config.anuladas);
   if (anular) s.add(lunes); else s.delete(lunes);
   await db().from("fantasy_config").update({ anuladas: [...s] }).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 /** Moderación del chat: avisar a alguien por un comentario o silenciarle un tiempo (horas; 0 = quitar; -1 = indefinido) */
@@ -407,32 +410,32 @@ export async function adminModerar(d: { participanteId: string; tipo: "aviso" | 
       await notificarFantasy(dd, [p as { id: string; perfil_id: string | null }], "🔇 Te han silenciado en el chat", `${cuando ? `Hasta el ${cuando}.` : "Hasta nuevo aviso."}${motivo ? ` Motivo: ${motivo}` : ""}`, "/fantasy?v=jornada");
     }
   }
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
 export async function adminSilenciar(id: string, silenciar: boolean): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").update(silenciar ? { silenciado: true } : { silenciado: false, silenciado_hasta: null }).eq("id", id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminQuitarFoto(id: string): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").update({ foto: null }).eq("id", id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 export async function adminBorrarParticipante(id: string): Promise<R> {
   await admin();
   await db().from("fantasy_participantes").delete().eq("id", id);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 /** Cerrar la temporada: el primero de la general es el campeón (y sale en Noticias) */
 export async function adminCerrarTemporada(cerrar: boolean): Promise<R> {
   const q = await admin();
-  if (!cerrar) { await db().from("fantasy_config").update({ cerrada: false, campeon: null }).eq("id", 1); revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout"); return { ok: true }; }
+  if (!cerrar) { await db().from("fantasy_config").update({ cerrada: false, campeon: null }).eq("id", 1); refrescarJuego(); revalidatePath("/fantasy", "layout"); return { ok: true }; }
   const { liga } = await cargarLiga(q.config);
   const campeon = liga.general[0];
   if (!campeon) return { error: "No hay participantes." };
@@ -444,7 +447,7 @@ export async function adminCerrarTemporada(cerrar: boolean): Promise<R> {
     resumen: `${campeon.alias} gana el Fantasy Turó con ${campeon.total} puntos.`,
     autor_id: q.perfil!.id, publicada_en: new Date().toISOString(),
   });
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   revalidatePath("/noticias");
   return { ok: true };
 }
@@ -513,7 +516,7 @@ export async function adminCrearPrueba(): Promise<R> {
     { jornada, participante_id: creados[2].id, texto: "¿Alguien sabe si el U18 juega el sábado o el domingo?" },
   ]);
   await d.from("fantasy_config").update({ inicio: jornada, especiales: esp, prueba: { inicio: q.config.inicio, jornada, especial, alineacionAdmin } }).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
@@ -529,7 +532,7 @@ export async function adminBorrarPrueba(): Promise<R> {
   const esp = { ...q.config.especiales };
   if (p.especial && esp[p.jornada]) { esp[p.jornada] = esp[p.jornada].filter((x) => x !== p.especial); if (!esp[p.jornada].length) delete esp[p.jornada]; }
   await d.from("fantasy_config").update({ inicio: p.inicio, especiales: esp, prueba: null }).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }
 
@@ -540,6 +543,6 @@ export async function adminDuo(equipoId: string, nombre: string): Promise<R> {
   const duos = { ...q.config.duos };
   if (n) duos[equipoId] = n; else delete duos[equipoId];
   await db().from("fantasy_config").update({ duos }).eq("id", 1);
-  revalidateTag(TAG_DATOS); revalidatePath("/fantasy", "layout");
+  refrescarJuego(); revalidatePath("/fantasy", "layout");
   return { ok: true };
 }

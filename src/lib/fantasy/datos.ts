@@ -104,7 +104,7 @@ const datosBase = unstable_cache(async (inicio: string) => {
 }, ["fantasy-base-v1"], { revalidate: 1800, tags: [TAG_FANTASY] });
 
 /** Lo que cambia al jugar (participantes, equipos fichados, precios guardados, mensajes por persona):
- *  en caché hasta que alguien guarda algo (revalidateTag(TAG_DATOS) en las acciones) o 5 minutos */
+ *  en caché hasta que alguien guarda algo ((olvidarLiga(), revalidateTag(TAG_DATOS)) en las acciones) o 5 minutos */
 export const TAG_DATOS = "fantasy-datos";
 const datosJuego = unstable_cache(async () => {
   const d = db();
@@ -118,7 +118,23 @@ const datosJuego = unstable_cache(async () => {
 }, ["fantasy-juego-v1"], { revalidate: 300, tags: [TAG_DATOS] });
 
 /** Todo lo necesario para calcular la liga */
-export async function cargarLiga(config: Config) {
+// Cálculo de la liga en memoria unos segundos: con Vercel Fluid la misma instancia atiende a muchos
+// visitantes seguidos, y así no se recalcula todo el Fantasy en cada visita (es lo que más CPU gasta).
+// Cualquier cambio (guardar equipo, mensaje, admin…) lo borra con olvidarLiga().
+const MEMO_MS = 30_000;
+let memoLiga: { clave: string; t: number; v: ReturnType<typeof calcularDatosLiga> } | null = null;
+export function olvidarLiga() { memoLiga = null; }
+
+export function cargarLiga(config: Config) {
+  const clave = JSON.stringify([config.inicio, config.especiales, config.anuladas, config.cerrada, config.campeon, config.duos]);
+  if (memoLiga && memoLiga.clave === clave && Date.now() - memoLiga.t < MEMO_MS) return memoLiga.v;
+  const v = calcularDatosLiga(config);
+  memoLiga = { clave, t: Date.now(), v };
+  v.catch(() => { if (memoLiga?.v === v) memoLiga = null; });
+  return v;
+}
+
+async function calcularDatosLiga(config: Config) {
   const d = db();
   const base = await datosBase(config.inicio);
   const { equipos } = base;
