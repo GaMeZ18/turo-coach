@@ -1,3 +1,4 @@
+-- NOTA: public.eventos ya existía (calendario); la tabla de eventos con inscripción es public.club_eventos (ver 0066).
 -- Eventos del club con inscripción de equipos, pago (transferencia con justificante; TPV/Bizum más adelante)
 -- y un pase QR por persona. Gestión: solo la cuenta de Juan Gámez (ve_eventos()).
 -- La parte pública (inscribirse, subir justificante, ver el pase) va por el servidor con adminClient.

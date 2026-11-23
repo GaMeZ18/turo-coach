@@ -17,7 +17,7 @@ export default async function EventoPage({ params, searchParams }: { params: Pro
   const { supabase, perfil } = await requireUser();
   if (!veEventos(perfil)) notFound();
   const [e, i, p, t] = await Promise.all([
-    supabase.from("eventos").select(CAMPOS_EVENTO).eq("id", id).maybeSingle(),
+    supabase.from("club_eventos").select(CAMPOS_EVENTO).eq("id", id).maybeSingle(),
     supabase.from("evento_inscripciones").select(CAMPOS_INSCRIPCION).eq("evento_id", id).order("created_at", { ascending: false }),
     supabase.from("evento_pases").select("id, codigo, nombre, rol, dorsal, anulado, usado_at, inscripcion_id").eq("evento_id", id).order("nombre"),
     supabase.from("torneos").select("id, nombre").order("created_at", { ascending: false }),

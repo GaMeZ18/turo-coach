@@ -23,7 +23,7 @@ export type DatosInscripcion = {
 /** Nueva inscripción de un equipo (pública). Devuelve el código para la página de estado. */
 export async function inscribir(slug: string, d: DatosInscripcion): Promise<{ codigo?: string; error?: string }> {
   if (d.web) return { error: "No se ha podido enviar." };
-  const { data: ev } = await db().from("eventos").select(CAMPOS_EVENTO).eq("slug", slug).maybeSingle();
+  const { data: ev } = await db().from("club_eventos").select(CAMPOS_EVENTO).eq("slug", slug).maybeSingle();
   if (!ev) return { error: "Este evento ya no existe." };
   const evento = ev as Evento;
   const { count } = await db().from("evento_inscripciones").select("id", { count: "exact", head: true }).eq("evento_id", evento.id).not("estado", "in", "(rechazada,cancelada)");
@@ -53,7 +53,7 @@ export async function inscribir(slug: string, d: DatosInscripcion): Promise<{ co
 
 async function inscripcionDe(codigo: string) {
   if (!/^[a-f0-9]{32}$/.test(codigo)) return null;
-  const { data } = await db().from("evento_inscripciones").select("id, evento_id, equipo, estado, importe, eventos(nombre)").eq("codigo", codigo).maybeSingle();
+  const { data } = await db().from("evento_inscripciones").select("id, evento_id, equipo, estado, importe, eventos:club_eventos(nombre)").eq("codigo", codigo).maybeSingle();
   return data as unknown as { id: string; evento_id: string; equipo: string; estado: string; importe: number; eventos: { nombre: string } | null } | null;
 }
 

@@ -13,7 +13,7 @@ export default async function EventosPage() {
   const { supabase, perfil } = await requireUser();
   if (!veEventos(perfil)) notFound();
   const [{ data }, { data: ts }, { data: ins }] = await Promise.all([
-    supabase.from("eventos").select("id, nombre, fecha, lugar, abierto").order("fecha", { ascending: false, nullsFirst: true }),
+    supabase.from("club_eventos").select("id, nombre, fecha, lugar, abierto").order("fecha", { ascending: false, nullsFirst: true }),
     supabase.from("torneos").select("id, nombre").order("created_at", { ascending: false }),
     supabase.from("evento_inscripciones").select("evento_id, estado"),
   ]);

@@ -11,7 +11,7 @@ export default async function PasePage({ params }: { params: Promise<{ codigo: s
   const { codigo } = await params;
   const db = adminClient();
   const { data } = db && /^[a-f0-9]{32}$/.test(codigo)
-    ? await db.from("evento_pases").select("nombre, rol, dorsal, anulado, usado_at, evento_inscripciones(equipo, estado), eventos(nombre, fecha, lugar)").eq("codigo", codigo).maybeSingle()
+    ? await db.from("evento_pases").select("nombre, rol, dorsal, anulado, usado_at, evento_inscripciones(equipo, estado), eventos:club_eventos(nombre, fecha, lugar)").eq("codigo", codigo).maybeSingle()
     : { data: null };
   const p = data as unknown as { nombre: string; rol: string; dorsal: string | null; anulado: boolean; usado_at: string | null; evento_inscripciones: { equipo: string; estado: string } | null; eventos: { nombre: string; fecha: string | null; lugar: string | null } | null } | null;
   const valido = !!p && !p.anulado && p.evento_inscripciones?.estado === "aprobada";

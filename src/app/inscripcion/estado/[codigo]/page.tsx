@@ -18,7 +18,7 @@ export default async function EstadoInscripcion({ params }: { params: Promise<{ 
   if (!db || !ins) return <main className="mx-auto max-w-md p-6 text-center"><h1 className="text-xl font-semibold">Inscripción no encontrada</h1><p className="mt-2 text-sm text-tinta/60">Revisa el enlace del email.</p></main>;
   const i = ins as Inscripcion;
   const [{ data: ev }, { data: ps }] = await Promise.all([
-    db.from("eventos").select(CAMPOS_EVENTO).eq("id", i.evento_id).single(),
+    db.from("club_eventos").select(CAMPOS_EVENTO).eq("id", i.evento_id).single(),
     i.estado === "aprobada" ? db.from("evento_pases").select("id, codigo, nombre, rol, dorsal, anulado, usado_at, inscripcion_id").eq("inscripcion_id", i.id).order("rol", { ascending: false }).order("nombre") : Promise.resolve({ data: [] }),
   ]);
   const evento = ev as Evento, pases = (ps ?? []) as Pase[];

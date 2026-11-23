@@ -8,7 +8,7 @@ export default async function EscanearPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const { supabase, perfil } = await requireUser();
   if (!veEventos(perfil)) notFound();
-  const { data } = await supabase.from("eventos").select("id, nombre").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("club_eventos").select("id, nombre").eq("id", id).maybeSingle();
   if (!data) notFound();
   return <Escaner eventoId={data.id} nombre={data.nombre} />;
 }

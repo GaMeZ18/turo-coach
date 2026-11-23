@@ -49,7 +49,7 @@ function datosEvento(f: FormData) {
 
 export async function crearEvento(f: FormData) {
   const supabase = await cliente();
-  const { data, error } = await supabase.from("eventos").insert(datosEvento(f)).select("id").single();
+  const { data, error } = await supabase.from("club_eventos").insert(datosEvento(f)).select("id").single();
   if (error) throw new Error(error.message.includes("slug") ? "Esa dirección ya la usa otro evento." : error.message);
   refrescar();
   redirect(`/eventos/${data.id}?v=ajustes`);
@@ -57,7 +57,7 @@ export async function crearEvento(f: FormData) {
 
 export async function editarEvento(id: string, f: FormData): Promise<R> {
   const supabase = await cliente();
-  const { error } = await supabase.from("eventos").update(datosEvento(f)).eq("id", id);
+  const { error } = await supabase.from("club_eventos").update(datosEvento(f)).eq("id", id);
   refrescar(id);
   return error ? { error: error.message.includes("slug") ? "Esa dirección ya la usa otro evento." : error.message } : { ok: true };
 }
@@ -65,10 +65,10 @@ export async function editarEvento(id: string, f: FormData): Promise<R> {
 export async function abrirEvento(id: string, abierto: boolean): Promise<R> {
   const supabase = await cliente();
   if (abierto) {
-    const { data } = await supabase.from("eventos").select("pago_transferencia, iban").eq("id", id).single();
+    const { data } = await supabase.from("club_eventos").select("pago_transferencia, iban").eq("id", id).single();
     if (data?.pago_transferencia && !data.iban) return { error: "Pon el IBAN del club antes de abrir las inscripciones." };
   }
-  const { error } = await supabase.from("eventos").update({ abierto }).eq("id", id);
+  const { error } = await supabase.from("club_eventos").update({ abierto }).eq("id", id);
   refrescar(id);
   return error ? { error: error.message } : { ok: true };
 }
@@ -78,7 +78,7 @@ export async function borrarEvento(id: string) {
   const { data } = await supabase.from("evento_inscripciones").select("comprobante").eq("evento_id", id).not("comprobante", "is", null);
   const rutas = (data ?? []).map((x) => x.comprobante as string);
   if (rutas.length) await adminClient()?.storage.from("eventos-justificantes").remove(rutas);
-  await supabase.from("eventos").delete().eq("id", id);
+  await supabase.from("club_eventos").delete().eq("id", id);
   refrescar();
   redirect("/eventos");
 }
@@ -87,7 +87,7 @@ export async function borrarEvento(id: string) {
 async function cargarInscripcion(supabase: Awaited<ReturnType<typeof cliente>>, id: string) {
   const { data: i } = await supabase.from("evento_inscripciones").select(CAMPOS_INSCRIPCION).eq("id", id).single();
   if (!i) throw new Error("Inscripción no encontrada");
-  const { data: e } = await supabase.from("eventos").select(CAMPOS_EVENTO).eq("id", i.evento_id).single();
+  const { data: e } = await supabase.from("club_eventos").select(CAMPOS_EVENTO).eq("id", i.evento_id).single();
   return { ins: i as Inscripcion, ev: e as Evento };
 }
 

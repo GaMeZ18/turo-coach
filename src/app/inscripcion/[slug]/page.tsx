@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const cargar = cache(async (slug: string) => {
   const db = adminClient();
   if (!db || !/^[a-z0-9-]{4,40}$/.test(slug)) return null;
-  const { data } = await db.from("eventos").select(CAMPOS_EVENTO).eq("slug", slug).maybeSingle();
+  const { data } = await db.from("club_eventos").select(CAMPOS_EVENTO).eq("slug", slug).maybeSingle();
   if (!data) return null;
   const { count } = await db.from("evento_inscripciones").select("id", { count: "exact", head: true }).eq("evento_id", data.id).not("estado", "in", "(rechazada,cancelada)");
   return { evento: data as Evento, ocupadas: count ?? 0 };
