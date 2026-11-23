@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   let ids: string[] = [];
   try {
     const j = JSON.parse(await req.text());
-    ids = [...new Set((Array.isArray(j?.ids) ? j.ids : []).map(String).filter((x: string) => /^\d{1,12}$/.test(x)))].slice(0, 2000) as string[];
+    ids = [...new Set((Array.isArray(j?.ids) ? j.ids : []).map(String).filter((x: string) => /^[0-9a-fA-F-]{20,40}$/.test(x)))].slice(0, 2000) as string[];
   } catch {}
   const db = adminClient();
   if (!db || !ids.length) return NextResponse.json({ ids }, { headers: cabeceras });

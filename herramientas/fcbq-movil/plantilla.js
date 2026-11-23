@@ -92,7 +92,7 @@
     }
     datos = r;
     // Estadísticas que le faltan a Coach Manager (se bajan ya, con esta pestaña delante)
-    const ids = [...new Set(r.paginas.filter((p) => /resultats/.test(p.url)).flatMap((p) => [...p.html.matchAll(/estadistica\/partit\/(\d+)/g)].map((m) => m[1])))];
+    const ids = [...new Set(r.paginas.filter((p) => /resultats/.test(p.url)).flatMap((p) => [...p.html.matchAll(/estadistica\/partit\/([0-9a-fA-F-]{20,})/g)].map((m) => m[1])))];
     let faltan = [];
     try {
       const j = await fetch(`${APP}/api/fcbq/stats-faltan`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ ids }) }).then((x) => x.json());
