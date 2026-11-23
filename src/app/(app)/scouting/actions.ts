@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { check } from "@/lib/db";
 import { VERSION_STATS, type StatsPartido } from "@/lib/stats-fcbq";
+import { marcarCambioFantasy } from "@/lib/fantasy/datos";
 
 /** De los partidos de cada equipo, cuáles aún no tienen estadísticas guardadas */
 export async function statsPendientes(pares: { equipoId: string; ids: string[] }[]): Promise<{ pendientes: { equipoId: string; id: string }[]; error?: string }> {
@@ -35,6 +36,7 @@ export async function guardarStatsFCBQ(equipoId: string, items: StatsPartido[]) 
     if (p) await supabase.from("partidos").update({ fcbq_stats_id: s.id }).eq("id", p.id);
   }
   revalidateTag("fantasy-stats"); // el Fantasy y el próximo rival vuelven a leer las estadísticas
+  await marcarCambioFantasy().catch(() => {}); // y el Fantasy recalcula los puntos al momento
   revalidatePath("/scouting", "layout");
   return items.length;
 }

@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { notificarEquipo } from "@/lib/notificar";
 import { createClient } from "@/lib/supabase/server";
 import { buscarExistente, cambiosFCBQ, datosFCBQ, unirResultados, type LigaFCBQ, type PartidoFCBQ, type ResultadoLiga } from "@/lib/fcbq";
+import { marcarCambioFantasy } from "@/lib/fantasy/datos";
 
 const COLUMNAS = "id, equipo_id, fecha, rival, local, lugar, competicion, jornada, puntos_favor, puntos_contra, estado, fcbq_id";
 type Existente = { id: string; equipo_id: string; fecha: string; rival: string; fcbq_id: string | null } & Record<string, unknown>;
@@ -112,6 +113,7 @@ export async function importarFCBQ(partidos: PartidoFCBQ[], asignaciones: Asigna
   }
 
   revalidateTag("fantasy-stats"); // el Fantasy y el próximo rival vuelven a leer las estadísticas
+  await marcarCambioFantasy().catch(() => {}); // y el Fantasy recalcula los puntos al momento
   revalidatePath("/partidos");
   revalidatePath("/calendario");
   return res;

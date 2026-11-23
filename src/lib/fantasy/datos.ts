@@ -11,7 +11,7 @@ export const ADMIN_FANTASY = "60fb55be-45e2-4f5d-addc-35aaf44b7610"; // Juan Gá
 export const COOKIE_FANTASY = "fantasy_sesion";
 
 export type Prueba = { inicio: string; jornada: string; especial: string | null; alineacionAdmin: boolean };
-export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null; duos: Record<string, string> };
+export type Config = { abierto: boolean; inicio: string; premio: string | null; especiales: Record<string, string[]>; anuladas: string[]; campeon: string | null; cerrada: boolean; prueba: Prueba | null; duos: Record<string, string>; version?: string };
 export type Participante = { id: string; perfil_id: string | null; alias: string; nombre: string; mostrar: string | null; contacto: string | null; silenciado: boolean; silenciado_hasta: string | null; comodines: Partial<Record<Comodin, string>>; emoji: string | null; color: string | null; foto: string | null; created_at: string };
 export const CAMPOS_PARTICIPANTE = "id, perfil_id, alias, nombre, mostrar, contacto, silenciado, silenciado_hasta, comodines, emoji, color, foto, created_at";
 /** "Juan Gámez Gómez" → "Juan G." */
@@ -40,8 +40,8 @@ export function pinOk(pin: string, guardado: string | null) {
 export const nuevaSesion = () => randomBytes(24).toString("hex");
 
 export async function leerConfig(): Promise<Config> {
-  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada, prueba, duos").eq("id", 1).single();
-  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada, prueba: (data?.prueba as Prueba | null) ?? null, duos: (data?.duos ?? {}) as Record<string, string> };
+  const { data } = await db().from("fantasy_config").select("abierto, inicio, premio, especiales, anuladas, campeon, cerrada, prueba, duos, version").eq("id", 1).single();
+  return { abierto: !!data?.abierto, inicio: data?.inicio ?? "2026-11-09", premio: data?.premio ?? null, especiales: (data?.especiales ?? {}) as Record<string, string[]>, anuladas: data?.anuladas ?? [], campeon: data?.campeon ?? null, cerrada: !!data?.cerrada, prueba: (data?.prueba as Prueba | null) ?? null, duos: (data?.duos ?? {}) as Record<string, string>, version: (data?.version as string | undefined) ?? "" };
 }
 
 /** Quién está mirando: usuario de la app (staff) y/o participante del fantasy */
@@ -121,12 +121,17 @@ const datosJuego = unstable_cache(async () => {
 // Cálculo de la liga en memoria unos segundos: con Vercel Fluid la misma instancia atiende a muchos
 // visitantes seguidos, y así no se recalcula todo el Fantasy en cada visita (es lo que más CPU gasta).
 // Cualquier cambio (guardar equipo, mensaje, admin…) lo borra con olvidarLiga().
-const MEMO_MS = 30_000;
+const MEMO_MS = 180_000;
 let memoLiga: { clave: string; t: number; v: ReturnType<typeof calcularDatosLiga> } | null = null;
 export function olvidarLiga() { memoLiga = null; }
+/** Avisa a todas las instancias de que los datos del Fantasy han cambiado (y borra el cálculo de esta) */
+export async function marcarCambioFantasy() {
+  memoLiga = null;
+  await db().from("fantasy_config").update({ version: new Date().toISOString() }).eq("id", 1);
+}
 
 export function cargarLiga(config: Config) {
-  const clave = JSON.stringify([config.inicio, config.especiales, config.anuladas, config.cerrada, config.campeon, config.duos]);
+  const clave = JSON.stringify([config.version, config.inicio, config.especiales, config.anuladas, config.cerrada, config.campeon, config.duos]);
   if (memoLiga && memoLiga.clave === clave && Date.now() - memoLiga.t < MEMO_MS) return memoLiga.v;
   const v = calcularDatosLiga(config);
   memoLiga = { clave, t: Date.now(), v };

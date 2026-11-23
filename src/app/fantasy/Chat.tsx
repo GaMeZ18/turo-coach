@@ -119,7 +119,7 @@ export default function Chat({ jornada, esAdmin, silenciado, equipos = [] }: { j
   }, [jornada]);
   useEffect(() => {
     void cargar();
-    const t = setInterval(() => { if (document.visibilityState === "visible") void cargar(); }, 20000);
+    const t = setInterval(() => { if (document.visibilityState === "visible") void cargar(); }, 30000);
     return () => clearInterval(t);
   }, [cargar]);
   useEffect(() => { fin.current?.scrollIntoView({ block: "nearest" }); }, [msgs?.length]);

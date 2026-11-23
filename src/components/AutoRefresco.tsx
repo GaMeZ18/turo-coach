@@ -6,8 +6,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 
 /**
  * Mantiene la app al día sin tener que recargar:
- * - al volver a la app (o a la pestaña) si hace más de 2 minutos, y cada 5 minutos mientras se ve, pide los datos nuevos
- *   (cada refresco vuelve a pintar la página en el servidor: más a menudo gastaba demasiada CPU en Vercel);
+ * - al volver a la app (o a la pestaña), si hace más de 2 minutos, pide los datos nuevos;
  * - en el móvil, deslizando hacia abajo desde arriba del todo se actualiza (como en otras apps).
  */
 export default function AutoRefresco({ oscuro = false }: { oscuro?: boolean }) {
@@ -27,17 +26,11 @@ export default function AutoRefresco({ oscuro = false }: { oscuro?: boolean }) {
     document.addEventListener("visibilitychange", refrescar);
     window.addEventListener("focus", refrescar);
     window.addEventListener("pageshow", refrescar);
-    const cada = window.setInterval(() => {
-      // No se refresca mientras se escribe (para no perder lo que se está tecleando)
-      const a = document.activeElement as HTMLElement | null;
-      if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT" || a.isContentEditable)) return;
-      if (Date.now() - ultimo.current >= 300000) refrescar();
-    }, 30000);
+    // (Sin recarga periódica: cada recarga vuelve a pintar la página en el servidor y gastaba la CPU gratuita de Vercel)
     return () => {
       document.removeEventListener("visibilitychange", refrescar);
       window.removeEventListener("focus", refrescar);
       window.removeEventListener("pageshow", refrescar);
-      window.clearInterval(cada);
     };
   }, [router]);
 
