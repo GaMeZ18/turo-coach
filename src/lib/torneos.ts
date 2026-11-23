@@ -72,16 +72,24 @@ export function clasificacion(equipos: EquipoT[], partidos: PartidoT[], pv: numb
     else if (b > a) { v.pg++; l.pp++; v.pts += pv; l.pts += pd; }
   }
   for (const f of filas.values()) f.dif = f.pf - f.pc;
-  const directo = (x: string, y: string) => {
-    let s = 0;
-    for (const p of jugados) {
-      if (p.local_id === x && p.visitante_id === y) s += p.puntos_local! - p.puntos_visitante!;
-      if (p.local_id === y && p.visitante_id === x) s += p.puntos_visitante! - p.puntos_local!;
-    }
-    return s;
-  };
   const nombre = new Map(equipos.map((e) => [e.id, e.nombre]));
-  return [...filas.values()].sort((a, b) => b.pts - a.pts || directo(b.id, a.id) || b.dif - a.dif || b.pf - a.pf || (nombre.get(a.id) ?? "").localeCompare(nombre.get(b.id) ?? ""));
+  // Empates (criterio FIBA): mini-liga solo con los partidos entre los empatados → puntos, diferencia,
+  // y después diferencia y puntos a favor generales
+  const porPts = new Map<number, FilaClasif[]>();
+  for (const f of filas.values()) porPts.set(f.pts, [...(porPts.get(f.pts) ?? []), f]);
+  const salida: FilaClasif[] = [];
+  for (const pts of [...porPts.keys()].sort((a, b) => b - a)) {
+    const empatados = porPts.get(pts)!, ids = new Set(empatados.map((f) => f.id));
+    const mini = new Map(empatados.map((f) => [f.id, { pts: 0, dif: 0 }]));
+    for (const p of jugados) {
+      if (!ids.has(p.local_id!) || !ids.has(p.visitante_id!)) continue;
+      const d = p.puntos_local! - p.puntos_visitante!, l = mini.get(p.local_id!)!, v = mini.get(p.visitante_id!)!;
+      l.dif += d; v.dif -= d;
+      if (d > 0) { l.pts += pv; v.pts += pd; } else if (d < 0) { v.pts += pv; l.pts += pd; }
+    }
+    salida.push(...empatados.sort((a, b) => mini.get(b.id)!.pts - mini.get(a.id)!.pts || mini.get(b.id)!.dif - mini.get(a.id)!.dif || b.dif - a.dif || b.pf - a.pf || (nombre.get(a.id) ?? "").localeCompare(nombre.get(b.id) ?? "")));
+  }
+  return salida;
 }
 
 /** Orden de siembra de un cuadro de tamaño potencia de 2: [1, 8, 4, 5, 2, 7, 3, 6] para 8 */
