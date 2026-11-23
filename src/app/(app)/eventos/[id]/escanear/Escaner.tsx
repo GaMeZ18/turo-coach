@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { ArrowLeft, Keyboard } from "lucide-react";
 import { hora } from "@/lib/fechas";
 import { validarPase, type Lectura } from "../../actions";

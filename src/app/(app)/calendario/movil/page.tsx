@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/supabase/server";
 import { misEquipos } from "@/lib/equipo-activo";

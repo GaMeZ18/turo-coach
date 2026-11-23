@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { Printer } from "lucide-react";
 
 /** Barra fija arriba con «volver» e «imprimir o guardar en PDF» (debajo de la muesca en el iPhone) */

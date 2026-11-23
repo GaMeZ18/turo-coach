@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { Loader2, Target } from "lucide-react";
 import { aplanar, arbol, type Nodo, type Objetivo } from "@/lib/objetivos";
 import { guardarObjetivosEntreno } from "../../planificaciones/actions";

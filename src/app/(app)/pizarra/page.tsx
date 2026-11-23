@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import PizarraEditor from "@/components/pizarra";
 import { pizarraVacia, type Pizarra } from "@/components/pizarra/modelo";
 import { CLAVE_BORRADOR } from "../ejercicios/FormEjercicio";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { adminClient } from "@/lib/supabase/admin";
 import { LLEGAR_ANTES, partidoMesa, plazoMesa } from "@/lib/mesas";
 import { lunesDe } from "@/lib/pistas";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, Filter, Loader2, Lock, Moon, Plus, Search, X } from "lucide-react";
 import { guardarEquipo } from "./actions";

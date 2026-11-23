@@ -3,7 +3,7 @@
 const VERSION_EXTENSION = "1.11.0";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { leerCalendarioFCBQ, leerLigaFCBQ, sugerirEquipo, unirResultados, type LigaFCBQ, type PartidoFCBQ } from "@/lib/fcbq";

@@ -3,7 +3,7 @@
 // Detectar tiros en el navegador: el vídeo original se elige del ordenador y se analiza aquí mismo
 // (no se sube a ningún sitio). Al acabar, los tiros se guardan como clips «por revisar».
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { ArrowLeft, CheckCircle2, Crosshair, FileVideo, Loader2, ScanSearch, Square, TriangleAlert } from "lucide-react";
 import { esPropio, estimarDescanso, type Aro, type Evento } from "@/lib/detector";
 import { alteracionLectura, buscarCanastas, buscarTiros, type Control, type Diagnostico } from "@/lib/detector-web";

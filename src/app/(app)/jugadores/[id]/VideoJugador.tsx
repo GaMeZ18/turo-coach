@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { esTiro, hayStat, mmss, pctTiro, statVacia, sumarStat, valoracion, type Estadistica, type StatVideo } from "@/lib/video";
 import { Clapperboard, ThumbsDown, ThumbsUp } from "lucide-react";

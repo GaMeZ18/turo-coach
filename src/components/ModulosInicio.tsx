@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import {
   ArrowDown, ArrowUp, BookMarked, BookOpen, Binoculars, CalendarClock, CalendarDays, ClipboardCheck, Eye, EyeOff, Gauge, Loader2, MapPin, Megaphone, Newspaper,
   Package, PenTool, RotateCcw, Settings2, Shield, Target, Timer, TrafficCone, Trophy, Users, Video,

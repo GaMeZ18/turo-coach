@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Binoculars, ChevronRight } from "lucide-react";
 import { informeRival } from "@/lib/informe-rival";

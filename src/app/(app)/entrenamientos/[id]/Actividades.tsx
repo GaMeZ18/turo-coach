@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { ArrowDown, ArrowUp, Check, GripVertical, PenTool, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import {
   actualizarActividad, anadirActividad, borrarActividad, reordenarActividades,

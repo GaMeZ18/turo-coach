@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { calcularClasificacion, esNuestro, type ResultadoLiga, type TablaFCBQ } from "@/lib/fcbq";
 
 export type LigaGuardada = {

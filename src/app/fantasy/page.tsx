@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import type { Metadata, Viewport } from "next";
 import { VAPID_PUBLICO } from "@/lib/notificar";
 import AvisosFantasy from "./Avisos";

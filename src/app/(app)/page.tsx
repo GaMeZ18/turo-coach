@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { veFantasy } from "@/lib/fantasy/menu";
 import { gestionaMesas, requireUser, veMaterial } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Check, Link2, Loader2, Plus, Share2, Trash2, X } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";

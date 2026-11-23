@@ -1,5 +1,5 @@
 import Transicion from "@/components/Transicion";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { veFantasy } from "@/lib/fantasy/menu";
 import { gestionaMesas, requireUser, veEventos, veMaterial, veTorneos } from "@/lib/supabase/server";
 import { equipoActivo, misEquipos } from "@/lib/equipo-activo";

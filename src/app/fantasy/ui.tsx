@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { Settings } from "lucide-react";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
 import AutoRefresco from "@/components/AutoRefresco";

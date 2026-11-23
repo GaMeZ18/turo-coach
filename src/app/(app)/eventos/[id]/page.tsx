@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ScanLine, Ticket } from "lucide-react";
 import { requireUser, veEventos } from "@/lib/supabase/server";

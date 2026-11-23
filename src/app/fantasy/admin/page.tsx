@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import "../fantasy.css";
 import { Escudo } from "../ui";
 import { redirect } from "next/navigation";

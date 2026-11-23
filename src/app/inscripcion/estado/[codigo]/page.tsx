@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { adminClient } from "@/lib/supabase/admin";
 import Cabecera from "@/components/publico/Cabecera";
 import AutoRefresco from "@/components/AutoRefresco";

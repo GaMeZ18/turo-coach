@@ -28,15 +28,7 @@ export default function NavPrincipal({ rol, mesas = false, material = false, tor
   const router = useRouter();
   // Precarga completa (con datos) de un menú: al acercar el dedo o el ratón ya se está pidiendo
   const precargar = (href: string) => { try { router.prefetch(href, { kind: "full" } as never); } catch { /* */ } };
-  // Y en un rato libre, los menús que más se usan (así el primer toque ya es instantáneo)
-  useEffect(() => {
-    const principales = ["/", "/entrenamientos", "/calendario", "/ejercicios", "/partidos", "/biblioteca"].filter((h) => h !== rutaReal);
-    const w = window as Window & { requestIdleCallback?: (f: () => void) => number };
-    const libre = (fn: () => void) => (w.requestIdleCallback ? w.requestIdleCallback(fn) : w.setTimeout(fn, 1200));
-    const t = window.setTimeout(() => principales.forEach((h, i) => window.setTimeout(() => libre(() => precargar(h)), i * 400)), 1500);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // (Antes se precargaban los menús principales en segundo plano: gastaba mucha CPU en Vercel. Ahora solo al ir a tocarlos.)
   // Al tocar un menú se marca al momento (sin esperar a que cargue la página)
   const [pulsado, setPulsado] = useState<string | null>(null);
   useEffect(() => setPulsado(null), [rutaReal]);
@@ -58,6 +50,7 @@ export default function NavPrincipal({ rol, mesas = false, material = false, tor
         <Link
           key={n.href}
           href={n.href}
+          prefetch={false}
           onClick={() => setPulsado(n.href)}
           onPointerEnter={() => precargar(n.href)}
           onTouchStart={() => precargar(n.href)}

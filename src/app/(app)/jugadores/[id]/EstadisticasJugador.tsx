@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parecido } from "@/lib/emparejar";
 import type { JugadorStats, StatsPartido } from "@/lib/stats-fcbq";

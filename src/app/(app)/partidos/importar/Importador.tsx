@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { Bookmark, CheckCircle2, Copy, FileUp, Loader2 } from "lucide-react";
 import { buscarExistente, cambiosFCBQ, leerCalendarioFCBQ, leerLigaFCBQ, sugerirEquipo, type LigaFCBQ, type PartidoFCBQ } from "@/lib/fcbq";
 import { importarFCBQ, type ResultadoImportacion } from "./actions";

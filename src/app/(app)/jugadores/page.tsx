@@ -1,6 +1,6 @@
 import { FileSpreadsheet } from "lucide-react";
 import { hoyLocal } from "@/lib/fechas";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { requireUser } from "@/lib/supabase/server";
 import { equipoActivo } from "@/lib/equipo-activo";
 import SinEquipo from "@/components/SinEquipo";

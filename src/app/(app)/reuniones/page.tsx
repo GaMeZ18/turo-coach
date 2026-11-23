@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { requireUser } from "@/lib/supabase/server";
 import { fechaLarga, hora, hoyLocal } from "@/lib/fechas";
 import Enviar from "@/components/Enviar";

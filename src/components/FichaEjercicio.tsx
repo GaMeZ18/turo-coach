@@ -2,7 +2,7 @@
 
 // Ficha completa de un ejercicio: pizarra, objetivos, descripción, correcciones y material.
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { ExternalLink, Loader2, Target, Timer, Users, PlayCircle } from "lucide-react";
 import MiniPizarra from "@/components/pizarra/Mini";
 import PizarraEditor from "@/components/pizarra";

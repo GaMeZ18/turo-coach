@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { gestionaMesas, requireUser } from "@/lib/supabase/server";

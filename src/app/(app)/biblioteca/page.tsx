@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Enlace";
 import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIAS } from "@/lib/categorias";
 import { aplicarFiltros } from "@/lib/rasgos-ejercicio";
