@@ -1,0 +1,51 @@
+name: Cargar FCBQ (nube)
+
+# Cada 10 minutos mira si hay un partido terminado sin estadísticas y, si lo hay, las carga
+# (resultados, estadísticas y puntos del Fantasy) sin necesitar ningún ordenador encendido.
+# También se puede lanzar a mano: pestaña Actions → «Cargar FCBQ (nube)» → Run workflow (desde el móvil, con la app de GitHub).
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+    - cron: "0 5 * * *" # cada día a las 6:00 (hora de invierno): calendario y clasificaciones completos
+  workflow_dispatch:
+    inputs:
+      forzar:
+        description: "Cargar aunque no haya nada pendiente"
+        type: boolean
+        default: true
+
+concurrency:
+  group: fcbq-nube
+  cancel-in-progress: false
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: herramientas/fcbq-nube
+    steps:
+      - name: ¿Hay algo pendiente?
+        id: mirar
+        working-directory: .
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.schedule }}" = "0 5 * * *" ]; then echo "seguir=true" >> $GITHUB_OUTPUT; exit 0; fi
+          P=$(curl -fsS https://coach.cbturo.com/api/fcbq/pendiente || echo '{}')
+          echo "$P"
+          if echo "$P" | grep -q '"pendiente":true'; then echo "seguir=true" >> $GITHUB_OUTPUT; else echo "seguir=false" >> $GITHUB_OUTPUT; fi
+      - uses: actions/checkout@v4
+        if: steps.mirar.outputs.seguir == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.mirar.outputs.seguir == 'true'
+        with: { node-version: 20 }
+      - name: Instalar navegador
+        if: steps.mirar.outputs.seguir == 'true'
+        run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: Cargar desde la FCBQ
+        if: steps.mirar.outputs.seguir == 'true'
+        env:
+          COACH_EMAIL: ${{ secrets.COACH_EMAIL }}
+          COACH_PASSWORD: ${{ secrets.COACH_PASSWORD }}
+          FORZAR: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * *' }}
+        run: xvfb-run --auto-servernum node fcbq.mjs
