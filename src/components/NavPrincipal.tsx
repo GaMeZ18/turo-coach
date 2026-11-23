@@ -23,7 +23,7 @@ const NAV = [
   { href: "/noticias", label: "Noticias" },
 ];
 
-export default function NavPrincipal({ rol, mesas = false, material = false, fantasy = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean; material?: boolean; fantasy?: boolean }) {
+export default function NavPrincipal({ rol, mesas = false, material = false, torneos = false, fantasy = false }: { rol: "coordinador" | "entrenador" | "gestor_mesas"; mesas?: boolean; material?: boolean; torneos?: boolean; fantasy?: boolean }) {
   const rutaReal = usePathname();
   const router = useRouter();
   // Precarga completa (con datos) de un menú: al acercar el dedo o el ratón ya se está pidiendo
@@ -44,7 +44,7 @@ export default function NavPrincipal({ rol, mesas = false, material = false, fan
   const coordinador = rol === "coordinador";
   // Mesas: para coordinadores y para quien tenga el permiso de gestor de mesas (que además es entrenador)
   const conMesas = mesas || coordinador ? [{ href: "/mesas", label: "Mesas" }] : [];
-  const conMaterial = [...(material ? [{ href: "/material", label: "Material" }] : []), ...(fantasy ? [{ href: "/fantasy", label: "🏆 Fantasy" }] : [])];
+  const conMaterial = [...(material ? [{ href: "/material", label: "Material" }] : []), ...(torneos ? [{ href: "/torneos", label: "Torneos" }] : []), ...(fantasy ? [{ href: "/fantasy", label: "🏆 Fantasy" }] : [])];
   const items = coordinador ? [{ href: "/coordinacion", label: "Coordinación" }, ...NAV, ...conMesas, ...conMaterial, { href: "/comunicados", label: "Comunicados" }, { href: "/club", label: "Club" }] : [...NAV, ...conMesas, ...conMaterial];
   const activo = (href: string) => (href === "/" ? ruta === "/" : href === "/mesas" ? ruta === "/mesas" || (ruta.startsWith("/mesas") && !items.some((i) => i.href !== "/mesas" && ruta.startsWith(i.href))) : ruta.startsWith(href));
 

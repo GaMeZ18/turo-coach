@@ -39,6 +39,8 @@ export type Perfil = {
 
 /** Inventario de material: de momento solo la cuenta de Juan Gámez (en la BD, ve_material()) */
 export const veMaterial = (p: Pick<Perfil, "id">) => p.id === "60fb55be-45e2-4f5d-addc-35aaf44b7610";
+/** Torneos: de momento solo la cuenta de Juan Gámez (en la BD, ve_torneos()) */
+export const veTorneos = (p: Pick<Perfil, "id">) => p.id === "60fb55be-45e2-4f5d-addc-35aaf44b7610";
 
 /** ¿Puede entrar en Mesas? (coordinadores y quien tenga el permiso de gestor de mesas) */
 export const gestionaMesas = (p: Perfil) => p.rol === "coordinador" || p.rol === "gestor_mesas" || !!p.gestor_mesas;
