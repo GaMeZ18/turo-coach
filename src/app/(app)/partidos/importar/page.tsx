@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import Importador from "./Importador";
 import ActualizarFCBQ from "./ActualizarFCBQ";
+import MarcadorMovil from "./MarcadorMovil";
 
 export default async function ImportarPage() {
   const { supabase } = await requireUser();
@@ -53,6 +54,28 @@ export default async function ImportarPage() {
           Al pulsarlo se abre una pestaña de basquetcatala.cat; si sale la verificación, resuélvela y la extensión sigue sola. Lee el calendario del club de toda la temporada,
           los resultados y las clasificaciones de cada equipo, lo guarda aquí y cierra la pestaña.
         </p>
+      </section>
+
+      <section id="movil" className="tarjeta mt-6 max-w-3xl scroll-mt-24 p-4 text-sm text-tinta/80">
+        <h2 className="text-base font-semibold text-tinta">Desde el móvil (iPhone o Android, sin ordenador)</h2>
+        <p className="mt-1 text-tinta/60">
+          Un marcador de Safari (o Chrome del móvil) hace lo mismo que la extensión: resultados, estadísticas y puntos del Fantasy.
+          Se configura una vez; después, actualizar son dos toques.
+        </p>
+        <p className="mt-3 font-medium text-tinta">Configurarlo (una vez):</p>
+        <ol className="mt-1 list-inside list-decimal space-y-1.5">
+          <li>Pulsa <strong>Copiar el marcador</strong> (abajo).</li>
+          <li>En Safari, abre cualquier página y añádela a marcadores: botón <strong>Compartir</strong> → <strong>Añadir marcador</strong>. Ponle de nombre <strong>Actualizar FCBQ</strong> y guárdalo en <strong>Favoritos</strong>.</li>
+          <li>Abre los marcadores (icono del libro) → <strong>Editar</strong> → toca <strong>Actualizar FCBQ</strong>, borra la dirección y <strong>pega</strong> lo copiado. Pulsa OK.</li>
+          <li>En Safari, inicia sesión en Coach Manager CBTuró (coach.cbturo.com) una vez: la app instalada en la pantalla de inicio tiene su propia sesión.</li>
+        </ol>
+        <MarcadorMovil />
+        <p className="mt-3 font-medium text-tinta">Actualizar:</p>
+        <ol className="mt-1 list-inside list-decimal space-y-1.5">
+          <li>Abre <strong>basquetcatala.cat</strong> en Safari (si sale la verificación de seguridad, resuélvela).</li>
+          <li>Toca la barra de direcciones y elige <strong>Actualizar FCBQ</strong> en Favoritos. Lee la FCBQ en un minuto: no cambies de pestaña.</li>
+          <li>Pulsa <strong>Guardar en Coach Manager</strong>: se abre la app y lo guarda sola. Al acabar, sale ✅ en las dos pestañas.</li>
+        </ol>
       </section>
 
       <details className="mt-6 max-w-3xl">

@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
-  const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/cal/") || path.startsWith("/apuntarse-mesa") || path.startsWith("/api/avisos") || path.startsWith("/api/fcbq/pendiente") || path.startsWith("/e/") || path.startsWith("/jugadas/") || path.startsWith("/a/") || path === "/fantasy" || path.startsWith("/fantasy/");
+  const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/cal/") || path.startsWith("/apuntarse-mesa") || path.startsWith("/api/avisos") || path.startsWith("/api/fcbq/pendiente") || path.startsWith("/api/fcbq/stats-faltan") || path.startsWith("/e/") || path.startsWith("/jugadas/") || path.startsWith("/a/") || path === "/fantasy" || path.startsWith("/fantasy/");
 
   if (!user && !publica) {
     const url = request.nextUrl.clone();
@@ -49,6 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.png|manifest.webmanifest|sw.js|offline.html|icons/|marca/|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|manifest.webmanifest|sw.js|fcbq-movil.js|offline.html|icons/|marca/|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
   ],
 };

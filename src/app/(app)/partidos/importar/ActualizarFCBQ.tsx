@@ -158,14 +158,35 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
   const guardarStatsRef = useRef(guardarStats);
   guardarStatsRef.current = guardarStats;
 
+  // Desde el móvil (?movil=1): esta pestaña la ha abierto el marcador desde basquetcatala.cat, que hace
+  // de extensión. Se reenvían los mensajes entre las dos pestañas (va antes que el saludo de abajo).
+  const movil = useRef(false);
+  useEffect(() => {
+    const op = window.opener as Window | null;
+    if (!op || !/[?&]movil=1/.test(location.search)) return;
+    movil.current = true;
+    const FCBQ = "https://www.basquetcatala.cat";
+    const haciaFCBQ = new Set(["turo-fcbq-ping", "turo-fcbq-pedir", "turo-fcbq-pedir-stats", "turo-fcbq-terminado"]);
+    const alMensaje = (e: MessageEvent) => {
+      const tipo = e.data?.tipo;
+      if (typeof tipo !== "string" || !tipo.startsWith("turo-fcbq-")) return;
+      if (e.source === op && e.origin === FCBQ) window.postMessage(e.data, location.origin);
+      else if (e.source === window && haciaFCBQ.has(tipo)) { try { op.postMessage(e.data, FCBQ); } catch {} }
+    };
+    window.addEventListener("message", alMensaje);
+    return () => window.removeEventListener("message", alMensaje);
+  }, []);
+
   useEffect(() => {
     // ¿Está la extensión? Le preguntamos y esperamos su respuesta
     let respondio = false;
     let recibido = false;
-    const ping = () => window.postMessage({ tipo: "turo-fcbq-ping" }, location.origin);
+    const ping = () => { if (!respondio) window.postMessage({ tipo: "turo-fcbq-ping" }, location.origin); };
     ping();
     const t1 = setTimeout(ping, 400);
-    const t = setTimeout(() => { if (!respondio) setInstalada(false); }, 1200);
+    // Desde el móvil la otra pestaña puede tardar en contestar (está en segundo plano): se insiste más rato
+    const tMovil = movil.current ? [1500, 3000, 5000, 8000].map((ms) => setTimeout(ping, ms)) : [];
+    const t = setTimeout(() => { if (!respondio) setInstalada(false); }, movil.current ? 12000 : 1200);
 
     const alRecibir = (e: MessageEvent) => {
       if (e.source !== window || !e.data || typeof e.data.tipo !== "string" || !e.data.tipo.startsWith("turo-fcbq-")) return;
@@ -226,7 +247,7 @@ export default function ActualizarFCBQ({ equipos }: { equipos: Equipo[] }) {
       }
     };
     window.addEventListener("message", alRecibir);
-    return () => { clearTimeout(t); clearTimeout(t1); window.removeEventListener("message", alRecibir); };
+    return () => { clearTimeout(t); clearTimeout(t1); tMovil.forEach(clearTimeout); window.removeEventListener("message", alRecibir); };
   }, []);
 
   // Modo automático (?auto=1): lo abre la extensión cada día a las 6:00; al acabar se cierra sola
