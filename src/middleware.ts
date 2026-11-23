@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
-  const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/cal/") || path.startsWith("/apuntarse-mesa") || path.startsWith("/api/avisos") || path.startsWith("/api/fcbq/pendiente") || path.startsWith("/api/fcbq/stats-faltan") || path.startsWith("/e/") || path.startsWith("/jugadas/") || path.startsWith("/a/") || path.startsWith("/t/") || path === "/fantasy" || path.startsWith("/fantasy/");
+  const publica = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/cal/") || path.startsWith("/apuntarse-mesa") || path.startsWith("/api/avisos") || path.startsWith("/api/fcbq/pendiente") || path.startsWith("/api/fcbq/stats-faltan") || path.startsWith("/e/") || path.startsWith("/jugadas/") || path.startsWith("/a/") || path.startsWith("/t/") || path.startsWith("/inscripcion/") || path.startsWith("/pase/") || path === "/fantasy" || path.startsWith("/fantasy/");
 
   if (!user && !publica) {
     const url = request.nextUrl.clone();
