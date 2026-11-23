@@ -2,10 +2,10 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, pinOk, quienSoy, silencio, TAG_DATOS } from "@/lib/fantasy/datos";
+import { COOKIE_FANTASY, cargarLiga, db, hashPin, hashSesion, leerConfig, nombreCorto, esFotoGuardada, fotoAStorage, nuevaSesion, misEspias, pinOk, quienSoy, silencio, TAG_DATOS } from "@/lib/fantasy/datos";
 import { REACCIONES } from "@/lib/fantasy/estilo";
 import { randomBytes } from "crypto";
-import { MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
+import { COSTE_ESPIA, MAX_POR_EQUIPO, PRESUPUESTO, type Comodin } from "@/lib/fantasy/motor";
 
 type R = { ok?: boolean; error?: string };
 export type Avatar = { emoji?: string | null; color?: string | null; foto?: string | null };
@@ -164,9 +164,10 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   // Comodín: uno por jornada y cada uno una vez por temporada
   const usados = q.participante.comodines ?? {};
   if (d.comodin && usados[d.comodin] && usados[d.comodin] !== l) return { error: "Ese comodín ya lo has gastado esta temporada." };
-  const presupuesto = PRESUPUESTO + (d.comodin === "presupuesto" ? 10 : 0);
+  const espiados = (await misEspias(q.participante.id, l)).size;
+  const presupuesto = PRESUPUESTO + (d.comodin === "presupuesto" ? 10 : 0) - espiados * COSTE_ESPIA;
   const coste = todos.reduce((s, id) => s + (precios.get(id)?.precio ?? 6), 0) + precioDuo;
-  if (coste > presupuesto) return { error: `Te pasas del presupuesto: ${coste} ⭐ de ${presupuesto} ⭐.` };
+  if (coste > presupuesto) return { error: `Te pasas del presupuesto: ${coste} ⭐ de ${presupuesto} ⭐${espiados ? ` (has gastado ${espiados * COSTE_ESPIA} ⭐ espiando)` : ""}.` };
   const ficha = (id: string) => ({ id, precio: precios.get(id)?.precio ?? 6 });
   const { error } = await db().from("fantasy_alineaciones").upsert({
     participante_id: q.participante.id, jornada: l, titulares: ids.map(ficha), suplente: d.suplente ? ficha(d.suplente) : null,
@@ -179,6 +180,27 @@ export async function guardarEquipo(d: { titulares: string[]; suplente: string |
   if (d.comodin) nuevos[d.comodin] = l;
   await db().from("fantasy_participantes").update({ comodines: nuevos }).eq("id", q.participante.id);
   revalidateTag(TAG_DATOS); revalidatePath("/fantasy");
+  return { ok: true };
+}
+
+/** Ver la alineación de otro equipo antes del cierre: cuesta COSTE_ESPIA ⭐ del presupuesto de esta jornada */
+export async function espiar(objetivoId: string): Promise<R> {
+  const q = await quienSoy();
+  if (!q.acceso || !q.participante) return { error: "No estás apuntado." };
+  const { liga } = await cargarLiga(q.config);
+  const l = liga.abierta;
+  if (!l || new Date().toISOString() >= liga.cierre(l)) return { error: "Los fichajes ya están cerrados: las alineaciones ya se ven gratis." };
+  if (objetivoId === q.participante.id) return { error: "Tu equipo ya lo ves." };
+  if (!liga.alineacion(objetivoId, l)) return { error: "Ese equipo aún no ha fichado." };
+  const ya = await misEspias(q.participante.id, l);
+  if (ya.has(objetivoId)) return { ok: true };
+  const mia = liga.alineacion(q.participante.id, l);
+  const presupuesto = PRESUPUESTO + (mia?.comodin === "presupuesto" ? 10 : 0);
+  const gastado = (mia?.coste ?? 0) + (ya.size + 1) * COSTE_ESPIA;
+  if (gastado > presupuesto) return { error: `No te llegan las ⭐: espiar cuesta ${COSTE_ESPIA} ⭐ y solo te quedan ${Math.max(0, presupuesto - (mia?.coste ?? 0) - ya.size * COSTE_ESPIA)} ⭐ libres. Abarata tu equipo primero.` };
+  const { error } = await db().from("fantasy_espias").insert({ participante_id: q.participante.id, objetivo_id: objetivoId, jornada: l });
+  if (error && !/duplicate/i.test(error.message)) return { error: error.message };
+  revalidatePath("/fantasy");
   return { ok: true };
 }
 

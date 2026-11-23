@@ -23,6 +23,12 @@ export function db() {
   return d;
 }
 
+/** A quién ha espiado un participante en una jornada (pagando ⭐ antes del cierre) */
+export async function misEspias(pid: string, jornada: string) {
+  const { data } = await db().from("fantasy_espias").select("objetivo_id").eq("participante_id", pid).eq("jornada", jornada);
+  return new Set((data ?? []).map((x) => x.objetivo_id as string));
+}
+
 export const hashSesion = (t: string) => createHash("sha256").update(t).digest("hex");
 export function hashPin(pin: string) { const sal = randomBytes(12).toString("hex"); return `${sal}:${scryptSync(pin, sal, 32).toString("hex")}`; }
 export function pinOk(pin: string, guardado: string | null) {

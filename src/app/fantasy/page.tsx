@@ -4,15 +4,16 @@ import { VAPID_PUBLICO } from "@/lib/notificar";
 import AvisosFantasy from "./Avisos";
 import InstalarFantasy from "./Instalar";
 import "./fantasy.css";
-import { cargarClasificaciones, cargarLiga, posicion, quienSoy, silencio } from "@/lib/fantasy/datos";
+import { cargarClasificaciones, cargarLiga, misEspias, posicion, quienSoy, silencio } from "@/lib/fantasy/datos";
 import { colorEquipo, sigla } from "@/lib/fantasy/estilo";
-import { COMODINES, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
+import { COMODINES, COSTE_ESPIA, INSIGNIAS, PRESUPUESTO, nombreJornada, type Comodin, type Nivel } from "@/lib/fantasy/motor";
 import { lunesDe, sumarDias } from "@/lib/pistas";
 import { diaInput, fechaCorta, hora, hoyLocal } from "@/lib/fechas";
 import { CalendarDays, ChevronDown, Lock, Star } from "lucide-react";
 import Alta from "./Alta";
 import Fichajes, { type DuoMercado, type JugadorMercado } from "./Fichajes";
 import Chat from "./Chat";
+import Espiar from "./Espiar";
 import Celebracion from "./Celebracion";
 import Compartir from "./Compartir";
 import { EditarPerfil } from "./Perfil";
@@ -162,6 +163,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const ultPts = ultJ === enJuego && resJuego ? resJuego.total : resAnt ? resAnt.total : null;
     const ultNombre = ultJ ? `${nombreJornada(q.config.inicio, ultJ, q.config.anuladas).replace("Jornada", "jornada")}${ultJ === enJuego ? " (en juego)" : ""}` : "última jornada";
     const alAnt = ant ? liga.alineacion(yo.id, ant) : undefined;
+    const gastoEspias = l ? (await misEspias(yo.id, l)).size * COSTE_ESPIA : 0;
     cuerpo = (
       <div className="space-y-3">
         <section className="relative overflow-hidden rounded-2xl border-2 border-[var(--fx-oro)] bg-gradient-to-br from-[#1d2f70] via-[#111a3a] to-[#3d0d19] p-4 shadow-[0_0_28px_-10px_rgba(246,196,69,.7)]">
@@ -203,8 +205,9 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
         {l ? (
           <Fichajes modo="equipo" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)} duos={duosDe(l)}
             actual={al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null, duo: al.duo?.id ?? null } : null}
-            comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>} presupuesto={PRESUPUESTO} />
+            comodinesUsados={Object.fromEntries(Object.entries(yo.comodines ?? {}).filter(([, v]) => v !== l)) as Partial<Record<Comodin, string>>} presupuesto={PRESUPUESTO - gastoEspias} />
         ) : <Cerrado />}
+        {l && gastoEspias > 0 && <p className="text-center text-xs fx-suave">👀 Has gastado {gastoEspias} ⭐ espiando esta jornada: tu presupuesto es de {PRESUPUESTO - gastoEspias} ⭐.</p>}
         {enJuego && alJuego && resJuego && <MiJornada duos={liga.duos} titulo={`${nombreJornada(q.config.inicio, enJuego, q.config.anuladas)} · en juego`} res={resJuego} al={alJuego} jugador={jug} />}
         {enJuego && !alJuego && <p className="fx-card p-3 text-center text-sm fx-suave">No fichaste equipo para esta jornada.</p>}
         {l && ant && alAnt && resAnt && <MiJornada duos={liga.duos} titulo={`${nombreJornada(q.config.inicio, ant, q.config.anuladas)} · terminada`} res={resAnt} al={alAnt} jugador={jug} />}
@@ -240,7 +243,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     cuerpo = l ? (<div className="space-y-3">{Rentables}
       <Fichajes modo="mercado" jornada={l} nombre={nombreJornada(q.config.inicio, l, q.config.anuladas)} cierre={liga.cierre(l)} mercado={mercadoDe(l)} duos={duosDe(l)}
         actual={(() => { const al = liga.alineacion(yo.id, l); return al ? { titulares: al.titulares.map((t) => t.id), suplente: al.suplente?.id ?? null, capitan: al.capitan, comodin: (al.comodin as Comodin | null) ?? null, duo: al.duo?.id ?? null } : null; })()}
-        comodinesUsados={{}} presupuesto={PRESUPUESTO} /></div>
+        comodinesUsados={{}} presupuesto={PRESUPUESTO - (await misEspias(yo.id, l)).size * COSTE_ESPIA} /></div>
     ) : <div className="space-y-3"><Cerrado />{Rentables}</div>;
   }
 
@@ -250,6 +253,10 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
     const chips = [...new Set([...liga.cerradas, ...(liga.abierta ? [liga.abierta] : [])])].sort();
     const jSel = sp.j && chips.includes(sp.j) ? sp.j : (liga.abierta ?? liga.cerradas[liga.cerradas.length - 1]);
     const enCurso = !!jSel && jSel === liga.abierta;
+    // Antes del cierre solo se ve tu equipo y los que has espiado (pagando ⭐)
+    const espiados = enCurso ? await misEspias(yo.id, jSel) : new Set<string>();
+    const miAl = enCurso ? liga.alineacion(yo.id, jSel) : undefined;
+    const libres = enCurso ? PRESUPUESTO + (miAl?.comodin === "presupuesto" ? 10 : 0) - (miAl?.coste ?? 0) - espiados.size * COSTE_ESPIA : null;
     const Fila = ({ pos, id, d, children }: { pos: number | string; id: string; d?: React.ReactNode; children: React.ReactNode }) => {
       const p = part.get(id);
       return (
@@ -292,10 +299,13 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
             </div>
             {enCurso ? (
               <>
-                <p className="text-sm fx-suave">Equipos fichados para la {nombreJornada(q.config.inicio, jSel, q.config.anuladas).toLowerCase()} (se pueden cambiar hasta el cierre).</p>
+                <p className="text-sm fx-suave">Equipos fichados para la {nombreJornada(q.config.inicio, jSel, q.config.anuladas).toLowerCase()}. Hasta el cierre ({fechaCorta(liga.cierre(jSel))} a las {hora(liga.cierre(jSel))}) son secretos: para ver uno antes, espíalo por {COSTE_ESPIA} ⭐ de tu presupuesto de esta jornada.</p>
                 <section className="fx-card fx-sep overflow-hidden">
                   {participantes.filter((p) => liga.alineacion(p.id, jSel)).map((p) => {
                     const al = liga.alineacion(p.id, jSel)!;
+                    if (p.id !== yo.id && !espiados.has(p.id)) return (
+                      <Fila key={p.id} pos="🔒" id={p.id} d={<Espiar id={p.id} alias={p.alias} libres={libres} />}>✓</Fila>
+                    );
                     return (
                       <details key={p.id}>
                         <summary className="list-none [&::-webkit-details-marker]:hidden">
@@ -321,7 +331,7 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
                   })}
                   {!participantes.some((p) => liga.alineacion(p.id, jSel)) && <p className="p-3 text-sm fx-suave">Nadie ha fichado todavía.</p>}
                 </section>
-                <p className="text-center text-xs fx-suave">Toca un equipo para ver a quién ha fichado.</p>
+                <p className="text-center text-xs fx-suave">{espiados.size ? `👀 Has espiado ${espiados.size} ${espiados.size === 1 ? "equipo" : "equipos"} (${espiados.size * COSTE_ESPIA} ⭐). ` : ""}Toca tu equipo{espiados.size ? " o uno espiado" : ""} para verlo.</p>
               </>
             ) : (<>
             {q.config.anuladas.includes(jSel) && <p className="rounded-lg bg-amber-900/50 p-2 text-sm text-amber-100">Jornada anulada: no cuenta para la clasificación.</p>}
@@ -974,7 +984,8 @@ export default async function FantasyPage({ searchParams }: { searchParams: Prom
           <ul className="list-disc space-y-1 pl-5">
             <li>Toca cualquier jugador o dúo en el <strong>Mercado</strong> para ver su ficha <strong>tipo bolsa</strong>: cómo ha subido o bajado su precio, sus puntos jornada a jornada, sus partidos y cuánta gente lo tiene fichado.</li>
             <li>Mientras haces el equipo se guarda un borrador en tu móvil; no cuenta hasta que pulsas <strong>Guardar</strong>.</li>
-            <li>En <strong>Clasificación</strong> ves la general y la de cada jornada. Cuando se cierran los fichajes, puedes ver el equipo de los demás.</li>
+            <li>En <strong>Clasificación</strong> ves la general y la de cada jornada. Los equipos de los demás son <strong>secretos hasta el cierre de fichajes</strong>; a partir de ahí, se ven todos.</li>
+            <li>👀 <strong>Espiar:</strong> durante los fichajes puedes ver el equipo de otro mánager por <strong>{COSTE_ESPIA} ⭐</strong> de tu presupuesto de esa jornada (en Clasificación → Por jornada). Lo verás hasta el cierre aunque lo cambie, y el espiado no se entera.</li>
             <li>Hay <strong>30 insignias</strong> que se ganan solas a lo largo de la temporada (mira cómo conseguir cada una en <strong>Insignias</strong>).</li>
           </ul>
         </Acordeon>

@@ -4,6 +4,8 @@ import { lunesDe, sumarDias } from "@/lib/pistas";
 import { aISO, diaInput } from "@/lib/fechas";
 
 export const PRESUPUESTO = 54;
+/** Ver la alineación de otro equipo antes del cierre de fichajes cuesta estas ⭐ del presupuesto de la jornada */
+export const COSTE_ESPIA = 4;
 export const DUO_MIN = 3, DUO_MAX = 8, DUO_SIN_DATOS = 5;
 export const PRECIO_MIN = 4;
 export const PRECIO_MAX = 15;
